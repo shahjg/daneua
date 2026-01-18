@@ -1,12 +1,12 @@
 {
-  "name": "D(ane)ua - Our Little World",
+  "name": "D(ane)ua",
   "short_name": "D(ane)ua",
-  "description": "A private space for us 💚",
+  "description": "Our little world",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FFFFF0",
-  "theme_color": "#05472A",
+  "background_color": "#FAF9F6",
+  "theme_color": "#1A3C34",
   "icons": [
     {
       "src": "/icon-192x192.png",

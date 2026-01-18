@@ -1,247 +1,355 @@
 -- ============================================
--- D(ane)ua - Supabase Database Schema
--- Private PWA for Shahjahan & Dane
+-- D(ane)ua V2 - Complete Database Schema
+-- Luxurious. Romantic. Personal.
 -- ============================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================
--- 1. MOOD MESSAGES
--- Messages/media triggered by mood buttons
+-- 1. USER PROFILES
+-- Basic info for both of you
 -- ============================================
-CREATE TABLE mood_messages (
+CREATE TABLE profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  mood VARCHAR(50) NOT NULL CHECK (mood IN ('sad', 'unmotivated', 'working_hard', 'missing_you')),
-  message_type VARCHAR(20) NOT NULL CHECK (message_type IN ('text', 'audio', 'video', 'image')),
-  content TEXT NOT NULL, -- Text message or storage path for media
-  title VARCHAR(255), -- Optional title for the message
-  storage_url TEXT, -- Supabase storage URL for media files
-  is_active BOOLEAN DEFAULT true,
-  priority INTEGER DEFAULT 0, -- Higher = shown more often
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Index for quick mood lookups
-CREATE INDEX idx_mood_messages_mood ON mood_messages(mood) WHERE is_active = true;
-
--- Sample data
-INSERT INTO mood_messages (mood, message_type, content, title) VALUES
-  ('sad', 'text', 'Hey love, I know today feels heavy. But you''re stronger than any storm. I''m proud of you for pushing through. 💚', 'You''re Not Alone'),
-  ('sad', 'text', 'Close your eyes. Breathe. Remember: this feeling is temporary, but my love for you isn''t.', 'Breathe'),
-  ('unmotivated', 'text', 'Babe, even on your worst day, you''re still incredible. Start small. One thing. You got this.', 'One Step'),
-  ('unmotivated', 'text', 'Remember why you started. I believe in you more than you know.', 'Remember'),
-  ('working_hard', 'text', 'I see you grinding. I''m so proud of you. Don''t forget to drink water and take breaks! 💪', 'Keep Going'),
-  ('working_hard', 'text', 'Your work ethic is inspiring. Future you will thank present you. I love watching you grow.', 'Future You'),
-  ('missing_you', 'text', 'I miss you too. Every moment apart makes the time together sweeter. Can''t wait to hold you again.', 'Soon'),
-  ('missing_you', 'text', 'No distance is too far when you''re on my mind 24/7. Thinking of you always.', 'Always');
-
-
--- ============================================
--- 2. URDU/TAGALOG WORDS
--- Word of the day with audio support
--- ============================================
-CREATE TABLE language_words (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  language VARCHAR(20) NOT NULL CHECK (language IN ('urdu', 'tagalog')),
-  word_native TEXT NOT NULL, -- Urdu script or Tagalog
-  word_romanized TEXT NOT NULL, -- Roman Urdu/Tagalog
-  meaning_english TEXT NOT NULL,
-  example_sentence TEXT,
-  example_translation TEXT,
-  audio_url TEXT, -- Your voice recording URL
-  category VARCHAR(50), -- e.g., 'greetings', 'love', 'daily', 'food', 'family'
-  difficulty INTEGER DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 5),
-  is_active BOOLEAN DEFAULT true,
-  shown_on DATE, -- Track when it was shown
+  name VARCHAR(100) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('shah', 'dane')),
+  avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for daily word selection
-CREATE INDEX idx_language_words_active ON language_words(language, is_active, shown_on);
-
--- Sample Urdu words
-INSERT INTO language_words (language, word_native, word_romanized, meaning_english, example_sentence, example_translation, category, difficulty) VALUES
-  ('urdu', 'جان', 'Jaan', 'Life / Term of endearment (like "my love")', 'تم میری جان ہو', 'Tum meri jaan ho (You are my life)', 'love', 1),
-  ('urdu', 'شکریہ', 'Shukriya', 'Thank you', 'بہت شکریہ', 'Bohat shukriya (Thank you very much)', 'greetings', 1),
-  ('urdu', 'میں تم سے پیار کرتا ہوں', 'Main tumse pyaar karta hoon', 'I love you', NULL, NULL, 'love', 2),
-  ('urdu', 'کیا حال ہے؟', 'Kya haal hai?', 'How are you?', NULL, NULL, 'greetings', 1),
-  ('urdu', 'خوبصورت', 'Khoobsurat', 'Beautiful', 'تم بہت خوبصورت ہو', 'Tum bohat khoobsurat ho (You are very beautiful)', 'compliments', 1),
-  ('urdu', 'انشاءاللہ', 'Inshallah', 'God willing / If God wills', 'انشاءاللہ ہم جلد ملیں گے', 'Inshallah hum jald milenge (God willing, we will meet soon)', 'islamic', 1);
-
--- Sample Tagalog words
-INSERT INTO language_words (language, word_native, word_romanized, meaning_english, example_sentence, example_translation, category, difficulty) VALUES
-  ('tagalog', 'Mahal kita', 'Mahal kita', 'I love you', NULL, NULL, 'love', 1),
-  ('tagalog', 'Salamat', 'Salamat', 'Thank you', 'Maraming salamat!', 'Thank you very much!', 'greetings', 1),
-  ('tagalog', 'Kumusta', 'Kumusta', 'How are you?', 'Kumusta ka?', 'How are you?', 'greetings', 1),
-  ('tagalog', 'Maganda', 'Maganda', 'Beautiful', 'Maganda ka', 'You are beautiful', 'compliments', 1),
-  ('tagalog', 'Gutom', 'Gutom', 'Hungry', 'Gutom na ako', 'I''m hungry now', 'daily', 1);
+INSERT INTO profiles (name, role) VALUES
+  ('Shah', 'shah'),
+  ('Dane', 'dane');
 
 
 -- ============================================
--- 3. DAILY DEEN (Islamic Insights)
--- Non-pushy, evergreen Islamic content
+-- 2. STATUS UPDATES
+-- Where you are / what you're doing
+-- ============================================
+CREATE TABLE status_updates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_role VARCHAR(20) NOT NULL DEFAULT 'shah',
+  status TEXT NOT NULL,
+  location VARCHAR(100),
+  is_current BOOLEAN DEFAULT false,
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  ended_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_status_current ON status_updates(is_current) WHERE is_current = true;
+
+INSERT INTO status_updates (status, location, is_current) VALUES
+  ('Working on something special', 'Home', true);
+
+
+-- ============================================
+-- 3. LOVE MESSAGES
+-- Messages for different emotional needs
+-- ============================================
+CREATE TABLE love_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category VARCHAR(50) NOT NULL CHECK (category IN (
+    'miss_you', 
+    'encouragement', 
+    'make_me_laugh', 
+    'stressed', 
+    'hear_your_voice',
+    'general'
+  )),
+  message_type VARCHAR(20) NOT NULL CHECK (message_type IN ('text', 'audio', 'video')),
+  title VARCHAR(255),
+  content TEXT NOT NULL,
+  storage_url TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sample messages
+INSERT INTO love_messages (category, message_type, title, content) VALUES
+  ('miss_you', 'text', NULL, 'Every moment apart is just a countdown to holding you again. You are constantly on my mind.'),
+  ('miss_you', 'text', NULL, 'Distance means nothing when someone means everything. And you mean everything to me.'),
+  ('encouragement', 'text', NULL, 'I have watched you overcome so much. This is just another chapter in your story of strength.'),
+  ('encouragement', 'text', NULL, 'You are more capable than you give yourself credit for. I see your potential even when you cannot.'),
+  ('make_me_laugh', 'text', NULL, 'Remember when you thought you could cook? The fire alarm remembers too.'),
+  ('stressed', 'text', NULL, 'Take a breath. Whatever this is, it is temporary. Your peace is permanent. I am here.'),
+  ('stressed', 'text', NULL, 'You do not have to have it all figured out. Just take the next small step. I will be here.'),
+  ('hear_your_voice', 'text', NULL, 'I wish I could be there right now. Until then, know that my voice is always just a call away.'),
+  ('general', 'text', NULL, 'I chose you. And I would choose you again. Every single time.');
+
+
+-- ============================================
+-- 4. LOVE LETTERS
+-- Archive of longer messages she can revisit
+-- ============================================
+CREATE TABLE love_letters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  occasion VARCHAR(100),
+  is_pinned BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- ============================================
+-- 5. LANGUAGE LEARNING
+-- Urdu, Tagalog words and phrases
+-- ============================================
+CREATE TABLE language_lessons (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  language VARCHAR(20) NOT NULL CHECK (language IN ('urdu', 'tagalog')),
+  word_native TEXT NOT NULL,
+  word_romanized TEXT NOT NULL,
+  meaning TEXT NOT NULL,
+  example_sentence TEXT,
+  example_translation TEXT,
+  audio_url TEXT,
+  category VARCHAR(50),
+  difficulty INTEGER DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 3),
+  shown_on DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_language_active ON language_lessons(language, is_active, shown_on);
+
+-- Urdu essentials
+INSERT INTO language_lessons (language, word_native, word_romanized, meaning, example_sentence, example_translation, category) VALUES
+  ('urdu', 'جان', 'Jaan', 'Life, soul — used as "my love"', 'تم میری جان ہو', 'Tum meri jaan ho — You are my life', 'love'),
+  ('urdu', 'شکریہ', 'Shukriya', 'Thank you', 'بہت شکریہ', 'Bohat shukriya — Thank you very much', 'basics'),
+  ('urdu', 'میں تم سے پیار کرتا ہوں', 'Main tumse pyaar karta hoon', 'I love you', NULL, NULL, 'love'),
+  ('urdu', 'کیا حال ہے؟', 'Kya haal hai?', 'How are you?', NULL, NULL, 'basics'),
+  ('urdu', 'خوبصورت', 'Khoobsurat', 'Beautiful', 'تم بہت خوبصورت ہو', 'Tum bohat khoobsurat ho — You are very beautiful', 'compliments'),
+  ('urdu', 'انشاءاللہ', 'Inshallah', 'God willing', 'انشاءاللہ ہم جلد ملیں گے', 'Inshallah hum jald milenge — God willing we will meet soon', 'islamic'),
+  ('urdu', 'السلام علیکم', 'Assalamu Alaikum', 'Peace be upon you — Islamic greeting', NULL, NULL, 'islamic'),
+  ('urdu', 'ماشاءاللہ', 'Mashallah', 'God has willed it — expresses appreciation', NULL, NULL, 'islamic'),
+  ('urdu', 'بھوک لگی ہے', 'Bhook lagi hai', 'I am hungry', NULL, NULL, 'daily'),
+  ('urdu', 'مجھے نیند آ رہی ہے', 'Mujhe neend aa rahi hai', 'I am sleepy', NULL, NULL, 'daily');
+
+-- Tagalog essentials  
+INSERT INTO language_lessons (language, word_native, word_romanized, meaning, example_sentence, example_translation, category) VALUES
+  ('tagalog', 'Mahal kita', 'Mahal kita', 'I love you', NULL, NULL, 'love'),
+  ('tagalog', 'Salamat', 'Salamat', 'Thank you', 'Maraming salamat', 'Thank you very much', 'basics'),
+  ('tagalog', 'Kumusta', 'Kumusta', 'How are you?', 'Kumusta ka?', 'How are you?', 'basics'),
+  ('tagalog', 'Maganda', 'Maganda', 'Beautiful', 'Maganda ka', 'You are beautiful', 'compliments'),
+  ('tagalog', 'Gutom na ako', 'Gutom na ako', 'I am hungry', NULL, NULL, 'daily'),
+  ('tagalog', 'Ingat', 'Ingat', 'Take care', 'Ingat ka', 'Take care of yourself', 'basics'),
+  ('tagalog', 'Oo', 'Oo', 'Yes', NULL, NULL, 'basics'),
+  ('tagalog', 'Hindi', 'Hindi', 'No', NULL, NULL, 'basics'),
+  ('tagalog', 'Miss na kita', 'Miss na kita', 'I miss you', NULL, NULL, 'love'),
+  ('tagalog', 'Tulog na', 'Tulog na', 'Go to sleep', NULL, NULL, 'daily');
+
+
+-- ============================================
+-- 6. DAILY DEEN (Islamic Insights)
 -- ============================================
 CREATE TABLE daily_deen (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   content_type VARCHAR(20) NOT NULL CHECK (content_type IN ('verse', 'hadith', 'insight', 'dua', 'fact')),
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  source TEXT, -- e.g., "Quran 2:286", "Sahih Bukhari"
-  arabic_text TEXT, -- Optional Arabic
-  reflection TEXT, -- Your personal note/reflection
-  category VARCHAR(50), -- e.g., 'patience', 'gratitude', 'love', 'mercy'
-  is_active BOOLEAN DEFAULT true,
+  source TEXT,
+  arabic_text TEXT,
+  reflection TEXT,
+  category VARCHAR(50),
   shown_on DATE,
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for daily selection
-CREATE INDEX idx_daily_deen_active ON daily_deen(is_active, shown_on);
-
--- Sample content (non-pushy, universal themes)
 INSERT INTO daily_deen (content_type, title, content, source, category, reflection) VALUES
-  ('verse', 'No Soul Burdened Beyond Capacity', 'Allah does not burden a soul beyond that it can bear.', 'Quran 2:286', 'patience', 'Whatever you''re facing right now, you have the strength to handle it. This is a promise.'),
-  ('insight', 'The Power of Intention', 'In Islam, your intention (niyyah) is everything. The same action can be worship or routine depending on why you do it.', NULL, 'mindfulness', 'Even drinking water can be an act of gratitude. It''s all about perspective.'),
-  ('hadith', 'Smiling is Charity', 'Your smile for your brother is charity.', 'Tirmidhi', 'kindness', 'You don''t need money to make someone''s day better.'),
-  ('dua', 'Morning Gratitude', 'Alhamdulillah (All praise is due to God) - said after waking, eating, or any blessing.', NULL, 'gratitude', 'Start small. Just say it when something good happens.'),
-  ('fact', 'The Month of Mercy', 'Ramadan isn''t just about fasting from food. It''s about fasting from negativity, gossip, and anger too.', NULL, 'ramadan', 'It''s a full reset for mind, body, and soul.'),
-  ('insight', 'Patience Has Two Types', 'Sabr (patience) in Islam is both enduring hardship AND restraining yourself from what''s wrong.', NULL, 'patience', 'Sometimes patience means waiting. Sometimes it means walking away.');
+  ('verse', 'On Hardship', 'With hardship comes ease. Verily, with hardship comes ease.', 'Quran 94:5-6', 'patience', 'This verse repeats "with hardship comes ease" twice. Not after — with. Even in the struggle, relief is already there.'),
+  ('verse', 'On Capacity', 'God does not burden a soul beyond that it can bear.', 'Quran 2:286', 'strength', 'Whatever you are facing, you have already been given the strength to handle it.'),
+  ('hadith', 'On Kindness', 'Kindness is a mark of faith, and whoever is not kind has no faith.', 'Muslim', 'character', 'Faith is not just prayer. It is how you treat people.'),
+  ('hadith', 'On Smiling', 'Your smile for your brother is charity.', 'Tirmidhi', 'kindness', 'The smallest acts count. A smile costs nothing but means everything.'),
+  ('insight', 'On Intention', 'In Islam, actions are judged by intentions. The same act can be worship or routine depending on why you do it.', NULL, 'mindfulness', 'Even drinking water can be worship if you do it with gratitude.'),
+  ('insight', 'On Patience', 'Sabr is not passive waiting. It is active perseverance while trusting the process.', NULL, 'patience', 'Patience does not mean doing nothing. It means doing what you can and leaving the rest to God.'),
+  ('dua', 'For Anxiety', 'Hasbunallahu wa ni''mal wakeel — God is sufficient for us, and He is the best disposer of affairs.', 'Quran 3:173', 'anxiety', 'This is what the Prophet said in his most difficult moments. When everything feels like too much.'),
+  ('fact', 'The Five Pillars', 'Islam is built on five pillars: faith declaration, prayer, charity, fasting, and pilgrimage. Simple foundations for a whole way of life.', NULL, 'basics', 'It is not complicated. These five things are the foundation everything else builds on.');
 
 
 -- ============================================
--- 4. STATUS UPDATES
--- Real-time "where I am" ticker
+-- 7. DATE IDEAS
+-- Restaurant and activity bank
 -- ============================================
-CREATE TABLE status_updates (
+CREATE TABLE date_ideas (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  status TEXT NOT NULL, -- e.g., "At the Gym 💪", "In Pakistan 🇵🇰"
-  emoji VARCHAR(10),
-  location VARCHAR(100),
-  is_current BOOLEAN DEFAULT false,
-  started_at TIMESTAMPTZ DEFAULT NOW(),
-  ended_at TIMESTAMPTZ,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  vibe VARCHAR(30) NOT NULL CHECK (vibe IN ('romantic', 'casual', 'adventure', 'cozy', 'fancy')),
+  price_level INTEGER NOT NULL CHECK (price_level BETWEEN 1 AND 4),
+  date_type VARCHAR(30) NOT NULL CHECK (date_type IN ('dinner', 'lunch', 'activity', 'day_trip', 'at_home', 'cafe')),
+  location VARCHAR(255),
+  link TEXT,
+  image_url TEXT,
+  notes TEXT,
+  status VARCHAR(20) DEFAULT 'want_to_do' CHECK (status IN ('want_to_do', 'planned', 'done')),
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  added_by VARCHAR(20) DEFAULT 'shah',
+  completed_on DATE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Only one current status at a time
-CREATE UNIQUE INDEX idx_status_current ON status_updates(is_current) WHERE is_current = true;
+CREATE INDEX idx_date_ideas_status ON date_ideas(status, vibe);
 
--- Sample statuses
-INSERT INTO status_updates (status, emoji, location, is_current) VALUES
-  ('Coding 💻', '💻', 'Home', true);
+-- Sample date ideas
+INSERT INTO date_ideas (name, description, vibe, price_level, date_type, notes, added_by) VALUES
+  ('Picnic at sunset', 'Pack a basket, find a spot with a view, watch the sun go down together', 'romantic', 1, 'activity', 'Need to find a good spot', 'shah'),
+  ('Cook a new cuisine together', 'Pick a country, find a recipe, make a mess in the kitchen', 'cozy', 2, 'at_home', 'Maybe try Pakistani food?', 'shah'),
+  ('Bookstore date', 'Pick a book for each other without revealing it until you leave', 'casual', 2, 'activity', NULL, 'shah');
 
 
 -- ============================================
--- 5. SHARED TO-DO LIST
--- Reminders you set for her
+-- 8. SHARED CALENDAR
+-- Events, trips, important dates
 -- ============================================
-CREATE TABLE shared_todos (
+CREATE TABLE calendar_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
-  due_date DATE,
-  due_time TIME,
-  is_completed BOOLEAN DEFAULT false,
-  completed_at TIMESTAMPTZ,
-  reminder_sent BOOLEAN DEFAULT false,
-  created_by VARCHAR(50) DEFAULT 'shahjahan',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Index for active todos
-CREATE INDEX idx_shared_todos_active ON shared_todos(is_completed, due_date);
-
-
--- ============================================
--- 6. SHARED CALENDAR
--- PPL schedule, travel dates, events
--- ============================================
-CREATE TABLE shared_calendar (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  event_type VARCHAR(30) NOT NULL CHECK (event_type IN ('workout', 'travel', 'date', 'reminder', 'special', 'other')),
+  event_type VARCHAR(30) NOT NULL CHECK (event_type IN ('date', 'trip', 'anniversary', 'reminder', 'workout', 'other')),
   start_date DATE NOT NULL,
   end_date DATE,
   start_time TIME,
-  end_time TIME,
   location VARCHAR(255),
   is_recurring BOOLEAN DEFAULT false,
-  recurrence_rule VARCHAR(50), -- e.g., 'weekly', 'monthly'
-  color VARCHAR(20), -- For UI display
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Index for date range queries
-CREATE INDEX idx_shared_calendar_dates ON shared_calendar(start_date, end_date);
-
--- Sample calendar entries (PPL Split)
-INSERT INTO shared_calendar (title, event_type, start_date, start_time, is_recurring, recurrence_rule, color) VALUES
-  ('Push Day 💪', 'workout', CURRENT_DATE, '06:00', true, 'weekly', 'evergreen'),
-  ('Pull Day 🏋️', 'workout', CURRENT_DATE + 1, '06:00', true, 'weekly', 'evergreen'),
-  ('Leg Day 🦵', 'workout', CURRENT_DATE + 2, '06:00', true, 'weekly', 'evergreen');
-
-
--- ============================================
--- 7. MEDIA VAULT
--- Pre-recorded messages (audio/video)
--- ============================================
-CREATE TABLE media_vault (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('audio', 'video', 'image')),
-  storage_path TEXT NOT NULL, -- Supabase storage path
-  storage_url TEXT, -- Full URL
-  thumbnail_url TEXT, -- For video previews
-  duration_seconds INTEGER,
-  is_favorite BOOLEAN DEFAULT false,
-  category VARCHAR(50), -- e.g., 'love', 'motivation', 'special_occasion'
-  unlock_date DATE, -- Optional: only show after this date
-  view_count INTEGER DEFAULT 0,
-  last_viewed_at TIMESTAMPTZ,
+  recurrence_rule VARCHAR(50),
+  added_by VARCHAR(20) DEFAULT 'shah',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for vault browsing
-CREATE INDEX idx_media_vault_category ON media_vault(category, is_favorite);
+CREATE INDEX idx_calendar_dates ON calendar_events(start_date);
+
+
+-- ============================================
+-- 9. GOALS
+-- Personal and shared goals
+-- ============================================
+CREATE TABLE goals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner VARCHAR(20) NOT NULL CHECK (owner IN ('shah', 'dane', 'shared')),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  target_date DATE,
+  progress INTEGER DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'paused')),
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE goal_milestones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  is_completed BOOLEAN DEFAULT false,
+  completed_at TIMESTAMPTZ,
+  sort_order INTEGER DEFAULT 0
+);
+
+
+-- ============================================
+-- 10. DAILY QUESTIONS
+-- Conversation starters
+-- ============================================
+CREATE TABLE daily_questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  question TEXT NOT NULL,
+  category VARCHAR(50),
+  shown_on DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE question_answers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  question_id UUID REFERENCES daily_questions(id) ON DELETE CASCADE,
+  user_role VARCHAR(20) NOT NULL,
+  answer TEXT NOT NULL,
+  answered_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sample questions
+INSERT INTO daily_questions (question, category) VALUES
+  ('What is one thing that made you smile today?', 'reflection'),
+  ('If we could travel anywhere tomorrow, where would you want to go?', 'dreams'),
+  ('What is something you are proud of but rarely talk about?', 'deep'),
+  ('What is a small thing I do that you appreciate?', 'love'),
+  ('What is on your mind right now?', 'connection'),
+  ('If you could master any skill instantly, what would it be?', 'fun'),
+  ('What is a fear you have overcome?', 'growth'),
+  ('What song reminds you of us?', 'love'),
+  ('What is something you want to do together this month?', 'plans'),
+  ('What made you fall in love with me?', 'love'),
+  ('What is one thing you wish you had more time for?', 'reflection'),
+  ('Describe your perfect lazy Sunday.', 'lifestyle'),
+  ('What is a dream you have never told anyone?', 'deep'),
+  ('What is one thing you want me to know today?', 'connection');
+
+
+-- ============================================
+-- 11. MOMENTS (Photo of the Day)
+-- ============================================
+CREATE TABLE moments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_role VARCHAR(20) NOT NULL,
+  photo_url TEXT NOT NULL,
+  caption TEXT,
+  moment_date DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_moments_date ON moments(moment_date, user_role);
+
+
+-- ============================================
+-- 12. NOTIFICATIONS / ACTIVITY FEED
+-- ============================================
+CREATE TABLE activity_feed (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  activity_type VARCHAR(50) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  link_to VARCHAR(100),
+  is_read BOOLEAN DEFAULT false,
+  for_user VARCHAR(20) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_unread ON activity_feed(for_user, is_read, created_at DESC);
 
 
 -- ============================================
 -- HELPER FUNCTIONS
 -- ============================================
 
--- Function to get random mood message
-CREATE OR REPLACE FUNCTION get_random_mood_message(mood_type VARCHAR)
+-- Get random love message by category
+CREATE OR REPLACE FUNCTION get_love_message(msg_category VARCHAR)
 RETURNS TABLE (
   id UUID,
   message_type VARCHAR,
-  content TEXT,
   title VARCHAR,
+  content TEXT,
   storage_url TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT m.id, m.message_type, m.content, m.title, m.storage_url
-  FROM mood_messages m
-  WHERE m.mood = mood_type AND m.is_active = true
+  SELECT m.id, m.message_type, m.title, m.content, m.storage_url
+  FROM love_messages m
+  WHERE m.category = msg_category AND m.is_active = true
   ORDER BY RANDOM()
   LIMIT 1;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to get today's word (rotates daily)
+
+-- Get daily word for language
 CREATE OR REPLACE FUNCTION get_daily_word(lang VARCHAR)
 RETURNS TABLE (
   id UUID,
   word_native TEXT,
   word_romanized TEXT,
-  meaning_english TEXT,
+  meaning TEXT,
   example_sentence TEXT,
   example_translation TEXT,
   audio_url TEXT,
@@ -249,22 +357,23 @@ RETURNS TABLE (
 ) AS $$
 DECLARE
   word_record RECORD;
+  today DATE := CURRENT_DATE;
 BEGIN
-  -- Try to get today's word
-  SELECT * INTO word_record FROM language_words lw
-  WHERE lw.language = lang AND lw.shown_on = CURRENT_DATE AND lw.is_active = true
+  -- Check if word already assigned today
+  SELECT * INTO word_record FROM language_lessons l
+  WHERE l.language = lang AND l.shown_on = today AND l.is_active = true
   LIMIT 1;
   
-  -- If no word for today, pick a random unshown one
+  -- If not, assign one
   IF word_record IS NULL THEN
-    SELECT * INTO word_record FROM language_words lw
-    WHERE lw.language = lang AND lw.is_active = true AND (lw.shown_on IS NULL OR lw.shown_on < CURRENT_DATE - 30)
+    SELECT * INTO word_record FROM language_lessons l
+    WHERE l.language = lang AND l.is_active = true 
+      AND (l.shown_on IS NULL OR l.shown_on < today - 14)
     ORDER BY RANDOM()
     LIMIT 1;
     
-    -- Mark it as shown today
     IF word_record IS NOT NULL THEN
-      UPDATE language_words SET shown_on = CURRENT_DATE WHERE language_words.id = word_record.id;
+      UPDATE language_lessons SET shown_on = today WHERE language_lessons.id = word_record.id;
     END IF;
   END IF;
   
@@ -272,7 +381,7 @@ BEGIN
     word_record.id,
     word_record.word_native,
     word_record.word_romanized,
-    word_record.meaning_english,
+    word_record.meaning,
     word_record.example_sentence,
     word_record.example_translation,
     word_record.audio_url,
@@ -280,18 +389,99 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to set current status (auto-clears previous)
-CREATE OR REPLACE FUNCTION set_current_status(new_status TEXT, new_emoji VARCHAR DEFAULT NULL, new_location VARCHAR DEFAULT NULL)
+
+-- Get daily deen
+CREATE OR REPLACE FUNCTION get_daily_deen()
+RETURNS TABLE (
+  id UUID,
+  content_type VARCHAR,
+  title VARCHAR,
+  content TEXT,
+  source TEXT,
+  arabic_text TEXT,
+  reflection TEXT,
+  category VARCHAR
+) AS $$
+DECLARE
+  deen_record RECORD;
+  today DATE := CURRENT_DATE;
+BEGIN
+  SELECT * INTO deen_record FROM daily_deen d
+  WHERE d.shown_on = today AND d.is_active = true
+  LIMIT 1;
+  
+  IF deen_record IS NULL THEN
+    SELECT * INTO deen_record FROM daily_deen d
+    WHERE d.is_active = true AND (d.shown_on IS NULL OR d.shown_on < today - 7)
+    ORDER BY RANDOM()
+    LIMIT 1;
+    
+    IF deen_record IS NOT NULL THEN
+      UPDATE daily_deen SET shown_on = today WHERE daily_deen.id = deen_record.id;
+    END IF;
+  END IF;
+  
+  RETURN QUERY SELECT 
+    deen_record.id,
+    deen_record.content_type,
+    deen_record.title,
+    deen_record.content,
+    deen_record.source,
+    deen_record.arabic_text,
+    deen_record.reflection,
+    deen_record.category;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Get daily question
+CREATE OR REPLACE FUNCTION get_daily_question()
+RETURNS TABLE (
+  id UUID,
+  question TEXT,
+  category VARCHAR,
+  shah_answer TEXT,
+  dane_answer TEXT
+) AS $$
+DECLARE
+  q_record RECORD;
+  today DATE := CURRENT_DATE;
+BEGIN
+  SELECT * INTO q_record FROM daily_questions q
+  WHERE q.shown_on = today AND q.is_active = true
+  LIMIT 1;
+  
+  IF q_record IS NULL THEN
+    SELECT * INTO q_record FROM daily_questions q
+    WHERE q.is_active = true AND (q.shown_on IS NULL OR q.shown_on < today - 7)
+    ORDER BY RANDOM()
+    LIMIT 1;
+    
+    IF q_record IS NOT NULL THEN
+      UPDATE daily_questions SET shown_on = today WHERE daily_questions.id = q_record.id;
+    END IF;
+  END IF;
+  
+  RETURN QUERY SELECT 
+    q_record.id,
+    q_record.question,
+    q_record.category,
+    (SELECT answer FROM question_answers WHERE question_id = q_record.id AND user_role = 'shah'),
+    (SELECT answer FROM question_answers WHERE question_id = q_record.id AND user_role = 'dane');
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Set current status
+CREATE OR REPLACE FUNCTION set_status(new_status TEXT, new_location VARCHAR DEFAULT NULL)
 RETURNS UUID AS $$
 DECLARE
   new_id UUID;
 BEGIN
-  -- End previous status
   UPDATE status_updates SET is_current = false, ended_at = NOW() WHERE is_current = true;
   
-  -- Insert new status
-  INSERT INTO status_updates (status, emoji, location, is_current)
-  VALUES (new_status, new_emoji, new_location, true)
+  INSERT INTO status_updates (status, location, is_current)
+  VALUES (new_status, new_location, true)
   RETURNING id INTO new_id;
   
   RETURN new_id;
@@ -300,25 +490,35 @@ $$ LANGUAGE plpgsql;
 
 
 -- ============================================
--- ROW LEVEL SECURITY (Optional but recommended)
--- Since this is private, you can keep it simple
+-- ROW LEVEL SECURITY
 -- ============================================
-
--- Enable RLS on all tables
-ALTER TABLE mood_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE language_words ENABLE ROW LEVEL SECURITY;
-ALTER TABLE daily_deen ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE status_updates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shared_todos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shared_calendar ENABLE ROW LEVEL SECURITY;
-ALTER TABLE media_vault ENABLE ROW LEVEL SECURITY;
+ALTER TABLE love_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE love_letters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE language_lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_deen ENABLE ROW LEVEL SECURITY;
+ALTER TABLE date_ideas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_milestones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE question_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE moments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_feed ENABLE ROW LEVEL SECURITY;
 
--- Simple policy: authenticated users can do everything
--- (Since it's just you two, this is fine)
-CREATE POLICY "Allow all for authenticated users" ON mood_messages FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON language_words FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON daily_deen FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON status_updates FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON shared_todos FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON shared_calendar FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON media_vault FOR ALL USING (auth.role() = 'authenticated');
+-- Allow authenticated users full access (private app for two)
+CREATE POLICY "Full access for authenticated" ON profiles FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON status_updates FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON love_messages FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON love_letters FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON language_lessons FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON daily_deen FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON date_ideas FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON calendar_events FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON goals FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON goal_milestones FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON daily_questions FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON question_answers FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON moments FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Full access for authenticated" ON activity_feed FOR ALL USING (auth.role() = 'authenticated');
