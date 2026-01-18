@@ -1,0 +1,438 @@
+import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
+import {
+  getGoals,
+  addGoal,
+  updateGoal,
+  addMilestone,
+  toggleMilestone
+} from '../lib/supabase'
+
+export default function GoalsPage() {
+  const { user } = useAuth()
+  const [goals, setGoals] = useState([])
+  const [filter, setFilter] = useState('all')
+  const [showAddGoal, setShowAddGoal] = useState(false)
+  const [expandedGoal, setExpandedGoal] = useState(null)
+  const [celebrateGoal, setCelebrateGoal] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shah'
+
+  useEffect(() => {
+    fetchGoals()
+  }, [filter])
+
+  const fetchGoals = async () => {
+    setLoading(true)
+    try {
+      const owner = filter === 'all' ? null : filter
+      const data = await getGoals(owner)
+      setGoals(data || [])
+    } catch (error) {
+      console.error('Error:', error)
+    }
+    setLoading(false)
+  }
+
+  const handleToggleMilestone = async (goalId, milestoneId, currentState) => {
+    try {
+      await toggleMilestone(milestoneId, !currentState)
+
+      setGoals(prev => prev.map(goal => {
+        if (goal.id !== goalId) return goal
+
+        const updatedMilestones = goal.milestones.map(m =>
+          m.id === milestoneId ? { ...m, is_completed: !currentState } : m
+        )
+
+        const completed = updatedMilestones.filter(m => m.is_completed).length
+        const total = updatedMilestones.length
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+
+        return { ...goal, milestones: updatedMilestones, progress }
+      }))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleCompleteGoal = async (goalId) => {
+    try {
+      await updateGoal(goalId, { status: 'completed', progress: 100 })
+      setGoals(prev => prev.map(goal =>
+        goal.id === goalId ? { ...goal, status: 'completed', progress: 100 } : goal
+      ))
+      setCelebrateGoal(goalId)
+      setTimeout(() => setCelebrateGoal(null), 3000)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleAddGoal = async (goalData, milestones) => {
+    try {
+      const newGoal = await addGoal({ ...goalData, owner: goalData.owner || user.role })
+
+      for (const title of milestones.filter(m => m.trim())) {
+        await addMilestone(newGoal.id, title)
+      }
+
+      await fetchGoals()
+      setShowAddGoal(false)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const getOwnerLabel = (owner) => {
+    if (owner === 'shared') return 'Shared'
+    if (owner === user?.role) return 'Mine'
+    return theirName
+  }
+
+  const getOwnerStyle = (owner) => {
+    if (owner === 'shared') return 'tag-gold'
+    if (owner === user?.role) return 'tag-forest'
+    return 'tag-rose'
+  }
+
+  return (
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="bg-forest px-6 pt-16 pb-10">
+        <div className="stagger">
+          <h1 className="font-serif text-display-sm text-cream-50 mb-2">Goals</h1>
+          <p className="text-body text-cream-300">Track what matters most</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'all', label: 'All' },
+            { id: user?.role, label: 'Mine' },
+            { id: user?.role === 'shah' ? 'dane' : 'shah', label: theirName },
+            { id: 'shared', label: 'Shared' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id)}
+              className={`
+                px-5 py-3 rounded-full text-body-sm font-medium whitespace-nowrap transition-all
+                ${filter === tab.id
+                  ? 'bg-forest text-cream-100'
+                  : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="bg-cream min-h-[60vh] px-6 py-8">
+        {/* Add Button */}
+        <button
+          onClick={() => setShowAddGoal(true)}
+          className="w-full mb-6 py-5 border-2 border-dashed border-cream-400 rounded-2xl text-ink-400 hover:border-forest hover:text-forest transition-all font-medium"
+        >
+          + Add goal
+        </button>
+
+        {/* Goals */}
+        {loading ? (
+          <p className="text-center py-12 text-ink-400">Loading...</p>
+        ) : goals.length > 0 ? (
+          <div className="space-y-6 stagger">
+            {goals.map((goal) => (
+              <div
+                key={goal.id}
+                className={`card-elevated transition-all ${goal.status === 'completed' ? 'opacity-70' : ''} ${celebrateGoal === goal.id ? 'ring-4 ring-gold ring-offset-4' : ''}`}
+              >
+                {/* Header */}
+                <div className="flex items-start gap-4">
+                  {/* Progress Circle */}
+                  <div className="flex-shrink-0">
+                    <ProgressCircle progress={goal.progress} size={64} />
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`tag ${getOwnerStyle(goal.owner)}`}>
+                        {getOwnerLabel(goal.owner)}
+                      </span>
+                      {goal.status === 'completed' && (
+                        <span className="tag tag-forest">Complete</span>
+                      )}
+                    </div>
+                    <h3 className={`font-serif text-title-sm text-forest ${goal.status === 'completed' ? 'line-through' : ''}`}>
+                      {goal.title}
+                    </h3>
+                    {goal.description && (
+                      <p className="text-body-sm text-ink-400 mt-1">{goal.description}</p>
+                    )}
+                    {goal.target_date && (
+                      <p className="text-caption text-ink-300 mt-2">
+                        Target: {new Date(goal.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Expand */}
+                  <button
+                    onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
+                    className="p-2 text-ink-300 hover:text-ink-500"
+                  >
+                    <svg
+                      className={`w-5 h-5 transition-transform ${expandedGoal === goal.id ? 'rotate-180' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Expanded Content */}
+                {expandedGoal === goal.id && (
+                  <div className="mt-6 pt-6 border-t border-cream-200 animate-fade-up">
+                    {/* Milestones */}
+                    {goal.milestones && goal.milestones.length > 0 && (
+                      <div className="space-y-3 mb-6">
+                        <p className="section-label">Milestones</p>
+                        {goal.milestones.map((milestone) => (
+                          <button
+                            key={milestone.id}
+                            onClick={() => handleToggleMilestone(goal.id, milestone.id, milestone.is_completed)}
+                            className="w-full flex items-center gap-3 text-left group"
+                          >
+                            <div className={`
+                              w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
+                              ${milestone.is_completed
+                                ? 'bg-forest border-forest'
+                                : 'border-cream-400 group-hover:border-forest-300'
+                              }
+                            `}>
+                              {milestone.is_completed && (
+                                <svg className="w-4 h-4 text-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span className={`text-body ${milestone.is_completed ? 'text-ink-400 line-through' : 'text-ink-600'}`}>
+                              {milestone.title}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Complete Button */}
+                    {goal.status !== 'completed' && (
+                      <button
+                        onClick={() => handleCompleteGoal(goal.id)}
+                        className="btn-gold w-full"
+                      >
+                        Mark as Complete 🎉
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <span className="text-5xl mb-4 block">🎯</span>
+            <p className="text-body text-ink-400">No goals yet</p>
+            <p className="text-body-sm text-ink-300 mt-1">Add your first one</p>
+          </div>
+        )}
+      </div>
+
+      {/* Add Goal Modal */}
+      {showAddGoal && (
+        <AddGoalModal
+          user={user}
+          theirName={theirName}
+          onClose={() => setShowAddGoal(false)}
+          onAdd={handleAddGoal}
+        />
+      )}
+
+      {/* Celebration Overlay */}
+      {celebrateGoal && (
+        <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+          <div className="text-center animate-scale-in">
+            <span className="text-8xl block animate-float">🎉</span>
+            <p className="font-serif text-display-sm text-forest mt-4">Goal Complete!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Spacer */}
+      <div className="h-24 bg-cream" />
+    </div>
+  )
+}
+
+function ProgressCircle({ progress, size = 64 }) {
+  const strokeWidth = 4
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (progress / 100) * circumference
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90" width={size} height={size}>
+        <circle
+          className="stroke-cream-300"
+          strokeWidth={strokeWidth}
+          fill="none"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        <circle
+          className="stroke-forest transition-all duration-700 ease-out"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          fill="none"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+          style={{
+            strokeDasharray: circumference,
+            strokeDashoffset: offset
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-serif text-title-sm text-forest">{progress}%</span>
+      </div>
+    </div>
+  )
+}
+
+function AddGoalModal({ user, theirName, onClose, onAdd }) {
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    owner: user?.role || 'dane',
+    target_date: '',
+  })
+  const [milestones, setMilestones] = useState(['', '', ''])
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.title.trim()) return
+    setLoading(true)
+    await onAdd(form, milestones)
+    setLoading(false)
+  }
+
+  const addMilestoneField = () => {
+    setMilestones(prev => [...prev, ''])
+  }
+
+  return (
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
+      <div className="bg-cream w-full rounded-t-4xl p-6 pb-10 max-h-[90vh] overflow-y-auto animate-slide-up safe-bottom" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-serif text-title text-forest">Add Goal</h2>
+          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal?</label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
+              className="input"
+              placeholder="Run a marathon, learn 50 words..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Why does it matter?</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+              className="input min-h-[80px] resize-none"
+              placeholder="Optional motivation..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Whose goal?</label>
+              <select
+                value={form.owner}
+                onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))}
+                className="input"
+              >
+                <option value={user?.role}>Mine</option>
+                <option value={user?.role === 'shah' ? 'dane' : 'shah'}>{theirName}'s</option>
+                <option value="shared">Shared</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Target date</label>
+              <input
+                type="date"
+                value={form.target_date}
+                onChange={(e) => setForm(p => ({ ...p, target_date: e.target.value }))}
+                className="input"
+              />
+            </div>
+          </div>
+
+          {/* Milestones */}
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Milestones (optional)</label>
+            <div className="space-y-3">
+              {milestones.map((m, i) => (
+                <input
+                  key={i}
+                  type="text"
+                  value={m}
+                  onChange={(e) => {
+                    const updated = [...milestones]
+                    updated[i] = e.target.value
+                    setMilestones(updated)
+                  }}
+                  className="input"
+                  placeholder={`Step ${i + 1}`}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addMilestoneField}
+              className="text-body-sm text-forest font-medium mt-3 hover:text-forest-700"
+            >
+              + Add another step
+            </button>
+          </div>
+
+          <button type="submit" className="btn-primary w-full" disabled={loading}>
+            {loading ? 'Creating...' : 'Create Goal'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
