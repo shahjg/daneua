@@ -1,15 +1,360 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* { -webkit-tap-highlight-color: transparent; }
-html { scroll-behavior: smooth; }
-body { 
-  font-family: 'Inter', system-ui, sans-serif; 
-  background: #faf8f5;
-  min-height: 100vh;
-  overscroll-behavior: none;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    font-size: 16px;
+  }
+
+  body {
+    @apply antialiased bg-cream text-ink font-sans;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    overscroll-behavior-y: contain;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-serif font-medium text-ink;
+  }
+
+  ::selection {
+    @apply bg-gold-200 text-forest;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
-input, textarea, select, button { font-family: inherit; }
-.hide-scrollbar::-webkit-scrollbar { display: none; }
-.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer components {
+  /* ========================================
+     BUTTONS
+     ======================================== */
+  .btn {
+    @apply inline-flex items-center justify-center font-sans font-medium transition-all duration-200;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-forest text-cream-100 px-8 py-4 rounded-2xl text-body;
+    @apply hover:bg-forest-700 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply btn bg-cream-300 text-forest px-8 py-4 rounded-2xl text-body;
+    @apply hover:bg-cream-400 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply btn text-forest-600 px-4 py-2 rounded-xl text-body-sm;
+    @apply hover:bg-cream-200 active:scale-[0.98];
+  }
+
+  .btn-gold {
+    @apply btn bg-gold text-white px-8 py-4 rounded-2xl text-body;
+    @apply hover:bg-gold-600 active:scale-[0.98];
+  }
+
+  /* ========================================
+     INPUTS
+     ======================================== */
+  .input {
+    @apply w-full bg-white border-2 border-cream-300 rounded-2xl px-5 py-4;
+    @apply text-body text-ink placeholder:text-ink-300;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:border-forest focus:ring-0;
+  }
+
+  .input-lg {
+    @apply input text-body-lg py-5;
+  }
+
+  /* ========================================
+     CARDS
+     ======================================== */
+  .card {
+    @apply bg-white rounded-3xl p-6 shadow-soft;
+  }
+
+  .card-elevated {
+    @apply bg-white rounded-4xl p-8 shadow-card;
+  }
+
+  .card-forest {
+    @apply bg-forest rounded-3xl p-6 text-cream-100;
+  }
+
+  .card-gold {
+    @apply bg-gold-100 rounded-3xl p-6;
+  }
+
+  .card-rose {
+    @apply bg-rose-100 rounded-3xl p-6;
+  }
+
+  /* ========================================
+     COLOR BLOCKS (Editorial sections)
+     ======================================== */
+  .block-forest {
+    @apply bg-forest text-cream-100 px-6 py-10;
+  }
+
+  .block-gold {
+    @apply bg-gold-100 px-6 py-10;
+  }
+
+  .block-rose {
+    @apply bg-rose-100 px-6 py-10;
+  }
+
+  .block-cream {
+    @apply bg-cream-200 px-6 py-10;
+  }
+
+  /* ========================================
+     TAGS / BADGES
+     ======================================== */
+  .tag {
+    @apply inline-flex items-center px-3 py-1.5 rounded-full text-caption uppercase tracking-wider;
+  }
+
+  .tag-forest {
+    @apply bg-forest-100 text-forest-600;
+  }
+
+  .tag-gold {
+    @apply bg-gold-100 text-gold-700;
+  }
+
+  .tag-rose {
+    @apply bg-rose-100 text-rose-600;
+  }
+
+  .tag-outline {
+    @apply border border-current bg-transparent;
+  }
+
+  /* ========================================
+     TYPOGRAPHY UTILITIES
+     ======================================== */
+  .editorial-headline {
+    @apply font-serif text-display text-ink leading-none tracking-tight;
+  }
+
+  .editorial-subhead {
+    @apply font-serif text-title text-ink-500;
+  }
+
+  .editorial-body {
+    @apply font-sans text-body-lg text-ink-500 leading-relaxed;
+  }
+
+  .section-label {
+    @apply text-caption uppercase tracking-widest text-ink-400 font-sans font-semibold;
+  }
+
+  /* ========================================
+     PROGRESS
+     ======================================== */
+  .progress-bar {
+    @apply h-2 bg-cream-300 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full bg-gradient-to-r from-forest to-forest-500 rounded-full transition-all duration-700 ease-out;
+  }
+
+  .progress-circle {
+    @apply relative w-20 h-20;
+  }
+
+  .progress-circle svg {
+    @apply transform -rotate-90;
+  }
+
+  .progress-circle-track {
+    @apply stroke-cream-300;
+  }
+
+  .progress-circle-fill {
+    @apply stroke-forest transition-all duration-700 ease-out;
+    stroke-linecap: round;
+  }
+
+  /* ========================================
+     MOOD CARDS (gradient backgrounds)
+     ======================================== */
+  .mood-card {
+    @apply relative overflow-hidden rounded-3xl p-6 transition-all duration-300;
+    @apply hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .mood-miss-you {
+    @apply bg-gradient-to-br from-rose-200 via-rose-100 to-cream text-rose-700;
+  }
+
+  .mood-encouragement {
+    @apply bg-gradient-to-br from-gold-200 via-gold-100 to-cream text-gold-700;
+  }
+
+  .mood-stressed {
+    @apply bg-gradient-to-br from-forest-100 via-forest-50 to-cream text-forest-600;
+  }
+
+  .mood-happy {
+    @apply bg-gradient-to-br from-gold-100 via-cream to-rose-50 text-gold-700;
+  }
+
+  .mood-anxious {
+    @apply bg-gradient-to-br from-cream-300 via-cream-200 to-cream text-ink-500;
+  }
+
+  .mood-loved {
+    @apply bg-gradient-to-br from-rose-300 via-rose-200 to-gold-100 text-rose-700;
+  }
+}
+
+@layer utilities {
+  /* Safe area for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+  }
+
+  /* Full bleed sections */
+  .full-bleed {
+    @apply -mx-6 px-6;
+  }
+
+  /* Text balance for headlines */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Decorative line */
+  .line-accent {
+    @apply w-12 h-1 bg-gold rounded-full;
+  }
+
+  /* Polaroid effect for photos */
+  .polaroid {
+    @apply bg-white p-3 pb-12 shadow-card rounded-lg;
+  }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Staggered children */
+.stagger > * {
+  @apply opacity-0;
+  animation: fadeUp 0.5s ease-out forwards;
+}
+
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger > *:nth-child(8) { animation-delay: 0.4s; }
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   AUDIO PLAYER
+   ======================================== */
+audio {
+  @apply w-full rounded-xl;
+  height: 48px;
+}
+
+audio::-webkit-media-controls-panel {
+  @apply bg-cream-200;
+}
+
+/* ========================================
+   FOCUS STATES
+   ======================================== */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply outline-none ring-2 ring-forest ring-offset-2 ring-offset-cream;
+}
+
+/* ========================================
+   RTL FOR URDU
+   ======================================== */
+[dir="rtl"] {
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', Georgia, serif;
+}
+
+/* ========================================
+   PIN INPUT
+   ======================================== */
+.pin-input {
+  @apply w-14 h-16 text-center text-title font-serif bg-white border-2 border-cream-300 rounded-2xl;
+  @apply focus:border-forest focus:ring-0 focus:outline-none;
+  @apply transition-all duration-200;
+}
+
+.pin-input:focus {
+  @apply scale-105 shadow-soft;
+}
+
+/* ========================================
+   LETTER PAPER EFFECT
+   ======================================== */
+.letter-paper {
+  @apply bg-cream-50 rounded-3xl p-8 shadow-card;
+  background-image: 
+    linear-gradient(rgba(26, 60, 52, 0.03) 1px, transparent 1px);
+  background-size: 100% 2rem;
+  background-position: 0 1rem;
+}
+
+/* ========================================
+   COUNTDOWN
+   ======================================== */
+.countdown-number {
+  @apply font-serif text-display-sm text-forest tabular-nums;
+}
+
+.countdown-label {
+  @apply text-caption text-ink-400 uppercase tracking-widest;
+}

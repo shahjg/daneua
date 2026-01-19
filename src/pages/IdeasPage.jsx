@@ -1,571 +1,683 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
-const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32', '40', '48']
-const COLORS = ['#1f2937', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777']
-const HIGHLIGHT_COLORS = ['transparent', '#fef08a', '#bbf7d0', '#bfdbfe', '#f5d0fe', '#fed7aa']
+// Ideas types for post-it style
+const ideaColors = [
+  { id: 'yellow', bg: 'bg-yellow-100', border: 'border-yellow-300' },
+  { id: 'pink', bg: 'bg-rose-100', border: 'border-rose-300' },
+  { id: 'blue', bg: 'bg-blue-100', border: 'border-blue-300' },
+  { id: 'green', bg: 'bg-emerald-100', border: 'border-emerald-300' },
+  { id: 'purple', bg: 'bg-purple-100', border: 'border-purple-300' },
+]
+
+const categories = [
+  { id: 'general', label: 'General', emoji: '💭' },
+  { id: 'travel', label: 'Travel', emoji: '✈️' },
+  { id: 'home', label: 'Home', emoji: '🏠' },
+  { id: 'date', label: 'Date Ideas', emoji: '💕' },
+  { id: 'bucket', label: 'Bucket List', emoji: '🌟' },
+  { id: 'food', label: 'Food', emoji: '🍽️' },
+  { id: 'gift', label: 'Gift Ideas', emoji: '🎁' },
+]
 
 export default function IdeasPage() {
-  const { user, supabase } = useAuth()
-  const [view, setView] = useState('folders') // folders, folder, document
-  const [folders, setFolders] = useState([])
-  const [currentFolder, setCurrentFolder] = useState(null)
-  const [documents, setDocuments] = useState([])
-  const [currentDoc, setCurrentDoc] = useState(null)
-  const [toast, setToast] = useState(null)
-  
-  // Folder modals
-  const [showNewFolder, setShowNewFolder] = useState(false)
-  const [newFolderName, setNewFolderName] = useState('')
-  const [editingFolder, setEditingFolder] = useState(null)
-  const [showDeleteFolder, setShowDeleteFolder] = useState(null)
-  
-  // Document modals
-  const [showNewDoc, setShowNewDoc] = useState(false)
-  const [newDocTitle, setNewDocTitle] = useState('')
-  const [editingDocTitle, setEditingDocTitle] = useState(null)
-  const [showDeleteDoc, setShowDeleteDoc] = useState(null)
-  
-  // Editor state
-  const [docTitle, setDocTitle] = useState('')
-  const [docContent, setDocContent] = useState('')
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [showToolbar, setShowToolbar] = useState(true)
-  const [showFontSize, setShowFontSize] = useState(false)
-  const [showTextColor, setShowTextColor] = useState(false)
-  const [showHighlight, setShowHighlight] = useState(false)
-  const editorRef = useRef(null)
-  const fileInputRef = useRef(null)
+  const { user } = useAuth()
+  const [ideas, setIdeas] = useState([])
+  const [filter, setFilter] = useState('all')
+  const [showAddIdea, setShowAddIdea] = useState(false)
+  const [showVoiceNote, setShowVoiceNote] = useState(false)
+  const [partnerTyping, setPartnerTyping] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
   useEffect(() => {
-    loadFolders()
+    fetchIdeas()
+    
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel('ideas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_ideas' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setIdeas(prev => [payload.new, ...prev])
+        } else if (payload.eventType === 'DELETE') {
+          setIdeas(prev => prev.filter(i => i.id !== payload.old.id))
+        } else if (payload.eventType === 'UPDATE') {
+          setIdeas(prev => prev.map(i => i.id === payload.new.id ? payload.new : i))
+        }
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload.user !== user?.role) {
+          setPartnerTyping(true)
+          setTimeout(() => setPartnerTyping(false), 3000)
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
+  const fetchIdeas = async () => {
+    try {
+      let query = supabase
+        .from('shared_ideas')
+        .select('*')
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+      
+      if (filter !== 'all') {
+        query = query.eq('category', filter)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      setIdeas(data || [])
+    } catch (error) {
+      console.error('Error:', error)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchIdeas()
+  }, [filter])
+
+  const handleAddIdea = async (ideaData) => {
+    try {
+      const { data, error } = await supabase
+        .from('shared_ideas')
+        .insert({ ...ideaData, added_by: user.role })
+        .select()
+        .single()
+      
+      if (error) throw error
+      setIdeas(prev => [data, ...prev])
+      setShowAddIdea(false)
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Could not add idea')
+    }
+  }
+
+  const handleDeleteIdea = async (id) => {
+    if (!confirm('Delete this idea?')) return
+    try {
+      await supabase.from('shared_ideas').delete().eq('id', id)
+      setIdeas(prev => prev.filter(i => i.id !== id))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleTogglePin = async (id, currentPinned) => {
+    try {
+      await supabase
+        .from('shared_ideas')
+        .update({ is_pinned: !currentPinned })
+        .eq('id', id)
+      
+      setIdeas(prev => prev.map(i => 
+        i.id === id ? { ...i, is_pinned: !currentPinned } : i
+      ))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleToggleComplete = async (id, currentComplete) => {
+    try {
+      await supabase
+        .from('shared_ideas')
+        .update({ is_completed: !currentComplete })
+        .eq('id', id)
+      
+      setIdeas(prev => prev.map(i => 
+        i.id === id ? { ...i, is_completed: !currentComplete } : i
+      ))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  return (
+    <div className="min-h-screen pb-28">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-purple-100 via-blue-50 to-pink-100 px-6 pt-14 pb-12">
+        <div className="max-w-lg mx-auto text-center">
+          <h1 className="font-serif text-display-sm text-forest mb-2">Our Ideas</h1>
+          <p className="text-body text-forest-600">Dream together, plan together 💭</p>
+          
+          {partnerTyping && (
+            <div className="mt-4 inline-flex items-center gap-2 bg-white/80 rounded-full px-4 py-2 text-body-sm text-forest">
+              <span className="flex gap-1">
+                <span className="w-2 h-2 bg-forest rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-forest rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-forest rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </span>
+              {theirName} is adding an idea...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-cream px-6 py-4 border-b border-cream-300">
+        <div className="max-w-lg mx-auto flex gap-3">
+          <button
+            onClick={() => setShowAddIdea(true)}
+            className="flex-1 py-3 bg-forest text-cream-100 rounded-2xl font-medium flex items-center justify-center gap-2"
+          >
+            <span>✏️</span> Quick Note
+          </button>
+          <button
+            onClick={() => setShowVoiceNote(true)}
+            className="flex-1 py-3 bg-rose-100 text-rose-600 rounded-2xl font-medium flex items-center justify-center gap-2"
+          >
+            <span>🎤</span> Voice Idea
+          </button>
+        </div>
+      </div>
+
+      {/* Category Filters */}
+      <div className="bg-cream px-4 py-3 sticky top-0 z-20 border-b border-cream-200 overflow-x-auto">
+        <div className="max-w-lg mx-auto flex gap-2">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-full text-body-sm font-medium whitespace-nowrap transition-all ${
+              filter === 'all' ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'
+            }`}
+          >
+            All
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setFilter(cat.id)}
+              className={`px-4 py-2 rounded-full text-body-sm font-medium whitespace-nowrap transition-all ${
+                filter === cat.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'
+              }`}
+            >
+              {cat.emoji} {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Ideas Grid */}
+      <div className="bg-cream min-h-[60vh] px-6 py-6">
+        <div className="max-w-lg mx-auto">
+          {loading ? (
+            <p className="text-center py-12 text-ink-400">Loading...</p>
+          ) : ideas.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {ideas.map((idea) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  currentUser={user?.role}
+                  theirName={theirName}
+                  onDelete={handleDeleteIdea}
+                  onTogglePin={handleTogglePin}
+                  onToggleComplete={handleToggleComplete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <span className="text-6xl mb-4 block">💭</span>
+              <p className="text-body text-ink-400">No ideas yet</p>
+              <p className="text-body-sm text-ink-300 mt-1">Add your first one!</p>
+              <button
+                onClick={() => setShowAddIdea(true)}
+                className="mt-4 btn-primary"
+              >
+                + Add Idea
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Idea Modal */}
+      {showAddIdea && (
+        <AddIdeaModal
+          user={user}
+          onClose={() => setShowAddIdea(false)}
+          onAdd={handleAddIdea}
+        />
+      )}
+
+      {/* Voice Note Modal */}
+      {showVoiceNote && (
+        <VoiceIdeaModal
+          user={user}
+          theirName={theirName}
+          onClose={() => setShowVoiceNote(false)}
+          onSave={handleAddIdea}
+        />
+      )}
+    </div>
+  )
+}
+
+function IdeaCard({ idea, currentUser, theirName, onDelete, onTogglePin, onToggleComplete }) {
+  const [expanded, setExpanded] = useState(false)
+  const colorStyle = ideaColors.find(c => c.id === idea.color) || ideaColors[0]
+  const category = categories.find(c => c.id === idea.category)
+  const isFromMe = idea.added_by === currentUser
+
+  return (
+    <div
+      className={`${colorStyle.bg} rounded-2xl p-4 shadow-soft relative group transition-all ${
+        idea.is_completed ? 'opacity-60' : ''
+      } ${idea.is_pinned ? 'ring-2 ring-gold' : ''}`}
+      style={{
+        transform: `rotate(${(idea.id?.charCodeAt(0) || 0) % 3 - 1}deg)`,
+      }}
+    >
+      {/* Actions */}
+      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onTogglePin(idea.id, idea.is_pinned)}
+          className={`w-7 h-7 rounded-full flex items-center justify-center shadow-sm ${
+            idea.is_pinned ? 'bg-gold text-white' : 'bg-white text-gold-600'
+          }`}
+        >
+          📌
+        </button>
+        <button
+          onClick={() => onDelete(idea.id)}
+          className="w-7 h-7 bg-white rounded-full flex items-center justify-center shadow-sm text-rose-500"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Pin indicator */}
+      {idea.is_pinned && (
+        <div className="absolute -top-1 -left-1 text-lg">📌</div>
+      )}
+
+      {/* Category */}
+      {category && (
+        <div className="text-xs text-ink-400 mb-2">
+          {category.emoji} {category.label}
+        </div>
+      )}
+
+      {/* Content */}
+      <div onClick={() => setExpanded(!expanded)} className="cursor-pointer">
+        {idea.title && (
+          <h3 className={`font-medium text-forest mb-1 ${idea.is_completed ? 'line-through' : ''}`}>
+            {idea.title}
+          </h3>
+        )}
+        
+        <p className={`text-body-sm text-ink-600 ${!expanded && 'line-clamp-4'} ${idea.is_completed ? 'line-through' : ''}`}>
+          {idea.content}
+        </p>
+
+        {/* Image */}
+        {idea.image_url && (
+          <div className="mt-3 rounded-xl overflow-hidden">
+            <img src={idea.image_url} alt="" className="w-full h-32 object-cover" />
+          </div>
+        )}
+
+        {/* Audio */}
+        {idea.audio_url && (
+          <div className="mt-3">
+            <audio src={idea.audio_url} controls className="w-full h-8" />
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-3 pt-2 border-t border-black/10 flex items-center justify-between">
+        <p className="text-caption text-ink-400">
+          {isFromMe ? 'You' : theirName}
+        </p>
+        <button
+          onClick={() => onToggleComplete(idea.id, idea.is_completed)}
+          className={`text-lg ${idea.is_completed ? 'opacity-100' : 'opacity-30 hover:opacity-60'}`}
+        >
+          ✓
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AddIdeaModal({ user, onClose, onAdd }) {
+  const [form, setForm] = useState({
+    title: '',
+    content: '',
+    category: 'general',
+    color: 'yellow',
+  })
+  const [image, setImage] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const fileName = `ideas/${user.role}/${Date.now()}.${file.name.split('.').pop()}`
+      const { error } = await supabase.storage
+        .from('photos')
+        .upload(fileName, file, { contentType: file.type, upsert: true })
+      
+      if (error) throw error
+
+      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
+      setImage(urlData.publicUrl)
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Could not upload image')
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.content.trim()) return
+    
+    setLoading(true)
+    
+    // Broadcast typing indicator
+    await supabase.channel('ideas').send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { user: user.role }
+    })
+
+    await onAdd({
+      ...form,
+      image_url: image,
+    })
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 bg-gradient-to-r from-purple-100 to-pink-100">
+          <h2 className="font-serif text-title text-forest">Add Idea</h2>
+          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="max-h-[50vh] overflow-y-auto p-5">
+          <form id="idea-form" onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Title (optional)</label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
+                className="input"
+                placeholder="Quick idea title..."
+              />
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">What's on your mind? *</label>
+              <textarea
+                value={form.content}
+                onChange={(e) => setForm(p => ({ ...p, content: e.target.value }))}
+                className="input min-h-[100px] resize-none"
+                placeholder="Write your idea..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Category</label>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, category: cat.id }))}
+                    className={`px-3 py-1.5 rounded-full text-body-sm transition-all ${
+                      form.category === cat.id 
+                        ? 'bg-forest text-cream-100' 
+                        : 'bg-cream-200 text-ink-500'
+                    }`}
+                  >
+                    {cat.emoji} {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Color</label>
+              <div className="flex gap-2">
+                {ideaColors.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, color: color.id }))}
+                    className={`w-10 h-10 rounded-xl ${color.bg} ${color.border} border-2 transition-all ${
+                      form.color === color.id ? 'ring-2 ring-forest ring-offset-2' : ''
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Image */}
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Add Photo</label>
+              {image ? (
+                <div className="relative">
+                  <img src={image} alt="" className="w-full h-32 object-cover rounded-xl" />
+                  <button
+                    type="button"
+                    onClick={() => setImage(null)}
+                    className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm text-rose-500"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-4 border-2 border-dashed border-cream-400 rounded-xl text-ink-400 hover:border-forest hover:text-forest transition-all"
+                >
+                  📷 Add Photo
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+            </div>
+          </form>
+        </div>
+
+        <div className="p-5 bg-cream border-t border-cream-300">
+          <button
+            type="submit"
+            form="idea-form"
+            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg shadow-lg"
+            disabled={loading}
+          >
+            {loading ? 'Adding...' : '💭 Add Idea'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function VoiceIdeaModal({ user, theirName, onClose, onSave }) {
+  const [isRecording, setIsRecording] = useState(false)
+  const [audioBlob, setAudioBlob] = useState(null)
+  const [audioUrl, setAudioUrl] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [category, setCategory] = useState('general')
+  
+  const mediaRecorderRef = useRef(null)
+  const chunksRef = useRef([])
+  const streamRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop())
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }, [])
 
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
-
-  const loadFolders = async () => {
-    if (!supabase) return
-    const { data } = await supabase.from('idea_folders').select('*').order('created_at', { ascending: false })
-    if (data) setFolders(data)
-  }
-
-  const loadDocuments = async (folderId) => {
-    if (!supabase) return
-    const { data } = await supabase.from('idea_documents').select('*').eq('folder_id', folderId).order('updated_at', { ascending: false })
-    if (data) setDocuments(data)
-  }
-
-  // Folder functions
-  const createFolder = async () => {
-    if (!newFolderName.trim() || !supabase) return
-    await supabase.from('idea_folders').insert({
-      name: newFolderName.trim(),
-      created_by: user.id
-    })
-    setNewFolderName('')
-    setShowNewFolder(false)
-    loadFolders()
-    showToast('Folder created!', 'success')
-  }
-
-  const updateFolder = async () => {
-    if (!editingFolder || !supabase) return
-    await supabase.from('idea_folders').update({ name: editingFolder.name }).eq('id', editingFolder.id)
-    setEditingFolder(null)
-    loadFolders()
-    showToast('Folder renamed!', 'success')
-  }
-
-  const deleteFolder = async (id) => {
-    if (!supabase) return
-    // Delete all documents in folder first
-    await supabase.from('idea_documents').delete().eq('folder_id', id)
-    await supabase.from('idea_folders').delete().eq('id', id)
-    setShowDeleteFolder(null)
-    loadFolders()
-    showToast('Folder deleted', 'success')
-  }
-
-  const openFolder = (folder) => {
-    setCurrentFolder(folder)
-    loadDocuments(folder.id)
-    setView('folder')
-  }
-
-  // Document functions
-  const createDocument = async () => {
-    if (!newDocTitle.trim() || !supabase || !currentFolder) return
-    const { data } = await supabase.from('idea_documents').insert({
-      folder_id: currentFolder.id,
-      title: newDocTitle.trim(),
-      content: '',
-      created_by: user.id
-    }).select().single()
-    
-    setNewDocTitle('')
-    setShowNewDoc(false)
-    if (data) {
-      openDocument(data)
-    }
-    loadDocuments(currentFolder.id)
-    showToast('Document created!', 'success')
-  }
-
-  const openDocument = (doc) => {
-    setCurrentDoc(doc)
-    setDocTitle(doc.title)
-    setDocContent(doc.content || '')
-    setHasUnsavedChanges(false)
-    setView('document')
-    
-    // Set editor content after a brief delay
-    setTimeout(() => {
-      if (editorRef.current) {
-        editorRef.current.innerHTML = doc.content || ''
-      }
-    }, 100)
-  }
-
-  const saveDocument = async () => {
-    if (!currentDoc || !supabase) return
-    
-    const content = editorRef.current?.innerHTML || ''
-    
-    await supabase.from('idea_documents').update({
-      title: docTitle,
-      content: content,
-      updated_at: new Date().toISOString()
-    }).eq('id', currentDoc.id)
-    
-    setHasUnsavedChanges(false)
-    showToast('Saved!', 'success')
-  }
-
-  const deleteDocument = async (id) => {
-    if (!supabase) return
-    await supabase.from('idea_documents').delete().eq('id', id)
-    setShowDeleteDoc(null)
-    if (currentDoc?.id === id) {
-      setView('folder')
-      setCurrentDoc(null)
-    }
-    loadDocuments(currentFolder.id)
-    showToast('Document deleted', 'success')
-  }
-
-  // Editor functions
-  const execCommand = (command, value = null) => {
-    document.execCommand(command, false, value)
-    editorRef.current?.focus()
-    setHasUnsavedChanges(true)
-  }
-
-  const handleEditorChange = () => {
-    setHasUnsavedChanges(true)
-  }
-
-  const insertImage = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file || !supabase) return
-    
+  const startRecording = async () => {
     try {
-      const fileName = `idea_${user.id}_${Date.now()}.jpg`
-      const { error } = await supabase.storage.from('photos').upload(fileName, file)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
       
-      if (error) {
-        showToast('Image upload failed', 'error')
-        return
+      let options = {}
+      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', '']
+      for (const type of types) {
+        if (type === '' || MediaRecorder.isTypeSupported(type)) {
+          if (type) options = { mimeType: type }
+          break
+        }
       }
       
-      const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName)
-      execCommand('insertImage', publicUrl)
-      showToast('Image added!', 'success')
+      mediaRecorderRef.current = new MediaRecorder(stream, options)
+      chunksRef.current = []
+
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+
+      mediaRecorderRef.current.onstop = () => {
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: mimeType })
+        setAudioBlob(blob)
+        setAudioUrl(URL.createObjectURL(blob))
+        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorderRef.current.start(1000)
+      setIsRecording(true)
+      timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000)
     } catch (err) {
-      showToast('Image upload failed', 'error')
+      alert('Could not access microphone')
     }
   }
 
-  const BackButton = ({ onClick, label = 'Back' }) => (
-    <button 
-      onClick={onClick}
-      className="flex items-center gap-2 px-4 py-3 bg-white rounded-xl shadow-soft text-forest font-medium mb-4"
-    >
-      <span className="text-xl">←</span>
-      <span>{label}</span>
-    </button>
-  )
+  const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
+  }
 
-  // FOLDERS VIEW
-  if (view === 'folders') {
-    return (
-      <div className="min-h-screen bg-cream-100 p-6">
-        {toast && (
-          <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-card ${toast.type === 'success' ? 'bg-forest text-cream-100' : 'bg-rose-500 text-white'}`}>
-            {toast.message}
-          </div>
-        )}
+  const handleSave = async () => {
+    if (!audioBlob) return
+    setSaving(true)
 
-        <h1 className="font-serif text-display-sm text-forest mb-2">Ideas</h1>
-        <p className="text-body text-ink-500 mb-6">Your creative space</p>
+    try {
+      const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm'
+      const fileName = `ideas/${user.role}/${Date.now()}.${ext}`
+      
+      const { error } = await supabase.storage
+        .from('audio')
+        .upload(fileName, audioBlob, { contentType: audioBlob.type, upsert: true })
+      
+      if (error) throw error
 
-        <button
-          onClick={() => setShowNewFolder(true)}
-          className="w-full bg-forest text-cream-100 py-4 rounded-xl font-medium mb-6"
-        >
-          + New Folder
-        </button>
+      const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
+      
+      await onSave({
+        content: '🎤 Voice idea',
+        audio_url: urlData.publicUrl,
+        category,
+        color: 'pink',
+      })
+      
+      onClose()
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Could not save voice idea')
+    }
+    setSaving(false)
+  }
 
-        <div className="grid grid-cols-2 gap-4 pb-24">
-          {folders.map(folder => (
-            <div key={folder.id} className="bg-white rounded-2xl p-5 shadow-soft">
-              <button onClick={() => openFolder(folder)} className="w-full text-left">
-                <div className="text-4xl mb-3">📁</div>
-                <h3 className="font-serif text-title-sm text-forest truncate">{folder.name}</h3>
-              </button>
-              <button 
-                onClick={() => setEditingFolder(folder)}
-                className="text-ink-400 text-body-sm mt-2"
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+
+  return (
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-cream w-full max-w-sm rounded-3xl shadow-elevated p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-serif text-title text-forest text-center mb-6">Voice Idea</h2>
+
+        <div className="text-center">
+          {!audioUrl ? (
+            <>
+              <button
+                onClick={isRecording ? stopRecording : startRecording}
+                className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto transition-all shadow-lg ${
+                  isRecording ? 'bg-rose-500 animate-pulse' : 'bg-forest'
+                }`}
               >
-                ✏️ Edit
+                {isRecording ? (
+                  <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                  </svg>
+                )}
               </button>
-            </div>
-          ))}
-          
-          {folders.length === 0 && (
-            <div className="col-span-2 text-center py-12">
-              <p className="text-4xl mb-4">📁</p>
-              <p className="text-body text-ink-500">No folders yet. Create one to get started!</p>
-            </div>
-          )}
-        </div>
-
-        {/* New Folder Modal */}
-        {showNewFolder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-serif text-title text-forest mb-4">New Folder</h3>
-              <input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Folder name"
-                className="w-full p-4 bg-cream-50 rounded-xl text-body mb-4 focus:outline-none focus:ring-2 focus:ring-forest/20"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button onClick={() => setShowNewFolder(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-                <button onClick={createFolder} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Create</button>
+              {isRecording && <p className="text-title text-rose-500 font-mono mt-4">{formatTime(recordingTime)}</p>}
+              <p className="text-body-sm text-ink-400 mt-2">{isRecording ? 'Tap to stop' : 'Tap to record'}</p>
+            </>
+          ) : (
+            <>
+              <div className="bg-cream-200 rounded-2xl p-4 mb-4">
+                <audio src={audioUrl} controls className="w-full" />
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Edit Folder Modal */}
-        {editingFolder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-serif text-title text-forest mb-4">Edit Folder</h3>
-              <input
-                value={editingFolder.name}
-                onChange={(e) => setEditingFolder({ ...editingFolder, name: e.target.value })}
-                className="w-full p-4 bg-cream-50 rounded-xl text-body mb-4 focus:outline-none focus:ring-2 focus:ring-forest/20"
-              />
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteFolder(editingFolder.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
-                <button onClick={() => setEditingFolder(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-                <button onClick={updateFolder} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Folder Modal */}
-        {showDeleteFolder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-serif text-title text-forest mb-2">Delete Folder?</h3>
-              <p className="text-body text-ink-500 mb-6">All documents inside will be deleted too.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteFolder(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-                <button onClick={() => { deleteFolder(showDeleteFolder); setEditingFolder(null) }} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // FOLDER VIEW (documents list)
-  if (view === 'folder') {
-    return (
-      <div className="min-h-screen bg-cream-100 p-6">
-        {toast && (
-          <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-card ${toast.type === 'success' ? 'bg-forest text-cream-100' : 'bg-rose-500 text-white'}`}>
-            {toast.message}
-          </div>
-        )}
-
-        <BackButton onClick={() => setView('folders')} label="All Folders" />
-        
-        <h1 className="font-serif text-title text-forest mb-2">{currentFolder?.name}</h1>
-        <p className="text-body-sm text-ink-400 mb-6">{documents.length} documents</p>
-
-        <button
-          onClick={() => setShowNewDoc(true)}
-          className="w-full bg-forest text-cream-100 py-4 rounded-xl font-medium mb-6"
-        >
-          + New Document
-        </button>
-
-        <div className="space-y-3 pb-24">
-          {documents.map(doc => (
-            <div key={doc.id} className="bg-white rounded-xl p-4 shadow-soft flex items-center justify-between">
-              <button onClick={() => openDocument(doc)} className="flex-1 text-left">
-                <h3 className="font-medium text-forest">{doc.title}</h3>
-                <p className="text-caption text-ink-400">
-                  {new Date(doc.updated_at).toLocaleDateString()}
-                </p>
-              </button>
-              <button onClick={() => setShowDeleteDoc(doc.id)} className="text-ink-400 p-2">🗑</button>
-            </div>
-          ))}
-          
-          {documents.length === 0 && (
-            <p className="text-center text-ink-400 py-8">No documents yet. Create one!</p>
-          )}
-        </div>
-
-        {/* New Document Modal */}
-        {showNewDoc && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-serif text-title text-forest mb-4">New Document</h3>
-              <input
-                value={newDocTitle}
-                onChange={(e) => setNewDocTitle(e.target.value)}
-                placeholder="Document title"
-                className="w-full p-4 bg-cream-50 rounded-xl text-body mb-4 focus:outline-none focus:ring-2 focus:ring-forest/20"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button onClick={() => setShowNewDoc(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-                <button onClick={createDocument} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Create</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Document Modal */}
-        {showDeleteDoc && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-serif text-title text-forest mb-2">Delete Document?</h3>
-              <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteDoc(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-                <button onClick={() => deleteDocument(showDeleteDoc)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // DOCUMENT EDITOR VIEW
-  if (view === 'document') {
-    return (
-      <div className="min-h-screen bg-cream-100 flex flex-col">
-        {toast && (
-          <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-card ${toast.type === 'success' ? 'bg-forest text-cream-100' : 'bg-rose-500 text-white'}`}>
-            {toast.message}
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="bg-white border-b border-cream-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <button 
-              onClick={() => {
-                if (hasUnsavedChanges) {
-                  if (confirm('You have unsaved changes. Save before leaving?')) {
-                    saveDocument()
-                  }
-                }
-                setView('folder')
-                loadDocuments(currentFolder.id)
-              }}
-              className="flex items-center gap-2 text-forest"
-            >
-              <span className="text-xl">←</span>
-              <span>Back</span>
-            </button>
-            
-            <button
-              onClick={saveDocument}
-              className={`px-4 py-2 rounded-lg font-medium ${hasUnsavedChanges ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'}`}
-            >
-              {hasUnsavedChanges ? 'Save' : 'Saved'}
-            </button>
-          </div>
-          
-          <input
-            value={docTitle}
-            onChange={(e) => { setDocTitle(e.target.value); setHasUnsavedChanges(true) }}
-            className="w-full font-serif text-title text-forest bg-transparent focus:outline-none"
-            placeholder="Document title"
-          />
-        </div>
-
-        {/* Toolbar */}
-        <div className="bg-white border-b border-cream-200 p-2 overflow-x-auto hide-scrollbar">
-          <div className="flex gap-1 min-w-max">
-            {/* Text Style */}
-            <button onClick={() => execCommand('bold')} className="p-2 rounded hover:bg-cream-100 font-bold">B</button>
-            <button onClick={() => execCommand('italic')} className="p-2 rounded hover:bg-cream-100 italic">I</button>
-            <button onClick={() => execCommand('underline')} className="p-2 rounded hover:bg-cream-100 underline">U</button>
-            <button onClick={() => execCommand('strikeThrough')} className="p-2 rounded hover:bg-cream-100 line-through">S</button>
-            
-            <div className="w-px bg-cream-200 mx-1" />
-            
-            {/* Headers */}
-            <button onClick={() => execCommand('formatBlock', 'h1')} className="p-2 rounded hover:bg-cream-100 text-lg font-bold">H1</button>
-            <button onClick={() => execCommand('formatBlock', 'h2')} className="p-2 rounded hover:bg-cream-100 font-bold">H2</button>
-            <button onClick={() => execCommand('formatBlock', 'h3')} className="p-2 rounded hover:bg-cream-100 text-sm font-bold">H3</button>
-            <button onClick={() => execCommand('formatBlock', 'p')} className="p-2 rounded hover:bg-cream-100">¶</button>
-            
-            <div className="w-px bg-cream-200 mx-1" />
-            
-            {/* Font Size */}
-            <div className="relative">
-              <button onClick={() => setShowFontSize(!showFontSize)} className="p-2 rounded hover:bg-cream-100">
-                Size ▾
-              </button>
-              {showFontSize && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-card border border-cream-200 py-1 z-10">
-                  {FONT_SIZES.map(size => (
+              <div className="mb-4">
+                <p className="text-body-sm font-medium text-ink-600 mb-2">Category</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {categories.slice(0, 4).map((cat) => (
                     <button
-                      key={size}
-                      onClick={() => { execCommand('fontSize', '7'); setShowFontSize(false) }}
-                      className="block w-full px-4 py-1 text-left hover:bg-cream-100"
-                      style={{ fontSize: `${size}px` }}
+                      key={cat.id}
+                      onClick={() => setCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-body-sm ${
+                        category === cat.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'
+                      }`}
                     >
-                      {size}px
+                      {cat.emoji}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-            
-            {/* Text Color */}
-            <div className="relative">
-              <button onClick={() => setShowTextColor(!showTextColor)} className="p-2 rounded hover:bg-cream-100">
-                <span className="border-b-2 border-forest">A</span> ▾
-              </button>
-              {showTextColor && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-card border border-cream-200 p-2 z-10">
-                  <div className="grid grid-cols-5 gap-1">
-                    {COLORS.map(color => (
-                      <button
-                        key={color}
-                        onClick={() => { execCommand('foreColor', color); setShowTextColor(false) }}
-                        className="w-6 h-6 rounded"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Highlight */}
-            <div className="relative">
-              <button onClick={() => setShowHighlight(!showHighlight)} className="p-2 rounded hover:bg-cream-100">
-                <span className="bg-yellow-200 px-1">H</span> ▾
-              </button>
-              {showHighlight && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-card border border-cream-200 p-2 z-10">
-                  <div className="grid grid-cols-3 gap-1">
-                    {HIGHLIGHT_COLORS.map(color => (
-                      <button
-                        key={color}
-                        onClick={() => { execCommand('hiliteColor', color); setShowHighlight(false) }}
-                        className="w-8 h-6 rounded border border-cream-200"
-                        style={{ backgroundColor: color === 'transparent' ? 'white' : color }}
-                      >
-                        {color === 'transparent' && '✕'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="w-px bg-cream-200 mx-1" />
-            
-            {/* Lists */}
-            <button onClick={() => execCommand('insertUnorderedList')} className="p-2 rounded hover:bg-cream-100">• List</button>
-            <button onClick={() => execCommand('insertOrderedList')} className="p-2 rounded hover:bg-cream-100">1. List</button>
-            
-            <div className="w-px bg-cream-200 mx-1" />
-            
-            {/* Alignment */}
-            <button onClick={() => execCommand('justifyLeft')} className="p-2 rounded hover:bg-cream-100">⬅</button>
-            <button onClick={() => execCommand('justifyCenter')} className="p-2 rounded hover:bg-cream-100">⬌</button>
-            <button onClick={() => execCommand('justifyRight')} className="p-2 rounded hover:bg-cream-100">➡</button>
-            
-            <div className="w-px bg-cream-200 mx-1" />
-            
-            {/* Image */}
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded hover:bg-cream-100">🖼️</button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={insertImage}
-              className="hidden"
-            />
-            
-            {/* Quote */}
-            <button onClick={() => execCommand('formatBlock', 'blockquote')} className="p-2 rounded hover:bg-cream-100">"</button>
-            
-            {/* Horizontal Rule */}
-            <button onClick={() => execCommand('insertHorizontalRule')} className="p-2 rounded hover:bg-cream-100">―</button>
-          </div>
-        </div>
+              </div>
 
-        {/* Editor */}
-        <div className="flex-1 overflow-y-auto pb-24">
-          <div
-            ref={editorRef}
-            contentEditable
-            onInput={handleEditorChange}
-            className="min-h-full p-6 bg-white focus:outline-none prose prose-forest max-w-none"
-            style={{ 
-              lineHeight: '1.6',
-              minHeight: 'calc(100vh - 200px)'
-            }}
-            dangerouslySetInnerHTML={{ __html: docContent }}
-          />
+              <div className="flex gap-3">
+                <button onClick={() => { setAudioBlob(null); setAudioUrl(null); setRecordingTime(0); }} className="btn-ghost flex-1">
+                  Redo
+                </button>
+                <button onClick={handleSave} className="btn-primary flex-1" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Idea'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
-
-        {/* Close dropdowns when clicking outside */}
-        {(showFontSize || showTextColor || showHighlight) && (
-          <div 
-            className="fixed inset-0 z-0" 
-            onClick={() => {
-              setShowFontSize(false)
-              setShowTextColor(false)
-              setShowHighlight(false)
-            }}
-          />
-        )}
       </div>
-    )
-  }
-
-  return null
+    </div>
+  )
 }
