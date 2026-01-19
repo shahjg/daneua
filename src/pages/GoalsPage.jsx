@@ -523,14 +523,8 @@ function EditGoalModal({ goal, user, theirName, onClose, onSave }) {
   }
 
   return (
-    <div 
-      className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 bg-forest">
           <h2 className="font-serif text-title text-cream-100">Edit Goal</h2>
           <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
@@ -544,58 +538,31 @@ function EditGoalModal({ goal, user, theirName, onClose, onSave }) {
           <form id="edit-goal-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Goal *</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
-                className="input"
-                required
-              />
+              <input type="text" value={form.title} onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} className="input" required />
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-              />
+              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Whose goal?</label>
-                <select
-                  value={form.owner}
-                  onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))}
-                  className="input"
-                >
+                <select value={form.owner} onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))} className="input">
                   <option value={user?.role}>Mine</option>
                   <option value={user?.role === 'shah' ? 'dane' : 'shah'}>{theirName}'s</option>
                   <option value="shared">Shared</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Target date</label>
-                <input
-                  type="date"
-                  value={form.target_date}
-                  onChange={(e) => setForm(p => ({ ...p, target_date: e.target.value }))}
-                  className="input"
-                />
+                <input type="date" value={form.target_date} onChange={(e) => setForm(p => ({ ...p, target_date: e.target.value }))} className="input" />
               </div>
             </div>
           </form>
         </div>
 
         <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="edit-goal-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
+          <button type="submit" form="edit-goal-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>

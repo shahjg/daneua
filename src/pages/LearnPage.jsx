@@ -1,169 +1,446 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import {
-  getDailyLesson,
-  getDailyDeen,
-  getLessonsByCategory,
-  getLessonCategories,
-  getLessonResponses,
-  addLessonResponse,
-  markLessonComplete,
-  getLearningStreak,
-  uploadAudio
-} from '../lib/supabase'
 
-const languages = [
-  { id: 'urdu', label: 'Urdu', flag: '🇵🇰' },
-  { id: 'tagalog', label: 'Tagalog', flag: '🇵🇭' },
-  { id: 'islam', label: 'Islam', flag: '🕌' },
+// Arabic Words Database - 150+ words organized by category
+const arabicWords = {
+  greetings: [
+    { arabic: 'السلام عليكم', roman: 'Assalamu Alaikum', meaning: 'Peace be upon you', usage: 'Standard Islamic greeting' },
+    { arabic: 'وعليكم السلام', roman: 'Wa Alaikum Assalam', meaning: 'And upon you peace', usage: 'Response to Salam' },
+    { arabic: 'صباح الخير', roman: 'Sabah al-khair', meaning: 'Good morning', usage: 'Morning greeting' },
+    { arabic: 'مساء الخير', roman: 'Masa al-khair', meaning: 'Good evening', usage: 'Evening greeting' },
+    { arabic: 'مرحبا', roman: 'Marhaba', meaning: 'Hello/Welcome', usage: 'Casual greeting' },
+    { arabic: 'أهلاً وسهلاً', roman: 'Ahlan wa sahlan', meaning: 'Welcome', usage: 'Welcoming someone' },
+    { arabic: 'كيف حالك', roman: 'Kayf halak', meaning: 'How are you? (m)', usage: 'Asking about wellbeing' },
+    { arabic: 'كيف حالك', roman: 'Kayf halik', meaning: 'How are you? (f)', usage: 'Asking about wellbeing' },
+    { arabic: 'الحمد لله', roman: 'Alhamdulillah', meaning: 'Praise be to God', usage: 'Response to "how are you"' },
+    { arabic: 'بخير', roman: 'Bikhayr', meaning: 'Fine/Well', usage: 'Response to "how are you"' },
+    { arabic: 'شكراً', roman: 'Shukran', meaning: 'Thank you', usage: 'Expressing gratitude' },
+    { arabic: 'عفواً', roman: 'Afwan', meaning: "You're welcome", usage: 'Response to thanks' },
+    { arabic: 'مع السلامة', roman: 'Ma\'a salama', meaning: 'Goodbye (go with peace)', usage: 'Farewell' },
+    { arabic: 'إلى اللقاء', roman: 'Ila al-liqa', meaning: 'Until we meet again', usage: 'Farewell' },
+  ],
+  love: [
+    { arabic: 'أحبك', roman: 'Uhibbuk', meaning: 'I love you (m)', usage: 'Expression of love' },
+    { arabic: 'أحبك', roman: 'Uhibbuki', meaning: 'I love you (f)', usage: 'Expression of love' },
+    { arabic: 'حبيبي', roman: 'Habibi', meaning: 'My love (m)', usage: 'Term of endearment' },
+    { arabic: 'حبيبتي', roman: 'Habibti', meaning: 'My love (f)', usage: 'Term of endearment' },
+    { arabic: 'قلبي', roman: 'Qalbi', meaning: 'My heart', usage: 'Term of endearment' },
+    { arabic: 'روحي', roman: 'Ruhi', meaning: 'My soul', usage: 'Deep term of endearment' },
+    { arabic: 'عمري', roman: 'Omri', meaning: 'My life', usage: 'Term of endearment' },
+    { arabic: 'نور عيني', roman: 'Noor ayni', meaning: 'Light of my eyes', usage: 'Term of endearment' },
+    { arabic: 'يا حياتي', roman: 'Ya hayati', meaning: 'Oh my life', usage: 'Term of endearment' },
+    { arabic: 'عزيزي', roman: 'Azizi', meaning: 'My dear (m)', usage: 'Affectionate term' },
+    { arabic: 'عزيزتي', roman: 'Azizati', meaning: 'My dear (f)', usage: 'Affectionate term' },
+    { arabic: 'أشتاق إليك', roman: 'Ashtaq ilayk', meaning: 'I miss you', usage: 'Expressing longing' },
+    { arabic: 'وحشتني', roman: 'Wahashitni', meaning: 'I missed you', usage: 'When reuniting' },
+    { arabic: 'أنت كل شيء', roman: 'Anta kulli shay', meaning: 'You are everything', usage: 'Deep affection' },
+  ],
+  family: [
+    { arabic: 'أب', roman: 'Ab', meaning: 'Father', usage: 'Family member' },
+    { arabic: 'أم', roman: 'Umm', meaning: 'Mother', usage: 'Family member' },
+    { arabic: 'أخ', roman: 'Akh', meaning: 'Brother', usage: 'Family member' },
+    { arabic: 'أخت', roman: 'Ukht', meaning: 'Sister', usage: 'Family member' },
+    { arabic: 'جد', roman: 'Jadd', meaning: 'Grandfather', usage: 'Family member' },
+    { arabic: 'جدة', roman: 'Jadda', meaning: 'Grandmother', usage: 'Family member' },
+    { arabic: 'عم', roman: 'Amm', meaning: 'Paternal uncle', usage: 'Family member' },
+    { arabic: 'عمة', roman: 'Amma', meaning: 'Paternal aunt', usage: 'Family member' },
+    { arabic: 'خال', roman: 'Khal', meaning: 'Maternal uncle', usage: 'Family member' },
+    { arabic: 'خالة', roman: 'Khala', meaning: 'Maternal aunt', usage: 'Family member' },
+    { arabic: 'ابن', roman: 'Ibn', meaning: 'Son', usage: 'Family member' },
+    { arabic: 'بنت', roman: 'Bint', meaning: 'Daughter', usage: 'Family member' },
+    { arabic: 'زوج', roman: 'Zawj', meaning: 'Husband', usage: 'Spouse' },
+    { arabic: 'زوجة', roman: 'Zawja', meaning: 'Wife', usage: 'Spouse' },
+    { arabic: 'عائلة', roman: 'A\'ila', meaning: 'Family', usage: 'General term' },
+  ],
+  food: [
+    { arabic: 'طعام', roman: 'Ta\'am', meaning: 'Food', usage: 'General term' },
+    { arabic: 'ماء', roman: 'Ma\'', meaning: 'Water', usage: 'Drink' },
+    { arabic: 'خبز', roman: 'Khubz', meaning: 'Bread', usage: 'Staple food' },
+    { arabic: 'أرز', roman: 'Aruzz', meaning: 'Rice', usage: 'Staple food' },
+    { arabic: 'لحم', roman: 'Lahm', meaning: 'Meat', usage: 'Protein' },
+    { arabic: 'دجاج', roman: 'Dajaj', meaning: 'Chicken', usage: 'Protein' },
+    { arabic: 'سمك', roman: 'Samak', meaning: 'Fish', usage: 'Protein' },
+    { arabic: 'خضروات', roman: 'Khudrawat', meaning: 'Vegetables', usage: 'Food category' },
+    { arabic: 'فواكه', roman: 'Fawakih', meaning: 'Fruits', usage: 'Food category' },
+    { arabic: 'تفاح', roman: 'Tuffah', meaning: 'Apple', usage: 'Fruit' },
+    { arabic: 'برتقال', roman: 'Burtuqal', meaning: 'Orange', usage: 'Fruit' },
+    { arabic: 'موز', roman: 'Mawz', meaning: 'Banana', usage: 'Fruit' },
+    { arabic: 'شاي', roman: 'Shay', meaning: 'Tea', usage: 'Drink' },
+    { arabic: 'قهوة', roman: 'Qahwa', meaning: 'Coffee', usage: 'Drink' },
+    { arabic: 'حليب', roman: 'Halib', meaning: 'Milk', usage: 'Drink' },
+    { arabic: 'بيض', roman: 'Bayd', meaning: 'Eggs', usage: 'Protein' },
+    { arabic: 'جبن', roman: 'Jubn', meaning: 'Cheese', usage: 'Dairy' },
+    { arabic: 'لذيذ', roman: 'Ladhidh', meaning: 'Delicious', usage: 'Describing food' },
+    { arabic: 'بسم الله', roman: 'Bismillah', meaning: 'In the name of Allah', usage: 'Before eating' },
+  ],
+  daily: [
+    { arabic: 'نعم', roman: 'Na\'am', meaning: 'Yes', usage: 'Affirmation' },
+    { arabic: 'لا', roman: 'La', meaning: 'No', usage: 'Negation' },
+    { arabic: 'من فضلك', roman: 'Min fadlak', meaning: 'Please (m)', usage: 'Polite request' },
+    { arabic: 'من فضلك', roman: 'Min fadlik', meaning: 'Please (f)', usage: 'Polite request' },
+    { arabic: 'آسف', roman: 'Asif', meaning: 'Sorry (m)', usage: 'Apology' },
+    { arabic: 'آسفة', roman: 'Asifa', meaning: 'Sorry (f)', usage: 'Apology' },
+    { arabic: 'إن شاء الله', roman: 'Insha\'Allah', meaning: 'God willing', usage: 'Future plans' },
+    { arabic: 'ما شاء الله', roman: 'Masha\'Allah', meaning: 'What Allah willed', usage: 'Admiration' },
+    { arabic: 'جزاك الله خيراً', roman: 'Jazak Allah khayran', meaning: 'May Allah reward you', usage: 'Thanks' },
+    { arabic: 'يوم', roman: 'Yawm', meaning: 'Day', usage: 'Time' },
+    { arabic: 'ليل', roman: 'Layl', meaning: 'Night', usage: 'Time' },
+    { arabic: 'صباح', roman: 'Sabah', meaning: 'Morning', usage: 'Time' },
+    { arabic: 'مساء', roman: 'Masa\'', meaning: 'Evening', usage: 'Time' },
+    { arabic: 'اليوم', roman: 'Al-yawm', meaning: 'Today', usage: 'Time reference' },
+    { arabic: 'غداً', roman: 'Ghadan', meaning: 'Tomorrow', usage: 'Time reference' },
+    { arabic: 'أمس', roman: 'Ams', meaning: 'Yesterday', usage: 'Time reference' },
+    { arabic: 'الآن', roman: 'Al-an', meaning: 'Now', usage: 'Time reference' },
+    { arabic: 'بعد', roman: 'Ba\'d', meaning: 'After', usage: 'Time preposition' },
+    { arabic: 'قبل', roman: 'Qabl', meaning: 'Before', usage: 'Time preposition' },
+    { arabic: 'هنا', roman: 'Huna', meaning: 'Here', usage: 'Place' },
+    { arabic: 'هناك', roman: 'Hunak', meaning: 'There', usage: 'Place' },
+  ],
+  colors: [
+    { arabic: 'أبيض', roman: 'Abyad', meaning: 'White', usage: 'Color' },
+    { arabic: 'أسود', roman: 'Aswad', meaning: 'Black', usage: 'Color' },
+    { arabic: 'أحمر', roman: 'Ahmar', meaning: 'Red', usage: 'Color' },
+    { arabic: 'أزرق', roman: 'Azraq', meaning: 'Blue', usage: 'Color' },
+    { arabic: 'أخضر', roman: 'Akhdar', meaning: 'Green', usage: 'Color' },
+    { arabic: 'أصفر', roman: 'Asfar', meaning: 'Yellow', usage: 'Color' },
+    { arabic: 'برتقالي', roman: 'Burtuqali', meaning: 'Orange', usage: 'Color' },
+    { arabic: 'بنفسجي', roman: 'Banafsaji', meaning: 'Purple', usage: 'Color' },
+    { arabic: 'وردي', roman: 'Wardi', meaning: 'Pink', usage: 'Color' },
+    { arabic: 'بني', roman: 'Bunni', meaning: 'Brown', usage: 'Color' },
+  ],
+  nature: [
+    { arabic: 'شمس', roman: 'Shams', meaning: 'Sun', usage: 'Nature' },
+    { arabic: 'قمر', roman: 'Qamar', meaning: 'Moon', usage: 'Nature' },
+    { arabic: 'نجم', roman: 'Najm', meaning: 'Star', usage: 'Nature' },
+    { arabic: 'سماء', roman: 'Sama\'', meaning: 'Sky', usage: 'Nature' },
+    { arabic: 'أرض', roman: 'Ard', meaning: 'Earth/Land', usage: 'Nature' },
+    { arabic: 'بحر', roman: 'Bahr', meaning: 'Sea', usage: 'Nature' },
+    { arabic: 'نهر', roman: 'Nahr', meaning: 'River', usage: 'Nature' },
+    { arabic: 'جبل', roman: 'Jabal', meaning: 'Mountain', usage: 'Nature' },
+    { arabic: 'شجرة', roman: 'Shajara', meaning: 'Tree', usage: 'Nature' },
+    { arabic: 'زهرة', roman: 'Zahra', meaning: 'Flower', usage: 'Nature' },
+    { arabic: 'مطر', roman: 'Matar', meaning: 'Rain', usage: 'Weather' },
+    { arabic: 'ثلج', roman: 'Thalj', meaning: 'Snow', usage: 'Weather' },
+    { arabic: 'هواء', roman: 'Hawa\'', meaning: 'Air/Wind', usage: 'Weather' },
+  ],
+  islamic: [
+    { arabic: 'الله', roman: 'Allah', meaning: 'God', usage: 'The one God' },
+    { arabic: 'محمد', roman: 'Muhammad', meaning: 'The Prophet', usage: 'Prophet\'s name' },
+    { arabic: 'قرآن', roman: 'Qur\'an', meaning: 'Holy Book', usage: 'Scripture' },
+    { arabic: 'مسجد', roman: 'Masjid', meaning: 'Mosque', usage: 'Place of worship' },
+    { arabic: 'صلاة', roman: 'Salah', meaning: 'Prayer', usage: 'Worship' },
+    { arabic: 'صوم', roman: 'Sawm', meaning: 'Fasting', usage: 'Pillar of Islam' },
+    { arabic: 'زكاة', roman: 'Zakat', meaning: 'Charity', usage: 'Pillar of Islam' },
+    { arabic: 'حج', roman: 'Hajj', meaning: 'Pilgrimage', usage: 'Pillar of Islam' },
+    { arabic: 'إيمان', roman: 'Iman', meaning: 'Faith', usage: 'Belief' },
+    { arabic: 'تقوى', roman: 'Taqwa', meaning: 'God-consciousness', usage: 'Spiritual concept' },
+    { arabic: 'دعاء', roman: 'Du\'a', meaning: 'Supplication', usage: 'Personal prayer' },
+    { arabic: 'ذكر', roman: 'Dhikr', meaning: 'Remembrance', usage: 'Remembering Allah' },
+    { arabic: 'حلال', roman: 'Halal', meaning: 'Permissible', usage: 'Islamic law' },
+    { arabic: 'حرام', roman: 'Haram', meaning: 'Forbidden', usage: 'Islamic law' },
+    { arabic: 'سنة', roman: 'Sunnah', meaning: 'Prophet\'s way', usage: 'Tradition' },
+  ],
+}
+
+// Arabic Numbers
+const arabicNumbers = [
+  { number: 0, arabic: 'صفر', roman: 'Sifr' },
+  { number: 1, arabic: 'واحد', roman: 'Wahid' },
+  { number: 2, arabic: 'اثنان', roman: 'Ithnan' },
+  { number: 3, arabic: 'ثلاثة', roman: 'Thalatha' },
+  { number: 4, arabic: 'أربعة', roman: 'Arba\'a' },
+  { number: 5, arabic: 'خمسة', roman: 'Khamsa' },
+  { number: 6, arabic: 'ستة', roman: 'Sitta' },
+  { number: 7, arabic: 'سبعة', roman: 'Sab\'a' },
+  { number: 8, arabic: 'ثمانية', roman: 'Thamaniya' },
+  { number: 9, arabic: 'تسعة', roman: 'Tis\'a' },
+  { number: 10, arabic: 'عشرة', roman: 'Ashara' },
+  { number: 11, arabic: 'أحد عشر', roman: 'Ahada ashar' },
+  { number: 12, arabic: 'اثنا عشر', roman: 'Ithna ashar' },
+  { number: 13, arabic: 'ثلاثة عشر', roman: 'Thalathata ashar' },
+  { number: 14, arabic: 'أربعة عشر', roman: 'Arba\'ata ashar' },
+  { number: 15, arabic: 'خمسة عشر', roman: 'Khamsata ashar' },
+  { number: 20, arabic: 'عشرون', roman: 'Ishrun' },
+  { number: 30, arabic: 'ثلاثون', roman: 'Thalathun' },
+  { number: 40, arabic: 'أربعون', roman: 'Arba\'un' },
+  { number: 50, arabic: 'خمسون', roman: 'Khamsun' },
+  { number: 60, arabic: 'ستون', roman: 'Sittun' },
+  { number: 70, arabic: 'سبعون', roman: 'Sab\'un' },
+  { number: 80, arabic: 'ثمانون', roman: 'Thamanun' },
+  { number: 90, arabic: 'تسعون', roman: 'Tis\'un' },
+  { number: 100, arabic: 'مائة', roman: 'Mi\'a' },
+  { number: 200, arabic: 'مائتان', roman: 'Mi\'atan' },
+  { number: 1000, arabic: 'ألف', roman: 'Alf' },
+]
+
+// Arabic Alphabet
+const arabicAlphabet = [
+  { letter: 'ا', name: 'Alif', sound: 'a/aa' },
+  { letter: 'ب', name: 'Ba', sound: 'b' },
+  { letter: 'ت', name: 'Ta', sound: 't' },
+  { letter: 'ث', name: 'Tha', sound: 'th (as in think)' },
+  { letter: 'ج', name: 'Jeem', sound: 'j' },
+  { letter: 'ح', name: 'Ha', sound: 'h (breathy)' },
+  { letter: 'خ', name: 'Kha', sound: 'kh (guttural)' },
+  { letter: 'د', name: 'Dal', sound: 'd' },
+  { letter: 'ذ', name: 'Dhal', sound: 'dh (as in this)' },
+  { letter: 'ر', name: 'Ra', sound: 'r (rolled)' },
+  { letter: 'ز', name: 'Zay', sound: 'z' },
+  { letter: 'س', name: 'Seen', sound: 's' },
+  { letter: 'ش', name: 'Sheen', sound: 'sh' },
+  { letter: 'ص', name: 'Sad', sound: 's (emphatic)' },
+  { letter: 'ض', name: 'Dad', sound: 'd (emphatic)' },
+  { letter: 'ط', name: 'Ta', sound: 't (emphatic)' },
+  { letter: 'ظ', name: 'Dha', sound: 'dh (emphatic)' },
+  { letter: 'ع', name: 'Ayn', sound: 'voiced pharyngeal' },
+  { letter: 'غ', name: 'Ghayn', sound: 'gh (like French r)' },
+  { letter: 'ف', name: 'Fa', sound: 'f' },
+  { letter: 'ق', name: 'Qaf', sound: 'q (deep k)' },
+  { letter: 'ك', name: 'Kaf', sound: 'k' },
+  { letter: 'ل', name: 'Lam', sound: 'l' },
+  { letter: 'م', name: 'Meem', sound: 'm' },
+  { letter: 'ن', name: 'Noon', sound: 'n' },
+  { letter: 'ه', name: 'Ha', sound: 'h' },
+  { letter: 'و', name: 'Waw', sound: 'w/oo' },
+  { letter: 'ي', name: 'Ya', sound: 'y/ee' },
+]
+
+// Arabic Grammar
+const arabicGrammar = [
+  {
+    title: 'Basic Sentence Structure',
+    content: 'Arabic sentences can be nominal (starting with noun) or verbal (starting with verb). Nominal: الكتاب كبير (The book is big). Verbal: يقرأ الولد (The boy reads).',
+    examples: ['الولد كبير - The boy is big', 'تأكل البنت - The girl eats']
+  },
+  {
+    title: 'Definite Article (ال)',
+    content: 'The prefix "ال" (al-) makes a noun definite, like "the" in English. كتاب (a book) → الكتاب (the book).',
+    examples: ['بيت → البيت (house → the house)', 'قمر → القمر (moon → the moon)']
+  },
+  {
+    title: 'Gender',
+    content: 'Arabic nouns are either masculine or feminine. Most feminine nouns end in ة (ta marbuta). معلم (male teacher), معلمة (female teacher).',
+    examples: ['طالب/طالبة (student m/f)', 'صديق/صديقة (friend m/f)']
+  },
+  {
+    title: 'Pronouns',
+    content: 'أنا (I), أنت (you m), أنتِ (you f), هو (he), هي (she), نحن (we), أنتم (you pl), هم (they).',
+    examples: ['أنا طالب - I am a student', 'هي معلمة - She is a teacher']
+  },
+  {
+    title: 'Possession',
+    content: 'Add suffixes to show possession: ي (my), ك (your m), كِ (your f), ه (his), ها (her).',
+    examples: ['كتابي (my book)', 'بيتك (your house)', 'قلمها (her pen)']
+  },
+  {
+    title: 'Plurals',
+    content: 'Regular plurals add ون (m) or ات (f). Broken plurals change the word pattern internally.',
+    examples: ['معلمون (teachers m)', 'طالبات (students f)', 'كتب (books - broken plural)']
+  },
+]
+
+// Islamic Lessons - Real comprehensive lessons
+const islamicLessons = {
+  beginner: [
+    {
+      title: 'The Five Pillars of Islam',
+      content: `Islam is built upon five fundamental pillars that every Muslim should know and practice:
+
+1. **Shahada (Declaration of Faith)**: "La ilaha illa Allah, Muhammad rasul Allah" - There is no god but Allah, and Muhammad is His messenger. This declaration is the foundation of Islamic faith.
+
+2. **Salah (Prayer)**: Muslims pray five times daily - Fajr (dawn), Dhuhr (noon), Asr (afternoon), Maghrib (sunset), and Isha (night). Prayer connects us directly with Allah.
+
+3. **Zakat (Charity)**: Giving 2.5% of one's savings annually to those in need. This purifies wealth and helps the community.
+
+4. **Sawm (Fasting)**: During Ramadan, Muslims fast from dawn to sunset, abstaining from food, drink, and negative behaviors. This builds self-discipline and empathy.
+
+5. **Hajj (Pilgrimage)**: Every able Muslim should perform pilgrimage to Mecca at least once in their lifetime if they can afford it.`,
+      keyPoints: ['Shahada is the entry point to Islam', 'Prayer is performed 5 times daily', 'Zakat purifies wealth', 'Fasting builds discipline', 'Hajj unites the Ummah']
+    },
+    {
+      title: 'Who is Allah?',
+      content: `Allah is the Arabic word for God - the same God worshipped by Abraham, Moses, Jesus, and Muhammad (peace be upon them all).
+
+**Key Attributes of Allah:**
+- Al-Rahman (The Most Merciful)
+- Al-Raheem (The Most Compassionate)  
+- Al-Malik (The King/Sovereign)
+- Al-Quddus (The Holy)
+- Al-Alim (The All-Knowing)
+- Al-Khaliq (The Creator)
+
+Allah has 99 beautiful names that describe His attributes. Muslims believe Allah is:
+- One and unique (Tawhid)
+- All-powerful and All-knowing
+- The Creator of everything
+- Close to His servants
+- Merciful and forgiving`,
+      keyPoints: ['Allah means "The God" in Arabic', 'He has 99 beautiful names', 'Tawhid is the belief in One God', 'Allah is Most Merciful']
+    },
+    {
+      title: 'The Prophet Muhammad ﷺ',
+      content: `Prophet Muhammad (peace be upon him) was born in Mecca in 570 CE. He received the first revelation from Allah through Angel Jibreel (Gabriel) at age 40.
+
+**Key Facts:**
+- Born in the Year of the Elephant
+- Known as "Al-Sadiq Al-Amin" (The Truthful, The Trustworthy)
+- Received revelation for 23 years
+- Migrated to Medina in 622 CE (Hijra)
+- Established the first Muslim community
+- Passed away in 632 CE in Medina
+
+**His Character:**
+- Honest in all dealings
+- Kind to all people
+- Patient in hardship
+- Merciful to enemies
+- Simple in lifestyle`,
+      keyPoints: ['Born in Mecca 570 CE', 'First revelation at age 40', 'Hijra to Medina in 622 CE', 'Known for honesty and trustworthiness']
+    },
+  ],
+  intermediate: [
+    {
+      title: 'Understanding the Quran',
+      content: `The Quran is the holy book of Islam, revealed to Prophet Muhammad ﷺ over 23 years.
+
+**Structure:**
+- 114 Surahs (chapters)
+- 6,236 verses (ayat)
+- Divided into 30 Juz (parts) for easier reading
+
+**Revelation:**
+- First revealed in Ramadan
+- First word: "Iqra" (Read)
+- Revealed in Arabic
+- Preserved unchanged since revelation
+
+**How to Approach the Quran:**
+1. Make wudu (ablution) before reading
+2. Seek refuge from Shaytan
+3. Start with Bismillah
+4. Read with contemplation (tadabbur)
+5. Implement what you learn`,
+      keyPoints: ['114 Surahs, 6236 verses', 'Preserved unchanged', 'First word was "Iqra" (Read)', 'Read with contemplation']
+    },
+    {
+      title: 'The Importance of Prayer',
+      content: `Salah (prayer) is the second pillar and the first thing we'll be asked about on Judgment Day.
+
+**The Five Daily Prayers:**
+- Fajr: 2 rakaat (before sunrise)
+- Dhuhr: 4 rakaat (after midday)
+- Asr: 4 rakaat (afternoon)
+- Maghrib: 3 rakaat (after sunset)
+- Isha: 4 rakaat (night)
+
+**Benefits of Prayer:**
+- Direct connection with Allah
+- Spiritual purification
+- Time management
+- Community bonding
+- Physical exercise
+- Mental peace
+
+**Prerequisites:**
+1. Cleanliness (Tahara)
+2. Proper clothing
+3. Facing Qibla (Mecca)
+4. Right intention (Niyyah)
+5. Proper time`,
+      keyPoints: ['5 prayers = 17 rakaat daily', 'First thing asked about on Judgment Day', 'Requires wudu and facing Qibla', 'Brings peace and discipline']
+    },
+  ],
+  advanced: [
+    {
+      title: 'Purification of the Heart',
+      content: `Islam emphasizes internal purification as much as external worship. The Prophet ﷺ said: "There is a piece of flesh in the body, if it is healthy, the whole body is healthy, and if it is corrupt, the whole body is corrupt. Verily, it is the heart."
+
+**Diseases of the Heart:**
+- Kibr (Arrogance)
+- Hasad (Envy)
+- Riya (Showing off)
+- Ghurur (Delusion)
+- Ghaflah (Heedlessness)
+
+**Cures:**
+- Regular dhikr (remembrance)
+- Self-accountability (muhasaba)
+- Keeping good company
+- Seeking knowledge
+- Sincere repentance
+- Gratitude (shukr)`,
+      keyPoints: ['The heart is central to faith', 'Pride and envy corrupt the heart', 'Dhikr purifies the heart', 'Self-reflection is essential']
+    },
+    {
+      title: 'Understanding Tawakkul (Trust in Allah)',
+      content: `Tawakkul means placing complete trust in Allah while taking appropriate action.
+
+**Misconceptions:**
+❌ Tawakkul is NOT abandoning effort
+❌ It's NOT fatalism or laziness
+❌ It's NOT neglecting responsibilities
+
+**True Tawakkul:**
+✓ Trust Allah with the outcome
+✓ Do your best effort
+✓ Accept Allah's decree
+✓ Maintain hope and patience
+
+The Prophet ﷺ said: "Tie your camel, then trust in Allah." This teaches us to take necessary precautions while trusting Allah with results.
+
+**Levels of Tawakkul:**
+1. Trust in worldly matters
+2. Trust in religious matters
+3. Complete surrender to Allah's will`,
+      keyPoints: ['Tie your camel, then trust Allah', 'Effort + Trust = True Tawakkul', 'Accept outcomes with patience', 'Not fatalism or laziness']
+    },
+  ],
+}
+
+// Words of the Day - rotating daily
+const wordsOfTheDay = [
+  { arabic: 'صبر', roman: 'Sabr', meaning: 'Patience', reflection: 'Patience is half of faith' },
+  { arabic: 'شكر', roman: 'Shukr', meaning: 'Gratitude', reflection: 'If you are grateful, I will give you more' },
+  { arabic: 'توكل', roman: 'Tawakkul', meaning: 'Trust in Allah', reflection: 'Trust Allah but tie your camel' },
+  { arabic: 'إحسان', roman: 'Ihsan', meaning: 'Excellence', reflection: 'Worship Allah as if you see Him' },
+  { arabic: 'تقوى', roman: 'Taqwa', meaning: 'God-consciousness', reflection: 'The best provision is Taqwa' },
+  { arabic: 'رحمة', roman: 'Rahma', meaning: 'Mercy', reflection: 'My mercy encompasses all things' },
+  { arabic: 'عدل', roman: 'Adl', meaning: 'Justice', reflection: 'Be just, even against yourselves' },
 ]
 
 export default function LearnPage() {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('urdu')
-  const [dailyLesson, setDailyLesson] = useState(null)
-  const [deen, setDeen] = useState(null)
-  const [streak, setStreak] = useState(null)
-  const [view, setView] = useState('daily') // 'daily' | 'browse' | 'alphabet'
-  const [categories, setCategories] = useState([])
-  const [lessons, setLessons] = useState([])
+  const [activeTab, setActiveTab] = useState('arabic')
+  const [view, setView] = useState('main')
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [responses, setResponses] = useState([])
-  const [comment, setComment] = useState('')
-  const [lessonComplete, setLessonComplete] = useState(false)
-  const [loading, setLoading] = useState(true)
-  
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState(null)
-  const [audioUrl, setAudioUrl] = useState(null)
-  const mediaRecorderRef = useRef(null)
-  const chunksRef = useRef([])
+  const [selectedLesson, setSelectedLesson] = useState(null)
 
-  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
+  const wordOfDay = wordsOfTheDay[new Date().getDay()]
 
-  useEffect(() => {
-    fetchData()
-  }, [activeTab])
+  const categories = [
+    { id: 'greetings', label: 'Greetings', emoji: '👋', count: arabicWords.greetings.length },
+    { id: 'love', label: 'Love & Affection', emoji: '💕', count: arabicWords.love.length },
+    { id: 'family', label: 'Family', emoji: '👨‍👩‍👧', count: arabicWords.family.length },
+    { id: 'food', label: 'Food & Drink', emoji: '🍽️', count: arabicWords.food.length },
+    { id: 'daily', label: 'Daily Words', emoji: '☀️', count: arabicWords.daily.length },
+    { id: 'colors', label: 'Colors', emoji: '🎨', count: arabicWords.colors.length },
+    { id: 'nature', label: 'Nature', emoji: '🌿', count: arabicWords.nature.length },
+    { id: 'islamic', label: 'Islamic Terms', emoji: '🕌', count: arabicWords.islamic.length },
+  ]
 
-  const fetchData = async () => {
-    setLoading(true)
-    setView('daily')
-    try {
-      if (activeTab === 'islam') {
-        const deenData = await getDailyDeen()
-        setDeen(deenData)
-      } else {
-        const [lessonData, streakData, cats] = await Promise.all([
-          getDailyLesson(activeTab),
-          user ? getLearningStreak(user.role) : null,
-          getLessonCategories(activeTab)
-        ])
-        setDailyLesson(lessonData)
-        setStreak(streakData)
-        setCategories(cats || [])
-        
-        if (lessonData?.id) {
-          const resp = await getLessonResponses(lessonData.id)
-          setResponses(resp || [])
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    }
-    setLoading(false)
-  }
-
-  const handleCategorySelect = async (cat) => {
-    setSelectedCategory(cat)
-    try {
-      const data = await getLessonsByCategory(activeTab, cat)
-      setLessons(data || [])
-    } catch (error) {
-      console.error('Error fetching lessons:', error)
-    }
-  }
-
-  const handleAddComment = async () => {
-    if (!comment.trim() || !dailyLesson) return
-    try {
-      await addLessonResponse(dailyLesson.id, user.role, 'comment', null, comment)
-      setResponses(prev => [{ user_role: user.role, response_type: 'comment', comment, created_at: new Date() }, ...prev])
-      setComment('')
-    } catch (error) {
-      console.error('Error adding comment:', error)
-    }
-  }
-
-  const handleComplete = async () => {
-    if (!dailyLesson) return
-    try {
-      await markLessonComplete(user.role, dailyLesson.id)
-      setLessonComplete(true)
-      if (streak) {
-        setStreak(prev => ({
-          ...prev,
-          current_streak: prev.current_streak + 1,
-          total_words_learned: prev.total_words_learned + 1
-        }))
-      }
-    } catch (error) {
-      console.error('Error completing lesson:', error)
-    }
-  }
-
-  // Recording functions
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorderRef.current = new MediaRecorder(stream)
-      chunksRef.current = []
-
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        chunksRef.current.push(e.data)
-      }
-
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        setAudioBlob(blob)
-        setAudioUrl(URL.createObjectURL(blob))
-        stream.getTracks().forEach(track => track.stop())
-      }
-
-      mediaRecorderRef.current.start()
-      setIsRecording(true)
-    } catch (error) {
-      console.error('Error starting recording:', error)
-      alert('Could not access microphone')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
-  }
-
-  const submitRecording = async () => {
-    if (!audioBlob || !dailyLesson) return
-    try {
-      const fileName = `${user.role}-${dailyLesson.id}-${Date.now()}.webm`
-      const url = await uploadAudio(audioBlob, fileName)
-      await addLessonResponse(dailyLesson.id, user.role, 'recording', url, null)
-      setResponses(prev => [{ user_role: user.role, response_type: 'recording', audio_url: url, created_at: new Date() }, ...prev])
-      setAudioBlob(null)
-      setAudioUrl(null)
-    } catch (error) {
-      console.error('Error uploading recording:', error)
-      alert('Could not upload recording')
-    }
-  }
-
-  const cancelRecording = () => {
-    setAudioBlob(null)
-    setAudioUrl(null)
-  }
+  const BackButton = ({ onClick, label }) => (
+    <button 
+      onClick={onClick}
+      className="flex items-center gap-3 text-forest mb-6 hover:opacity-80 transition-opacity"
+    >
+      <div className="w-10 h-10 rounded-full bg-forest flex items-center justify-center">
+        <svg className="w-5 h-5 text-cream-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </div>
+      <span className="text-body font-medium">{label || 'Back'}</span>
+    </button>
+  )
 
   return (
     <div className="min-h-screen pb-28">
@@ -171,344 +448,289 @@ export default function LearnPage() {
       <div className="bg-forest px-6 pt-14 pb-10">
         <div className="max-w-lg mx-auto text-center">
           <h1 className="font-serif text-display-sm text-cream-50 mb-2">Learn</h1>
-          <p className="text-body text-cream-300">A little something new each day</p>
-          
-          {/* Streak */}
-          {streak && activeTab !== 'islam' && (
-            <div className="mt-6 flex items-center justify-center gap-8">
-              <div className="text-center">
-                <p className="font-serif text-title text-gold">{streak.current_streak}</p>
-                <p className="text-caption text-cream-400">Day streak</p>
-              </div>
-              <div className="w-px h-10 bg-forest-500" />
-              <div className="text-center">
-                <p className="font-serif text-title text-cream-100">{streak.total_words_learned}</p>
-                <p className="text-caption text-cream-400">Words learned</p>
-              </div>
-            </div>
-          )}
+          <p className="text-body text-cream-300">Grow together, learn together</p>
         </div>
       </div>
+
+      {/* Word of the Day */}
+      {view === 'main' && (
+        <div className="bg-gradient-to-r from-gold-100 via-rose-100 to-gold-100 px-6 py-6">
+          <div className="max-w-lg mx-auto text-center">
+            <p className="text-caption text-gold-700 uppercase tracking-widest mb-2">Word of the Day</p>
+            <p className="font-serif text-display-sm text-forest mb-1">{wordOfDay.arabic}</p>
+            <p className="text-title-sm text-forest-700">{wordOfDay.roman}</p>
+            <p className="text-body text-forest-600">{wordOfDay.meaning}</p>
+            <p className="text-body-sm text-gold-700 mt-2 italic">"{wordOfDay.reflection}"</p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
-      <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
-        <div className="max-w-lg mx-auto flex justify-center gap-2">
-          {languages.map((lang) => (
-            <button
-              key={lang.id}
-              onClick={() => { setActiveTab(lang.id); setView('daily'); }}
-              className={`
-                flex items-center gap-2 px-5 py-3 rounded-full text-body-sm font-medium transition-all
-                ${activeTab === lang.id 
-                  ? 'bg-forest text-cream-100' 
-                  : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
-                }
-              `}
-            >
-              <span>{lang.flag}</span>
-              <span>{lang.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="bg-cream min-h-[60vh]">
-        {loading ? (
-          <div className="px-6 py-20 text-center">
-            <p className="text-ink-400 animate-pulse-soft">Loading...</p>
-          </div>
-        ) : activeTab === 'islam' ? (
-          /* Islam Content */
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              {deen && (
-                <div className="bg-white rounded-3xl p-8 shadow-card">
-                  <div className="text-center mb-6">
-                    <span className="tag tag-gold capitalize">{deen.content_type}</span>
-                  </div>
-
-                  <h2 className="font-serif text-title text-forest text-center mb-6">{deen.title}</h2>
-
-                  {deen.arabic_text && (
-                    <p className="text-3xl text-forest text-center py-6 leading-relaxed font-medium" dir="rtl">
-                      {deen.arabic_text}
-                    </p>
-                  )}
-
-                  <p className="text-body-lg text-ink-500 leading-relaxed text-center mb-6">
-                    {deen.content}
-                  </p>
-
-                  {deen.source && (
-                    <p className="text-body-sm text-ink-400 italic text-center mb-6">— {deen.source}</p>
-                  )}
-
-                  {deen.reflection && (
-                    <div className="bg-gold-50 rounded-2xl p-6 border-l-4 border-gold">
-                      <p className="text-caption text-gold-700 mb-2">Shahjahan's Reflection</p>
-                      <p className="text-body text-ink-600 italic">{deen.reflection}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : view === 'daily' ? (
-          /* Daily Lesson */
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              {dailyLesson && (
-                <>
-                  {/* Main Word Card */}
-                  <div className="bg-white rounded-3xl p-8 shadow-card mb-6">
-                    <div className="flex items-center justify-center gap-3 mb-6">
-                      <span className="tag tag-forest">Today's Word</span>
-                      {dailyLesson.is_couples_vocab && (
-                        <span className="tag tag-rose">For Us</span>
-                      )}
-                    </div>
-
-                    {/* Word Display */}
-                    <div className="text-center py-8 border-b border-cream-200 mb-6">
-                      {activeTab === 'urdu' && dailyLesson.word_native && (
-                        <p className="text-4xl text-forest mb-4 font-medium" dir="rtl">
-                          {dailyLesson.word_native}
-                        </p>
-                      )}
-                      <h2 className="font-serif text-display-sm text-forest mb-3">
-                        {dailyLesson.word_romanized}
-                      </h2>
-                      <p className="text-body-lg text-ink-500">{dailyLesson.meaning}</p>
-                    </div>
-
-                    {/* Usage Context */}
-                    {dailyLesson.usage_context && (
-                      <div className="bg-gold-50 rounded-2xl p-5 mb-6 text-center">
-                        <p className="text-caption text-gold-700 mb-2">When to use this</p>
-                        <p className="text-body text-ink-600">{dailyLesson.usage_context}</p>
-                      </div>
-                    )}
-
-                    {/* Example */}
-                    {dailyLesson.example_sentence && (
-                      <div className="bg-cream-100 rounded-2xl p-5 mb-6 text-center">
-                        <p className="text-caption text-ink-400 mb-2">Example</p>
-                        <p className="text-body text-ink-600 italic mb-1">{dailyLesson.example_sentence}</p>
-                        {dailyLesson.example_translation && (
-                          <p className="text-body-sm text-ink-400">{dailyLesson.example_translation}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Shahjahan's Audio */}
-                    {dailyLesson.audio_url && (
-                      <div className="mb-6">
-                        <p className="text-caption text-ink-400 mb-3 text-center">Listen to Shahjahan</p>
-                        <audio controls src={dailyLesson.audio_url} className="w-full" />
-                      </div>
-                    )}
-
-                    {/* Complete Button */}
-                    {!lessonComplete ? (
-                      <button onClick={handleComplete} className="btn-primary w-full">
-                        Mark as Learned ✓
-                      </button>
-                    ) : (
-                      <div className="bg-forest-50 rounded-2xl p-5 text-center">
-                        <span className="text-2xl mb-2 block">✓</span>
-                        <p className="text-body font-medium text-forest">Word learned!</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Recording Section */}
-                  <div className="bg-white rounded-3xl p-6 shadow-card mb-6">
-                    <h3 className="font-serif text-title-sm text-forest text-center mb-4">Practice Saying It</h3>
-                    
-                    {!audioUrl ? (
-                      <div className="text-center">
-                        <button
-                          onClick={isRecording ? stopRecording : startRecording}
-                          className={`
-                            w-20 h-20 rounded-full flex items-center justify-center mx-auto transition-all
-                            ${isRecording 
-                              ? 'bg-rose-500 animate-pulse' 
-                              : 'bg-forest hover:bg-forest-700'
-                            }
-                          `}
-                        >
-                          {isRecording ? (
-                            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                              <rect x="6" y="6" width="12" height="12" rx="2" />
-                            </svg>
-                          ) : (
-                            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                            </svg>
-                          )}
-                        </button>
-                        <p className="text-body-sm text-ink-400 mt-3">
-                          {isRecording ? 'Recording... Tap to stop' : 'Tap to record yourself'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <audio controls src={audioUrl} className="w-full" />
-                        <div className="flex gap-3">
-                          <button onClick={submitRecording} className="btn-primary flex-1">
-                            Send to {theirName}
-                          </button>
-                          <button onClick={cancelRecording} className="btn-ghost">
-                            Redo
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Comments Section */}
-                  <div className="bg-white rounded-3xl p-6 shadow-card mb-6">
-                    <h3 className="font-serif text-title-sm text-forest text-center mb-4">Comments</h3>
-                    
-                    <div className="flex gap-3 mb-4">
-                      <input
-                        type="text"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder="Add a note..."
-                        className="input flex-1"
-                      />
-                      <button onClick={handleAddComment} className="btn-secondary px-5">
-                        Send
-                      </button>
-                    </div>
-
-                    {responses.length > 0 && (
-                      <div className="space-y-3 mt-4">
-                        {responses.map((resp, i) => (
-                          <div 
-                            key={i} 
-                            className={`rounded-xl p-4 ${
-                              resp.user_role === user?.role ? 'bg-forest-50' : 'bg-cream-100'
-                            }`}
-                          >
-                            <p className="text-caption text-ink-400 mb-1">
-                              {resp.user_role === user?.role ? 'You' : resp.user_role === 'shah' ? 'Shahjahan' : 'Dane'}
-                            </p>
-                            {resp.comment && <p className="text-body text-ink-600">{resp.comment}</p>}
-                            {resp.audio_url && <audio controls src={resp.audio_url} className="w-full mt-2" />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Browse More */}
-                  <div className="bg-gradient-to-br from-gold-100 via-rose-50 to-cream rounded-3xl p-6 shadow-soft">
-                    <p className="text-center text-caption text-gold-700 mb-3">Want to learn more?</p>
-                    <h3 className="font-serif text-title text-forest text-center mb-4">
-                      ✨ Explore {activeTab === 'urdu' ? 'Urdu' : 'Tagalog'}
-                    </h3>
-                    <p className="text-body-sm text-ink-500 text-center mb-5">
-                      Discover words for love, food, family & more
-                    </p>
-                    <button 
-                      onClick={() => setView('browse')}
-                      className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-medium flex items-center justify-center gap-2"
-                    >
-                      <span>📚</span> Start Exploring
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Browse Mode */
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              <button 
-                onClick={() => { setView('daily'); setSelectedCategory(null); }}
-                className="flex items-center gap-2 text-body-sm text-ink-400 hover:text-forest mb-6"
+      {view === 'main' && (
+        <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
+          <div className="max-w-lg mx-auto flex justify-center gap-2">
+            {[
+              { id: 'arabic', label: 'Arabic' },
+              { id: 'islam', label: 'Islam' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 rounded-full text-body-sm font-medium transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-forest text-cream-100' 
+                    : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
+                }`}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to today's lesson
+                {tab.label}
               </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-              <div className="text-center mb-8">
-                <h2 className="font-serif text-display-sm text-forest mb-2">
-                  {activeTab === 'urdu' ? '🇵🇰 Urdu' : '🇵🇭 Tagalog'} Library
-                </h2>
-                <p className="text-body text-ink-500">Learn words that matter</p>
+      <div className="bg-cream min-h-[60vh]">
+        {/* Main View */}
+        {view === 'main' && activeTab === 'arabic' && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              {/* Quick Links */}
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                <button
+                  onClick={() => setView('alphabet')}
+                  className="bg-forest-50 rounded-2xl p-4 text-center hover:bg-forest-100 transition-colors"
+                >
+                  <span className="text-2xl block mb-1">أ ب</span>
+                  <span className="text-body-sm text-forest">Alphabet</span>
+                </button>
+                <button
+                  onClick={() => setView('numbers')}
+                  className="bg-gold-50 rounded-2xl p-4 text-center hover:bg-gold-100 transition-colors"
+                >
+                  <span className="text-2xl block mb-1">١٢٣</span>
+                  <span className="text-body-sm text-forest">Numbers</span>
+                </button>
+                <button
+                  onClick={() => setView('grammar')}
+                  className="bg-rose-50 rounded-2xl p-4 text-center hover:bg-rose-100 transition-colors"
+                >
+                  <span className="text-2xl block mb-1">📖</span>
+                  <span className="text-body-sm text-forest">Grammar</span>
+                </button>
               </div>
 
-              {!selectedCategory ? (
-                <div className="space-y-4">
-                  {/* Vibe Categories */}
-                  {[
-                    { id: 'love', label: 'Love & Endearment', emoji: '💕', desc: 'Sweet words for your Jaan', gradient: 'from-rose-100 to-rose-200' },
-                    { id: 'food', label: 'Food & Dining', emoji: '🍽️', desc: 'Talk about delicious food', gradient: 'from-gold-100 to-gold-200' },
-                    { id: 'family', label: 'Family & Respect', emoji: '👨‍👩‍👧', desc: 'Words for loved ones', gradient: 'from-forest-50 to-forest-100' },
-                    { id: 'daily', label: 'Daily Essentials', emoji: '☀️', desc: 'Common everyday phrases', gradient: 'from-cream-200 to-cream-300' },
-                    { id: 'emotions', label: 'Feelings & Emotions', emoji: '🥰', desc: 'Express how you feel', gradient: 'from-purple-100 to-purple-200' },
-                    { id: 'culture', label: 'Culture & Customs', emoji: '🎊', desc: 'Traditions & etiquette', gradient: 'from-blue-100 to-blue-200' },
-                  ].filter(c => categories.includes(c.id) || categories.length === 0).map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleCategorySelect(cat.id)}
-                      className={`w-full bg-gradient-to-r ${cat.gradient} rounded-2xl p-5 text-left hover:scale-[1.02] transition-transform active:scale-[0.98]`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className="text-4xl">{cat.emoji}</span>
-                        <div>
-                          <p className="font-serif text-title-sm text-forest">{cat.label}</p>
-                          <p className="text-body-sm text-forest-600">{cat.desc}</p>
-                        </div>
+              {/* Word Categories */}
+              <p className="section-label mb-4">Word Library</p>
+              <div className="space-y-3">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCategory(cat.id); setView('words'); }}
+                    className="w-full bg-white rounded-2xl p-5 shadow-soft hover:shadow-card transition-shadow flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="text-3xl">{cat.emoji}</span>
+                      <div className="text-left">
+                        <p className="font-serif text-title-sm text-forest">{cat.label}</p>
+                        <p className="text-body-sm text-ink-400">{cat.count} words</p>
                       </div>
-                    </button>
-                  ))}
+                    </div>
+                    <svg className="w-5 h-5 text-ink-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
-                  {/* Show original categories that don't match our presets */}
-                  {categories.filter(c => !['love', 'food', 'family', 'daily', 'emotions', 'culture'].includes(c)).map((cat) => (
+        {/* Islam Tab */}
+        {view === 'main' && activeTab === 'islam' && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <p className="section-label mb-4">Islamic Studies</p>
+              
+              {/* Beginner */}
+              <div className="mb-6">
+                <p className="text-body-sm font-medium text-ink-500 mb-3">📗 Beginner</p>
+                <div className="space-y-3">
+                  {islamicLessons.beginner.map((lesson, i) => (
                     <button
-                      key={cat}
-                      onClick={() => handleCategorySelect(cat)}
-                      className="w-full bg-white rounded-2xl p-5 text-left shadow-soft hover:shadow-card transition-shadow capitalize"
+                      key={i}
+                      onClick={() => { setSelectedLesson(lesson); setView('lesson'); }}
+                      className="w-full bg-green-50 rounded-2xl p-5 text-left hover:bg-green-100 transition-colors"
                     >
-                      <p className="font-serif text-title-sm text-forest">{cat}</p>
+                      <p className="font-serif text-title-sm text-forest">{lesson.title}</p>
+                      <p className="text-body-sm text-ink-400 mt-1">{lesson.keyPoints.length} key points</p>
                     </button>
                   ))}
                 </div>
-              ) : (
-                <>
-                  <button 
-                    onClick={() => setSelectedCategory(null)}
-                    className="text-body-sm text-ink-400 hover:text-forest mb-4"
-                  >
-                    ← All categories
-                  </button>
-                  
-                  <div className="space-y-4">
-                    {lessons.map((lesson) => (
-                      <div key={lesson.id} className="bg-white rounded-2xl p-5 shadow-soft">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-serif text-title-sm text-forest">{lesson.word_romanized}</h3>
-                          {lesson.is_couples_vocab && (
-                            <span className="tag tag-rose text-tiny">For Us</span>
-                          )}
-                        </div>
-                        <p className="text-body text-ink-500">{lesson.meaning}</p>
-                        {lesson.usage_context && (
-                          <p className="text-body-sm text-ink-400 mt-2 italic">{lesson.usage_context}</p>
-                        )}
-                      </div>
-                    ))}
+              </div>
+
+              {/* Intermediate */}
+              <div className="mb-6">
+                <p className="text-body-sm font-medium text-ink-500 mb-3">📘 Intermediate</p>
+                <div className="space-y-3">
+                  {islamicLessons.intermediate.map((lesson, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setSelectedLesson(lesson); setView('lesson'); }}
+                      className="w-full bg-blue-50 rounded-2xl p-5 text-left hover:bg-blue-100 transition-colors"
+                    >
+                      <p className="font-serif text-title-sm text-forest">{lesson.title}</p>
+                      <p className="text-body-sm text-ink-400 mt-1">{lesson.keyPoints.length} key points</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Advanced */}
+              <div>
+                <p className="text-body-sm font-medium text-ink-500 mb-3">📕 Advanced</p>
+                <div className="space-y-3">
+                  {islamicLessons.advanced.map((lesson, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setSelectedLesson(lesson); setView('lesson'); }}
+                      className="w-full bg-rose-50 rounded-2xl p-5 text-left hover:bg-rose-100 transition-colors"
+                    >
+                      <p className="font-serif text-title-sm text-forest">{lesson.title}</p>
+                      <p className="text-body-sm text-ink-400 mt-1">{lesson.keyPoints.length} key points</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Words View */}
+        {view === 'words' && selectedCategory && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <BackButton onClick={() => { setView('main'); setSelectedCategory(null); }} label="Back to categories" />
+              
+              <h2 className="font-serif text-title text-forest mb-6">
+                {categories.find(c => c.id === selectedCategory)?.emoji} {categories.find(c => c.id === selectedCategory)?.label}
+              </h2>
+
+              <div className="space-y-4">
+                {arabicWords[selectedCategory]?.map((word, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-5 shadow-soft">
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="font-serif text-display-sm text-forest">{word.arabic}</p>
+                    </div>
+                    <p className="text-title-sm text-forest-700">{word.roman}</p>
+                    <p className="text-body text-ink-600 mt-1">{word.meaning}</p>
+                    {word.usage && (
+                      <p className="text-body-sm text-ink-400 mt-2 italic">{word.usage}</p>
+                    )}
                   </div>
-                </>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Alphabet View */}
+        {view === 'alphabet' && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <BackButton onClick={() => setView('main')} label="Back" />
+              
+              <h2 className="font-serif text-title text-forest mb-2">Arabic Alphabet</h2>
+              <p className="text-body text-ink-500 mb-6">28 letters, read right to left</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {arabicAlphabet.map((item, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-4 shadow-soft text-center">
+                    <p className="font-serif text-display-sm text-forest mb-1">{item.letter}</p>
+                    <p className="text-body font-medium text-forest-700">{item.name}</p>
+                    <p className="text-body-sm text-ink-400">{item.sound}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Numbers View */}
+        {view === 'numbers' && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <BackButton onClick={() => setView('main')} label="Back" />
+              
+              <h2 className="font-serif text-title text-forest mb-2">Arabic Numbers</h2>
+              <p className="text-body text-ink-500 mb-6">From 0 to 1000</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {arabicNumbers.map((item, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-4 shadow-soft">
+                    <div className="flex items-center justify-between">
+                      <span className="text-title text-gold-600 font-bold">{item.number}</span>
+                      <span className="font-serif text-title text-forest">{item.arabic}</span>
+                    </div>
+                    <p className="text-body-sm text-ink-500 mt-1">{item.roman}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Grammar View */}
+        {view === 'grammar' && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <BackButton onClick={() => setView('main')} label="Back" />
+              
+              <h2 className="font-serif text-title text-forest mb-6">Arabic Grammar Basics</h2>
+
+              <div className="space-y-4">
+                {arabicGrammar.map((item, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-5 shadow-soft">
+                    <h3 className="font-serif text-title-sm text-forest mb-3">{item.title}</h3>
+                    <p className="text-body text-ink-600 mb-4">{item.content}</p>
+                    <div className="bg-cream-100 rounded-xl p-3">
+                      <p className="text-caption text-ink-500 mb-2">Examples:</p>
+                      {item.examples.map((ex, j) => (
+                        <p key={j} className="text-body-sm text-forest">{ex}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lesson View */}
+        {view === 'lesson' && selectedLesson && (
+          <div className="px-6 py-8">
+            <div className="max-w-lg mx-auto">
+              <BackButton onClick={() => { setView('main'); setSelectedLesson(null); }} label="Back to lessons" />
+              
+              <h2 className="font-serif text-display-sm text-forest mb-6">{selectedLesson.title}</h2>
+
+              <div className="bg-white rounded-2xl p-6 shadow-soft mb-6">
+                <div className="prose prose-forest text-body text-ink-600 whitespace-pre-line">
+                  {selectedLesson.content}
+                </div>
+              </div>
+
+              {selectedLesson.keyPoints && (
+                <div className="bg-forest-50 rounded-2xl p-5">
+                  <h3 className="font-serif text-title-sm text-forest mb-3">Key Points</h3>
+                  <ul className="space-y-2">
+                    {selectedLesson.keyPoints.map((point, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-forest mt-1">✓</span>
+                        <span className="text-body text-ink-600">{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </div>

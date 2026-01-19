@@ -1,26 +1,29 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { 
-  getCurrentStatus, 
   getCountdowns,
   addCountdown,
   deleteCountdown,
   getDailyQuestion, 
   answerQuestion,
   sendDuaRequest,
-  getUnreadDuaRequests
+  getLoveNotes,
+  addLoveNote
 } from '../lib/supabase'
 
 export default function HomePage({ onOpenSettings }) {
   const { user } = useAuth()
-  const [status, setStatus] = useState(null)
   const [countdowns, setCountdowns] = useState([])
   const [question, setQuestion] = useState(null)
   const [answer, setAnswer] = useState('')
   const [showAnswerInput, setShowAnswerInput] = useState(false)
-  const [duaRequests, setDuaRequests] = useState([])
   const [duaSent, setDuaSent] = useState(false)
   const [showAddCountdown, setShowAddCountdown] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
+  const [loveNotes, setLoveNotes] = useState([])
+  const [newNote, setNewNote] = useState('')
+  const [showAddNote, setShowAddNote] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const greeting = getGreeting()
@@ -29,20 +32,37 @@ export default function HomePage({ onOpenSettings }) {
 
   useEffect(() => {
     fetchData()
+    checkNotificationPermission()
   }, [user])
+
+  const checkNotificationPermission = () => {
+    if ('Notification' in window) {
+      const enabled = Notification.permission === 'granted'
+      setNotificationsEnabled(enabled)
+      setShowNotificationPrompt(Notification.permission === 'default')
+    }
+  }
+
+  const handleEnableNotifications = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        setNotificationsEnabled(true)
+        setShowNotificationPrompt(false)
+      }
+    }
+  }
 
   const fetchData = async () => {
     try {
-      const [statusData, countdownData, questionData, duaData] = await Promise.all([
-        getCurrentStatus(),
+      const [countdownData, questionData, notesData] = await Promise.all([
         getCountdowns(),
         getDailyQuestion(),
-        user ? getUnreadDuaRequests(user.role) : []
+        getLoveNotes ? getLoveNotes() : []
       ])
-      setStatus(statusData)
       setCountdowns(countdownData || [])
       setQuestion(questionData)
-      setDuaRequests(duaData || [])
+      setLoveNotes(notesData || [])
     } catch (error) {
       console.error('Error fetching data:', error)
     }
@@ -94,6 +114,18 @@ export default function HomePage({ onOpenSettings }) {
     }
   }
 
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return
+    try {
+      const note = await addLoveNote(user.role, newNote)
+      setLoveNotes(prev => [note, ...prev])
+      setNewNote('')
+      setShowAddNote(false)
+    } catch (error) {
+      console.error('Error adding note:', error)
+    }
+  }
+
   const myAnswer = user?.role === 'shah' ? question?.shah_answer : question?.dane_answer
   const theirAnswer = user?.role === 'shah' ? question?.dane_answer : question?.shah_answer
 
@@ -102,7 +134,6 @@ export default function HomePage({ onOpenSettings }) {
       {/* Hero Section */}
       <div className="bg-forest text-cream-100 px-6 pt-14 pb-12">
         <div className="max-w-lg mx-auto">
-          {/* Settings Button */}
           <div className="flex justify-end mb-4">
             <button 
               onClick={onOpenSettings}
@@ -122,15 +153,20 @@ export default function HomePage({ onOpenSettings }) {
         </div>
       </div>
 
-      {/* Dua Request Alert */}
-      {duaRequests.length > 0 && (
-        <div className="bg-rose-100 px-6 py-5">
-          <div className="max-w-lg mx-auto flex items-center justify-center gap-4">
-            <span className="text-3xl">🤲</span>
-            <div className="text-center">
-              <p className="text-body font-medium text-rose-700">{theirName} needs a Dua</p>
-              <p className="text-body-sm text-rose-500">They're thinking of you</p>
+      {/* Notification Prompt - disappears after enabling */}
+      {showNotificationPrompt && !notificationsEnabled && (
+        <div className="bg-gold-100 px-6 py-4">
+          <div className="max-w-lg mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔔</span>
+              <p className="text-body-sm text-forest">Enable notifications?</p>
             </div>
+            <button
+              onClick={handleEnableNotifications}
+              className="px-4 py-2 bg-forest text-cream-100 rounded-full text-body-sm font-medium"
+            >
+              Enable
+            </button>
           </div>
         </div>
       )}
@@ -227,8 +263,60 @@ export default function HomePage({ onOpenSettings }) {
         </div>
       )}
 
-      {/* Send a Dua */}
+      {/* Love Notes */}
       <div className="px-6 py-10 bg-cream">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <p className="section-label">Love Notes</p>
+            <button 
+              onClick={() => setShowAddNote(true)}
+              className="text-body-sm text-forest font-medium hover:text-forest-700"
+            >
+              + Send
+            </button>
+          </div>
+
+          {showAddNote && (
+            <div className="bg-rose-50 rounded-2xl p-4 mb-4">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder={`Write something sweet for ${theirName}...`}
+                className="input min-h-[80px] resize-none mb-3"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button onClick={handleAddNote} className="btn-primary flex-1 py-2">Send 💕</button>
+                <button onClick={() => { setShowAddNote(false); setNewNote('') }} className="btn-ghost py-2">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {loveNotes.length > 0 ? (
+            <div className="space-y-3">
+              {loveNotes.slice(0, 3).map((note) => (
+                <div key={note.id} className={`rounded-2xl p-4 ${note.from_user === user?.role ? 'bg-forest text-cream-100' : 'bg-rose-100 text-rose-800'}`}>
+                  <p className="text-caption opacity-70 mb-1">
+                    {note.from_user === user?.role ? 'You' : theirName}
+                  </p>
+                  <p className="text-body">{note.note}</p>
+                </div>
+              ))}
+            </div>
+          ) : !showAddNote && (
+            <button 
+              onClick={() => setShowAddNote(true)}
+              className="w-full py-6 border-2 border-dashed border-rose-200 rounded-2xl text-rose-400 hover:border-rose-300 hover:bg-rose-50 transition-all"
+            >
+              <span className="text-2xl block mb-2">💕</span>
+              <span className="text-body">Send a love note</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Send a Dua */}
+      <div className="px-6 py-10 bg-cream-200">
         <div className="max-w-lg mx-auto">
           <button
             onClick={handleSendDua}

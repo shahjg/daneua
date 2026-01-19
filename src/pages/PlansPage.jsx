@@ -27,6 +27,36 @@ const dateTypes = [
   { id: 'at_home', label: 'At Home' },
 ]
 
+// 2025-2026 Holidays
+const holidays = [
+  { date: '2025-01-01', title: "New Year's Day", emoji: '🎉' },
+  { date: '2025-01-20', title: 'Martin Luther King Jr. Day', emoji: '✊' },
+  { date: '2025-02-14', title: "Valentine's Day", emoji: '💕' },
+  { date: '2025-02-17', title: "Presidents' Day", emoji: '🇺🇸' },
+  { date: '2025-03-17', title: "St. Patrick's Day", emoji: '☘️' },
+  { date: '2025-03-30', title: 'Ramadan Begins (approx)', emoji: '🌙' },
+  { date: '2025-04-20', title: 'Easter', emoji: '🐣' },
+  { date: '2025-04-29', title: 'Eid al-Fitr (approx)', emoji: '🌙' },
+  { date: '2025-05-11', title: "Mother's Day", emoji: '💐' },
+  { date: '2025-05-26', title: 'Memorial Day', emoji: '🇺🇸' },
+  { date: '2025-06-15', title: "Father's Day", emoji: '👔' },
+  { date: '2025-06-19', title: 'Juneteenth', emoji: '✊' },
+  { date: '2025-07-04', title: 'Independence Day', emoji: '🎆' },
+  { date: '2025-07-06', title: 'Eid al-Adha (approx)', emoji: '🐑' },
+  { date: '2025-09-01', title: 'Labor Day', emoji: '👷' },
+  { date: '2025-10-13', title: 'Columbus Day', emoji: '⛵' },
+  { date: '2025-10-31', title: 'Halloween', emoji: '🎃' },
+  { date: '2025-11-11', title: "Veterans Day", emoji: '🎖️' },
+  { date: '2025-11-27', title: 'Thanksgiving', emoji: '🦃' },
+  { date: '2025-12-25', title: 'Christmas', emoji: '🎄' },
+  { date: '2025-12-31', title: "New Year's Eve", emoji: '🥳' },
+  { date: '2026-01-01', title: "New Year's Day", emoji: '🎉' },
+  { date: '2026-02-14', title: "Valentine's Day", emoji: '💕' },
+  { date: '2026-03-19', title: 'Ramadan Begins (approx)', emoji: '🌙' },
+  { date: '2026-04-05', title: 'Easter', emoji: '🐣' },
+  { date: '2026-04-18', title: 'Eid al-Fitr (approx)', emoji: '🌙' },
+]
+
 export default function PlansPage() {
   const { user } = useAuth()
   const [activeSection, setActiveSection] = useState('dates')
@@ -84,6 +114,18 @@ export default function PlansPage() {
     }
   }
 
+  const handleEditIdea = async (updatedIdea) => {
+    try {
+      await updateDateIdea(editingIdea.id, updatedIdea)
+      setDateIdeas(prev => prev.map(i => 
+        i.id === editingIdea.id ? { ...i, ...updatedIdea } : i
+      ))
+      setEditingIdea(null)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
   const handleAddEvent = async (event) => {
     try {
       const newEvent = await addCalendarEvent({ ...event, added_by: user.role })
@@ -99,18 +141,6 @@ export default function PlansPage() {
     try {
       await deleteDateIdea(id)
       setDateIdeas(prev => prev.filter(i => i.id !== id))
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleEditIdea = async (updatedIdea) => {
-    try {
-      await updateDateIdea(editingIdea.id, updatedIdea)
-      setDateIdeas(prev => prev.map(i => 
-        i.id === editingIdea.id ? { ...i, ...updatedIdea } : i
-      ))
-      setEditingIdea(null)
     } catch (error) {
       console.error('Error:', error)
     }
@@ -137,6 +167,24 @@ export default function PlansPage() {
     return styles[vibe] || 'bg-cream-200 text-ink-500'
   }
 
+  // Get upcoming holidays
+  const upcomingHolidays = holidays
+    .filter(h => new Date(h.date) >= new Date())
+    .slice(0, 5)
+
+  // Combine events with holidays for calendar view
+  const allEvents = [
+    ...events.map(e => ({ ...e, isHoliday: false })),
+    ...holidays.map(h => ({ 
+      id: `holiday-${h.date}`, 
+      title: h.title, 
+      start_date: h.date,
+      emoji: h.emoji,
+      isHoliday: true 
+    }))
+  ].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+    .filter(e => new Date(e.start_date) >= new Date(new Date().setHours(0,0,0,0)))
+
   return (
     <div className="min-h-screen pb-28">
       {/* Header */}
@@ -147,7 +195,7 @@ export default function PlansPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Date Ideas First */}
       <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
         <div className="max-w-lg mx-auto flex justify-center gap-2">
           {[
@@ -212,7 +260,7 @@ export default function PlansPage() {
                 <div className="space-y-4">
                   {dateIdeas.map((idea) => (
                     <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card relative group">
-                      {/* Edit & Delete Buttons */}
+                      {/* Edit & Delete - show on hover */}
                       <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setEditingIdea(idea)}
@@ -303,43 +351,85 @@ export default function PlansPage() {
                 + Add event
               </button>
 
-              {events.length > 0 ? (
-                <div className="space-y-4">
-                  {events.map((event) => (
-                    <div key={event.id} className="bg-white rounded-2xl p-5 shadow-soft flex items-start gap-4 relative group">
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                      
-                      <div className="flex-shrink-0 w-16 text-center py-2 bg-forest-50 rounded-xl">
-                        <p className="text-caption text-forest-600">
-                          {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
-                        </p>
-                        <p className="font-serif text-title text-forest">
-                          {new Date(event.start_date).getDate()}
-                        </p>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
-                        {event.description && (
-                          <p className="text-body-sm text-ink-400 mt-1">{event.description}</p>
-                        )}
-                        <div className="flex flex-wrap gap-3 mt-2 text-caption text-ink-300">
-                          {event.start_time && <span>🕐 {event.start_time}</span>}
-                          {event.location && <span>📍 {event.location}</span>}
-                        </div>
-                        <p className="text-caption text-ink-300 mt-2">
-                          By {event.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                        </p>
-                      </div>
+              {/* Upcoming Holidays */}
+              <div className="mb-8">
+                <p className="section-label mb-4">Upcoming Holidays</p>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {upcomingHolidays.map((h) => (
+                    <div key={h.date} className="flex-shrink-0 bg-rose-50 rounded-2xl p-4 min-w-[140px] text-center">
+                      <span className="text-2xl block mb-2">{h.emoji}</span>
+                      <p className="text-body-sm font-medium text-forest">{h.title}</p>
+                      <p className="text-caption text-ink-400">
+                        {new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Events List */}
+              <p className="section-label mb-4">Upcoming Events</p>
+              {allEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {allEvents.slice(0, 20).map((event) => {
+                    const isMultiDay = event.end_date && event.end_date !== event.start_date
+                    return (
+                      <div 
+                        key={event.id} 
+                        className={`rounded-2xl p-5 relative group ${
+                          event.isHoliday ? 'bg-rose-50' : 'bg-white shadow-card'
+                        }`}
+                      >
+                        {!event.isHoliday && (
+                          <button
+                            onClick={() => handleDeleteEvent(event.id)}
+                            className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
+                          >
+                            ×
+                          </button>
+                        )}
+
+                        <div className="flex items-start gap-4">
+                          <div className="text-center min-w-[50px]">
+                            <p className="text-caption text-ink-400 uppercase">
+                              {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
+                            </p>
+                            <p className="font-serif text-title text-forest">
+                              {new Date(event.start_date).getDate()}
+                            </p>
+                            {isMultiDay && (
+                              <>
+                                <p className="text-caption text-ink-300">to</p>
+                                <p className="font-serif text-body text-forest">
+                                  {new Date(event.end_date).getDate()}
+                                </p>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              {event.emoji && <span>{event.emoji}</span>}
+                              <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
+                            </div>
+                            {event.start_time && (
+                              <p className="text-body-sm text-gold-600 mt-1">
+                                🕐 {event.start_time}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-2 mt-2 text-body-sm text-ink-400">
+                              {event.location && <span>📍 {event.location}</span>}
+                            </div>
+                            {!event.isHoliday && event.added_by && (
+                              <p className="text-caption text-ink-300 mt-2">
+                                By {event.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-16">
@@ -359,11 +449,7 @@ export default function PlansPage() {
 
       {/* Edit Date Idea Modal */}
       {editingIdea && (
-        <EditDateModal 
-          idea={editingIdea} 
-          onClose={() => setEditingIdea(null)} 
-          onSave={handleEditIdea} 
-        />
+        <EditDateModal idea={editingIdea} onClose={() => setEditingIdea(null)} onSave={handleEditIdea} />
       )}
 
       {/* Add Event Modal */}
@@ -395,11 +481,7 @@ function AddDateModal({ onClose, onAdd }) {
 
   return (
     <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 bg-gold-100">
           <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
           <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-gold-200">
@@ -409,50 +491,26 @@ function AddDateModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        {/* Scrollable Content */}
         <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="date-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-                className="input"
-                placeholder="Sunset picnic..."
-                required
-              />
+              <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="Sunset picnic..." required />
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-                placeholder="What makes this special?"
-              />
+              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" placeholder="What makes this special?" />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
-                <select
-                  value={form.vibe}
-                  onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
-                  className="input"
-                >
+                <select value={form.vibe} onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))} className="input">
                   {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
-                <select
-                  value={form.price_level}
-                  onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
-                  className="input"
-                >
+                <select value={form.price_level} onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))} className="input">
                   <option value={1}>$ Free</option>
                   <option value={2}>$$ Moderate</option>
                   <option value={3}>$$$ Pricey</option>
@@ -460,39 +518,21 @@ function AddDateModal({ onClose, onAdd }) {
                 </select>
               </div>
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select
-                value={form.date_type}
-                onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))}
-                className="input"
-              >
+              <select value={form.date_type} onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))} className="input">
                 {dateTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-                className="input"
-                placeholder="Where?"
-              />
+              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" placeholder="Where?" />
             </div>
           </form>
         </div>
 
-        {/* Fixed Footer - Always Visible */}
         <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="date-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
+          <button type="submit" form="date-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
             {loading ? 'Adding...' : '✨ Add Date Idea'}
           </button>
         </div>
@@ -522,13 +562,10 @@ function EditDateModal({ idea, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 bg-gold-100">
           <h2 className="font-serif text-title text-forest">Edit Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-gold-200">
+          <button onClick={onClose} className="p-2 text-forest rounded-full hover:bg-gold-200">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -539,43 +576,22 @@ function EditDateModal({ idea, onClose, onSave }) {
           <form id="edit-date-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-                className="input"
-                required
-              />
+              <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" required />
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-              />
+              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
-                <select
-                  value={form.vibe}
-                  onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
-                  className="input"
-                >
+                <select value={form.vibe} onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))} className="input">
                   {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
-                <select
-                  value={form.price_level}
-                  onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
-                  className="input"
-                >
+                <select value={form.price_level} onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))} className="input">
                   <option value={1}>$ Free</option>
                   <option value={2}>$$ Moderate</option>
                   <option value={3}>$$$ Pricey</option>
@@ -583,26 +599,15 @@ function EditDateModal({ idea, onClose, onSave }) {
                 </select>
               </div>
             </div>
-
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-                className="input"
-              />
+              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" />
             </div>
           </form>
         </div>
 
         <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="edit-date-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
+          <button type="submit" form="edit-date-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
@@ -617,6 +622,7 @@ function AddEventModal({ onClose, onAdd }) {
     description: '',
     event_type: 'date',
     start_date: '',
+    end_date: '',
     start_time: '',
     location: '',
   })
@@ -626,17 +632,16 @@ function AddEventModal({ onClose, onAdd }) {
     e.preventDefault()
     if (!form.title.trim() || !form.start_date) return
     setLoading(true)
-    await onAdd(form)
+    await onAdd({
+      ...form,
+      end_date: form.end_date || form.start_date
+    })
     setLoading(false)
   }
 
   return (
     <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 bg-forest">
           <h2 className="font-serif text-title text-cream-100">Add Event</h2>
           <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
@@ -646,28 +651,16 @@ function AddEventModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        {/* Scrollable Content */}
         <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Title *</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
-                className="input"
-                placeholder="Dinner at..."
-                required
-              />
+              <input type="text" value={form.title} onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} className="input" placeholder="Dinner at..." required />
             </div>
 
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select
-                value={form.event_type}
-                onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))}
-                className="input"
-              >
+              <select value={form.event_type} onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))} className="input">
                 <option value="date">Date</option>
                 <option value="trip">Trip</option>
                 <option value="anniversary">Anniversary</option>
@@ -677,58 +670,34 @@ function AddEventModal({ onClose, onAdd }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))}
-                  className="input"
-                  required
-                />
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Start Date *</label>
+                <input type="date" value={form.start_date} onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))} className="input" required />
               </div>
-
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Time</label>
-                <input
-                  type="time"
-                  value={form.start_time}
-                  onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))}
-                  className="input"
-                />
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">End Date</label>
+                <input type="date" value={form.end_date} onChange={(e) => setForm(p => ({ ...p, end_date: e.target.value }))} className="input" placeholder="Multi-day?" />
               </div>
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">⏰ Time (optional)</label>
+              <input type="time" value={form.start_time} onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))} className="input" />
             </div>
 
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-                className="input"
-                placeholder="Where?"
-              />
+              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" placeholder="Where?" />
             </div>
 
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-                placeholder="Details..."
-              />
+              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" placeholder="Details..." />
             </div>
           </form>
         </div>
 
-        {/* Fixed Footer - Always Visible */}
         <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="event-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
+          <button type="submit" form="event-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
             {loading ? 'Adding...' : '📅 Add Event'}
           </button>
         </div>

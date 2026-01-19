@@ -1,8 +1,22 @@
 -- ============================================
+-- D(ANE)UA V3-FIX10 - DATABASE SETUP
 -- RUN THIS IN SUPABASE SQL EDITOR
 -- ============================================
 
--- 1. CREATE VOICE NOTES TABLE
+-- 1. LOVE NOTES TABLE (for HomePage)
+-- ============================================
+CREATE TABLE IF NOT EXISTS love_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
+  note TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE love_notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all love notes" ON love_notes FOR ALL USING (true);
+
+
+-- 2. VOICE NOTES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS voice_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -11,46 +25,55 @@ CREATE TABLE IF NOT EXISTS voice_notes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS
 ALTER TABLE voice_notes ENABLE ROW LEVEL SECURITY;
-
--- Allow all access (since this is a private couples app)
-CREATE POLICY "Allow all" ON voice_notes FOR ALL USING (true);
+CREATE POLICY "Allow all voice notes" ON voice_notes FOR ALL USING (true);
 
 
--- 2. CREATE SHARED IDEAS TABLE (for Ideas feature)
+-- 3. IDEA FOLDERS TABLE (for Ideas feature)
 -- ============================================
-CREATE TABLE IF NOT EXISTS shared_ideas (
+CREATE TABLE IF NOT EXISTS idea_folders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  title TEXT,
-  content TEXT NOT NULL,
-  category TEXT DEFAULT 'general',
-  color TEXT DEFAULT 'yellow',
-  image_url TEXT,
-  audio_url TEXT,
-  added_by TEXT NOT NULL CHECK (added_by IN ('shah', 'dane')),
-  is_pinned BOOLEAN DEFAULT false,
-  is_completed BOOLEAN DEFAULT false,
+  name TEXT NOT NULL,
+  created_by TEXT NOT NULL CHECK (created_by IN ('shah', 'dane')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE idea_folders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all folders" ON idea_folders FOR ALL USING (true);
+
+
+-- 4. IDEA DOCUMENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS idea_documents (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  folder_id UUID REFERENCES idea_folders(id) ON DELETE CASCADE,
+  title TEXT DEFAULT 'Untitled',
+  content TEXT,
+  created_by TEXT NOT NULL CHECK (created_by IN ('shah', 'dane')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS
-ALTER TABLE shared_ideas ENABLE ROW LEVEL SECURITY;
-
--- Allow all access
-CREATE POLICY "Allow all ideas" ON shared_ideas FOR ALL USING (true);
-
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE shared_ideas;
+ALTER TABLE idea_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all documents" ON idea_documents FOR ALL USING (true);
 
 
--- 3. STORAGE BUCKET POLICIES
+-- 5. ADD END_DATE TO CALENDAR_EVENTS (for multi-day events)
 -- ============================================
--- First create buckets manually in Supabase Storage UI:
--- - Create bucket named "audio" and set it to Public
--- - Create bucket named "photos" and set it to Public
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_date DATE;
 
+
+-- 6. STORAGE BUCKET SETUP
+-- ============================================
+-- IMPORTANT: Create these buckets manually in Supabase Storage UI:
+-- 
+-- 1. Go to Supabase Dashboard > Storage
+-- 2. Click "New bucket"
+-- 3. Create bucket named "audio" 
+--    - Check "Public bucket"
+-- 4. Create bucket named "photos"
+--    - Check "Public bucket"
+--
 -- Then run these policies:
 
 -- Audio bucket policies
@@ -63,6 +86,9 @@ CREATE POLICY "Public Audio Upload" ON storage.objects
 CREATE POLICY "Public Audio Update" ON storage.objects 
   FOR UPDATE USING (bucket_id = 'audio');
 
+CREATE POLICY "Public Audio Delete" ON storage.objects 
+  FOR DELETE USING (bucket_id = 'audio');
+
 -- Photos bucket policies  
 CREATE POLICY "Public Photos Read" ON storage.objects 
   FOR SELECT USING (bucket_id = 'photos');
@@ -73,18 +99,37 @@ CREATE POLICY "Public Photos Upload" ON storage.objects
 CREATE POLICY "Public Photos Update" ON storage.objects 
   FOR UPDATE USING (bucket_id = 'photos');
 
+CREATE POLICY "Public Photos Delete" ON storage.objects 
+  FOR DELETE USING (bucket_id = 'photos');
 
--- 4. UPDATE USER NAMES
+
+-- 7. UPDATE USER NAMES
 -- ============================================
 UPDATE users SET name = 'Shahjahan' WHERE role = 'shah';
 UPDATE users SET name = 'Dane' WHERE role = 'dane';
 
 
--- 5. IF YOU GET POLICY ERRORS, RUN THIS FIRST:
 -- ============================================
+-- IF YOU GET ERRORS, RUN THESE FIRST:
+-- ============================================
+-- 
+-- DROP POLICY IF EXISTS "Allow all love notes" ON love_notes;
+-- DROP TABLE IF EXISTS love_notes;
+-- 
+-- DROP POLICY IF EXISTS "Allow all voice notes" ON voice_notes;
+-- DROP TABLE IF EXISTS voice_notes;
+-- 
+-- DROP POLICY IF EXISTS "Allow all documents" ON idea_documents;
+-- DROP TABLE IF EXISTS idea_documents;
+-- 
+-- DROP POLICY IF EXISTS "Allow all folders" ON idea_folders;
+-- DROP TABLE IF EXISTS idea_folders;
+-- 
 -- DROP POLICY IF EXISTS "Public Audio Read" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Audio Upload" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Audio Update" ON storage.objects;
+-- DROP POLICY IF EXISTS "Public Audio Delete" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Photos Read" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Photos Upload" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Photos Update" ON storage.objects;
+-- DROP POLICY IF EXISTS "Public Photos Delete" ON storage.objects;
