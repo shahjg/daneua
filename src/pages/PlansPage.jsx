@@ -9,11 +9,11 @@ import {
 } from '../lib/supabase'
 
 const vibes = [
-  { id: 'romantic', label: 'Romantic', color: 'bg-rose-100 text-rose-600' },
-  { id: 'casual', label: 'Casual', color: 'bg-cream-300 text-ink-600' },
-  { id: 'adventure', label: 'Adventure', color: 'bg-gold-100 text-gold-700' },
-  { id: 'cozy', label: 'Cozy', color: 'bg-forest-50 text-forest-600' },
-  { id: 'fancy', label: 'Fancy', color: 'bg-gold-200 text-gold-800' },
+  { id: 'romantic', label: 'Romantic' },
+  { id: 'casual', label: 'Casual' },
+  { id: 'adventure', label: 'Adventure' },
+  { id: 'cozy', label: 'Cozy' },
+  { id: 'fancy', label: 'Fancy' },
 ]
 
 const dateTypes = [
@@ -46,7 +46,7 @@ export default function PlansPage() {
         getDateIdeas(filter ? { status: filter } : {}),
         getCalendarEvents(
           new Date().toISOString().split('T')[0],
-          new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         )
       ])
       setDateIdeas(ideas || [])
@@ -91,7 +91,16 @@ export default function PlansPage() {
     }
   }
 
-  const getVibeStyle = (vibe) => vibes.find(v => v.id === vibe)?.color || 'bg-cream-200 text-ink-500'
+  const getVibeStyle = (vibe) => {
+    const styles = {
+      romantic: 'bg-rose-100 text-rose-600',
+      casual: 'bg-cream-300 text-ink-600',
+      adventure: 'bg-gold-100 text-gold-700',
+      cozy: 'bg-forest-50 text-forest-600',
+      fancy: 'bg-gold-200 text-gold-800',
+    }
+    return styles[vibe] || 'bg-cream-200 text-ink-500'
+  }
 
   return (
     <div className="min-h-screen pb-28">
@@ -135,10 +144,22 @@ export default function PlansPage() {
             <div className="max-w-lg mx-auto">
               {/* Filters */}
               <div className="flex justify-center gap-2 mb-6 flex-wrap">
-                <FilterPill label="All" active={!filter} onClick={() => setFilter(null)} />
-                <FilterPill label="Want to do" active={filter === 'want_to_do'} onClick={() => setFilter('want_to_do')} />
-                <FilterPill label="Planned" active={filter === 'planned'} onClick={() => setFilter('planned')} />
-                <FilterPill label="Complete" active={filter === 'done'} onClick={() => setFilter('done')} />
+                {[
+                  { id: null, label: 'All' },
+                  { id: 'want_to_do', label: 'Want' },
+                  { id: 'planned', label: 'Planned' },
+                  { id: 'done', label: 'Complete' },
+                ].map((f) => (
+                  <button
+                    key={f.id || 'all'}
+                    onClick={() => setFilter(f.id)}
+                    className={`px-4 py-2 rounded-full text-body-sm font-medium transition-all ${
+                      filter === f.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
 
               {/* Add Button */}
@@ -164,7 +185,7 @@ export default function PlansPage() {
                           </p>
                         </div>
                         <span className="text-body font-semibold text-gold-600">
-                          {'$'.repeat(idea.price_level)}
+                          {'$'.repeat(idea.price_level || 1)}
                         </span>
                       </div>
 
@@ -173,16 +194,12 @@ export default function PlansPage() {
                       )}
 
                       <div className="flex flex-wrap gap-2 mb-4">
-                        <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>
-                        <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>
+                        {idea.vibe && <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>}
+                        {idea.date_type && <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>}
                       </div>
 
                       {idea.location && (
                         <p className="text-body-sm text-ink-400 mb-4">📍 {idea.location}</p>
-                      )}
-
-                      {idea.notes && (
-                        <p className="text-body-sm text-ink-400 italic mb-4">"{idea.notes}"</p>
                       )}
 
                       {/* Status Buttons */}
@@ -214,7 +231,6 @@ export default function PlansPage() {
                 <div className="text-center py-16">
                   <span className="text-5xl mb-4 block">💡</span>
                   <p className="text-body text-ink-400">No date ideas yet</p>
-                  <p className="text-body-sm text-ink-300 mt-1">Add your first one!</p>
                 </div>
               )}
             </div>
@@ -266,7 +282,6 @@ export default function PlansPage() {
                 <div className="text-center py-16">
                   <span className="text-5xl mb-4 block">📅</span>
                   <p className="text-body text-ink-400">No upcoming events</p>
-                  <p className="text-body-sm text-ink-300 mt-1">Add something to look forward to</p>
                 </div>
               )}
             </div>
@@ -284,20 +299,6 @@ export default function PlansPage() {
         <AddEventModal onClose={() => setShowAddEvent(false)} onAdd={handleAddEvent} />
       )}
     </div>
-  )
-}
-
-function FilterPill({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        px-4 py-2 rounded-full text-body-sm font-medium transition-all
-        ${active ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}
-      `}
-    >
-      {label}
-    </button>
   )
 }
 
@@ -322,110 +323,115 @@ function AddDateModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50" onClick={onClose}>
       <div 
-        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
-        style={{ maxHeight: '85vh' }}
+        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
+        style={{ maxHeight: 'calc(100vh - 80px)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
           <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
+          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Name *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-              className="input"
-              placeholder="Sunset picnic at the park"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-              className="input min-h-[80px] resize-none"
-              placeholder="What makes this special?"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form id="date-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Vibe</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Name *</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
+                className="input"
+                placeholder="Sunset picnic..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                className="input min-h-[60px] resize-none"
+                placeholder="What makes this special?"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Vibe</label>
+                <select
+                  value={form.vibe}
+                  onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
+                  className="input"
+                >
+                  {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Price</label>
+                <select
+                  value={form.price_level}
+                  onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
+                  className="input"
+                >
+                  <option value={1}>$ Free</option>
+                  <option value={2}>$$ Moderate</option>
+                  <option value={3}>$$$ Pricey</option>
+                  <option value={4}>$$$$ Splurge</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
               <select
-                value={form.vibe}
-                onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
+                value={form.date_type}
+                onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))}
                 className="input"
               >
-                {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                {dateTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Price</label>
-              <select
-                value={form.price_level}
-                onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
                 className="input"
-              >
-                <option value={1}>$ Free/Cheap</option>
-                <option value={2}>$$ Moderate</option>
-                <option value={3}>$$$ Pricey</option>
-                <option value={4}>$$$$ Splurge</option>
-              </select>
+                placeholder="Where?"
+              />
             </div>
-          </div>
 
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
-            <select
-              value={form.date_type}
-              onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))}
-              className="input"
-            >
-              {dateTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </div>
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Notes</label>
+              <input
+                type="text"
+                value={form.notes}
+                onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
+                className="input"
+                placeholder="Make reservation..."
+              />
+            </div>
+          </form>
+        </div>
 
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-              className="input"
-              placeholder="Where?"
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Notes</label>
-            <input
-              type="text"
-              value={form.notes}
-              onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
-              className="input"
-              placeholder="Make reservation, bring blanket..."
-            />
-          </div>
-
-          <div className="pt-4">
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Date Idea'}
-            </button>
-          </div>
-        </form>
+        {/* Fixed Footer */}
+        <div className="p-6 border-t border-cream-200 flex-shrink-0">
+          <button type="submit" form="date-form" className="btn-primary w-full" disabled={loading}>
+            {loading ? 'Adding...' : 'Add Date Idea'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -451,99 +457,103 @@ function AddEventModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50" onClick={onClose}>
       <div 
-        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
-        style={{ maxHeight: '85vh' }}
+        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
+        style={{ maxHeight: 'calc(100vh - 80px)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
           <h2 className="font-serif text-title text-forest">Add Event</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
+          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Title *</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
-              className="input"
-              placeholder="Dinner at..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
-            <select
-              value={form.event_type}
-              onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))}
-              className="input"
-            >
-              <option value="date">Date</option>
-              <option value="trip">Trip</option>
-              <option value="anniversary">Anniversary</option>
-              <option value="reminder">Reminder</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Date *</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Title *</label>
               <input
-                type="date"
-                value={form.start_date}
-                onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))}
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
                 className="input"
+                placeholder="Dinner at..."
                 required
               />
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Time</label>
-              <input
-                type="time"
-                value={form.start_time}
-                onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))}
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
+              <select
+                value={form.event_type}
+                onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))}
                 className="input"
+              >
+                <option value="date">Date</option>
+                <option value="trip">Trip</option>
+                <option value="anniversary">Anniversary</option>
+                <option value="reminder">Reminder</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Date *</label>
+                <input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Time</label>
+                <input
+                  type="time"
+                  value={form.start_time}
+                  onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))}
+                  className="input"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
+                className="input"
+                placeholder="Where?"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-              className="input"
-              placeholder="Where?"
-            />
-          </div>
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                className="input min-h-[60px] resize-none"
+                placeholder="Details..."
+              />
+            </div>
+          </form>
+        </div>
 
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-              className="input min-h-[80px] resize-none"
-              placeholder="Details..."
-            />
-          </div>
-
-          <div className="pt-4">
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Event'}
-            </button>
-          </div>
-        </form>
+        {/* Fixed Footer */}
+        <div className="p-6 border-t border-cream-200 flex-shrink-0">
+          <button type="submit" form="event-form" className="btn-primary w-full" disabled={loading}>
+            {loading ? 'Adding...' : 'Add Event'}
+          </button>
+        </div>
       </div>
     </div>
   )

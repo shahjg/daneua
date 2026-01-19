@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { 
   getCurrentStatus, 
-  getCountdowns, 
+  getCountdowns,
+  addCountdown,
+  deleteCountdown,
   getDailyQuestion, 
   answerQuestion,
   sendDuaRequest,
-  getUnreadDuaRequests,
-  subscribeToStatus,
-  subscribeToDuaRequests
+  getUnreadDuaRequests
 } from '../lib/supabase'
 
 export default function HomePage({ onOpenSettings }) {
@@ -20,6 +20,7 @@ export default function HomePage({ onOpenSettings }) {
   const [showAnswerInput, setShowAnswerInput] = useState(false)
   const [duaRequests, setDuaRequests] = useState([])
   const [duaSent, setDuaSent] = useState(false)
+  const [showAddCountdown, setShowAddCountdown] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const greeting = getGreeting()
@@ -27,41 +28,26 @@ export default function HomePage({ onOpenSettings }) {
   const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusData, countdownData, questionData, duaData] = await Promise.all([
-          getCurrentStatus(),
-          getCountdowns(),
-          getDailyQuestion(),
-          user ? getUnreadDuaRequests(user.role) : []
-        ])
-        setStatus(statusData)
-        setCountdowns(countdownData || [])
-        setQuestion(questionData)
-        setDuaRequests(duaData || [])
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      }
-      setLoading(false)
-    }
-
     fetchData()
-
-    const statusSub = subscribeToStatus((payload) => {
-      if (payload.new?.is_current) setStatus(payload.new)
-    })
-
-    const duaSub = subscribeToDuaRequests((payload) => {
-      if (payload.new?.from_user !== user?.role) {
-        setDuaRequests(prev => [payload.new, ...prev])
-      }
-    })
-
-    return () => {
-      statusSub.unsubscribe()
-      duaSub.unsubscribe()
-    }
   }, [user])
+
+  const fetchData = async () => {
+    try {
+      const [statusData, countdownData, questionData, duaData] = await Promise.all([
+        getCurrentStatus(),
+        getCountdowns(),
+        getDailyQuestion(),
+        user ? getUnreadDuaRequests(user.role) : []
+      ])
+      setStatus(statusData)
+      setCountdowns(countdownData || [])
+      setQuestion(questionData)
+      setDuaRequests(duaData || [])
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    }
+    setLoading(false)
+  }
 
   const handleSendDua = async () => {
     if (duaSent) return
@@ -86,6 +72,25 @@ export default function HomePage({ onOpenSettings }) {
       setAnswer('')
     } catch (error) {
       console.error('Error submitting answer:', error)
+    }
+  }
+
+  const handleAddCountdown = async (title, targetDate, emoji) => {
+    try {
+      const newCountdown = await addCountdown(title, targetDate, emoji)
+      setCountdowns(prev => [...prev, newCountdown])
+      setShowAddCountdown(false)
+    } catch (error) {
+      console.error('Error adding countdown:', error)
+    }
+  }
+
+  const handleDeleteCountdown = async (id) => {
+    try {
+      await deleteCountdown(id)
+      setCountdowns(prev => prev.filter(c => c.id !== id))
+    } catch (error) {
+      console.error('Error deleting countdown:', error)
     }
   }
 
@@ -141,16 +146,31 @@ export default function HomePage({ onOpenSettings }) {
       )}
 
       {/* Countdowns */}
-      {countdowns.length > 0 && (
-        <div className="px-6 py-10 bg-cream">
-          <div className="max-w-lg mx-auto">
-            <p className="section-label text-center mb-6">Counting Down</p>
+      <div className="px-6 py-10 bg-cream">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <p className="section-label">Counting Down</p>
+            <button 
+              onClick={() => setShowAddCountdown(true)}
+              className="text-body-sm text-forest font-medium hover:text-forest-700"
+            >
+              + Add
+            </button>
+          </div>
+          
+          {countdowns.length > 0 ? (
             <div className="grid grid-cols-2 gap-4">
-              {countdowns.slice(0, 2).map((countdown) => {
+              {countdowns.map((countdown) => {
                 const days = getDaysUntil(countdown.target_date)
                 return (
-                  <div key={countdown.id} className="bg-gold-100 rounded-3xl p-6 text-center">
-                    <span className="text-3xl mb-3 block">{countdown.emoji}</span>
+                  <div key={countdown.id} className="bg-gold-100 rounded-3xl p-6 text-center relative group">
+                    <button
+                      onClick={() => handleDeleteCountdown(countdown.id)}
+                      className="absolute top-3 right-3 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-ink-400 hover:text-rose-500"
+                    >
+                      ×
+                    </button>
+                    <span className="text-3xl mb-3 block">{countdown.emoji || '📅'}</span>
                     <p className="font-serif text-display-sm text-forest">{days}</p>
                     <p className="text-caption text-gold-700 uppercase tracking-widest">days</p>
                     <p className="text-body-sm text-gold-600 mt-2">{countdown.title}</p>
@@ -158,9 +178,17 @@ export default function HomePage({ onOpenSettings }) {
                 )
               })}
             </div>
-          </div>
+          ) : (
+            <button 
+              onClick={() => setShowAddCountdown(true)}
+              className="w-full py-8 border-2 border-dashed border-gold-300 rounded-3xl text-gold-600 hover:border-gold-400 hover:bg-gold-50 transition-all"
+            >
+              <span className="text-3xl block mb-2">📅</span>
+              <span className="text-body">Add a countdown</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Daily Question */}
       {question && (
@@ -171,7 +199,6 @@ export default function HomePage({ onOpenSettings }) {
               {question.question}
             </h2>
 
-            {/* Their Answer */}
             {theirAnswer && (
               <div className="bg-white rounded-2xl p-5 mb-4">
                 <p className="text-caption text-ink-400 mb-2">{theirName}</p>
@@ -179,7 +206,6 @@ export default function HomePage({ onOpenSettings }) {
               </div>
             )}
 
-            {/* My Answer */}
             {myAnswer ? (
               <div className="bg-forest rounded-2xl p-5">
                 <p className="text-caption text-forest-200 mb-2">You</p>
@@ -195,12 +221,8 @@ export default function HomePage({ onOpenSettings }) {
                   autoFocus
                 />
                 <div className="flex gap-3">
-                  <button onClick={handleAnswerSubmit} className="btn-primary flex-1">
-                    Submit
-                  </button>
-                  <button onClick={() => setShowAnswerInput(false)} className="btn-ghost">
-                    Cancel
-                  </button>
+                  <button onClick={handleAnswerSubmit} className="btn-primary flex-1">Submit</button>
+                  <button onClick={() => setShowAnswerInput(false)} className="btn-ghost">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -221,13 +243,10 @@ export default function HomePage({ onOpenSettings }) {
           <button
             onClick={handleSendDua}
             disabled={duaSent}
-            className={`
-              w-full py-6 rounded-3xl transition-all duration-500
-              ${duaSent 
-                ? 'bg-forest text-cream-100' 
-                : 'bg-gradient-to-r from-gold-200 via-rose-200 to-gold-200 text-forest hover:shadow-elevated active:scale-[0.98]'
-              }
-            `}
+            className={`w-full py-6 rounded-3xl transition-all duration-500 ${duaSent 
+              ? 'bg-forest text-cream-100' 
+              : 'bg-gradient-to-r from-gold-200 via-rose-200 to-gold-200 text-forest hover:shadow-elevated active:scale-[0.98]'
+            }`}
           >
             {duaSent ? (
               <span className="flex items-center justify-center gap-3">
@@ -245,6 +264,92 @@ export default function HomePage({ onOpenSettings }) {
             Let {theirName} know you're thinking of them
           </p>
         </div>
+      </div>
+
+      {/* Add Countdown Modal */}
+      {showAddCountdown && (
+        <AddCountdownModal 
+          onClose={() => setShowAddCountdown(false)} 
+          onAdd={handleAddCountdown}
+        />
+      )}
+    </div>
+  )
+}
+
+function AddCountdownModal({ onClose, onAdd }) {
+  const [title, setTitle] = useState('')
+  const [targetDate, setTargetDate] = useState('')
+  const [emoji, setEmoji] = useState('🎯')
+  const [loading, setLoading] = useState(false)
+
+  const emojis = ['🎯', '✈️', '🏖️', '💍', '🎂', '🎄', '🎉', '💪', '📅', '❤️']
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!title.trim() || !targetDate) return
+    setLoading(true)
+    await onAdd(title, targetDate, emoji)
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={onClose}>
+      <div 
+        className="bg-cream rounded-3xl p-6 w-full max-w-sm shadow-elevated"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-serif text-title text-forest text-center mb-6">Add Countdown</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">What are you counting down to?</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="input"
+              placeholder="Summer vacation..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Date</label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="input"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Emoji</label>
+            <div className="flex flex-wrap gap-2">
+              {emojis.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${
+                    emoji === e ? 'bg-forest text-white scale-110' : 'bg-cream-200 hover:bg-cream-300'
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+            <button type="submit" className="btn-primary flex-1" disabled={loading}>
+              {loading ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -158,7 +158,7 @@ export default function GoalsPage() {
                   <div className="flex items-start gap-4">
                     {/* Progress Circle */}
                     <div className="flex-shrink-0">
-                      <ProgressCircle progress={goal.progress} size={64} />
+                      <ProgressCircle progress={goal.progress || 0} size={64} />
                     </div>
 
                     {/* Info */}
@@ -336,103 +336,111 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+    <div 
+      className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50"
+      onClick={onClose}
+    >
       <div 
-        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
-        style={{ maxHeight: '85vh' }}
+        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
+        style={{ maxHeight: 'calc(100vh - 80px)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
           <h2 className="font-serif text-title text-forest">Add Goal</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
+          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal? *</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
-              className="input"
-              placeholder="Run a marathon, learn 50 words..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Why does it matter?</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-              className="input min-h-[80px] resize-none"
-              placeholder="Optional motivation..."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form id="goal-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Whose goal?</label>
-              <select
-                value={form.owner}
-                onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))}
-                className="input"
-              >
-                <option value={user?.role}>Mine</option>
-                <option value={user?.role === 'shah' ? 'dane' : 'shah'}>{theirName}'s</option>
-                <option value="shared">Shared</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Target date</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal? *</label>
               <input
-                type="date"
-                value={form.target_date}
-                onChange={(e) => setForm(p => ({ ...p, target_date: e.target.value }))}
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
                 className="input"
+                placeholder="Run a marathon, learn 50 words..."
+                required
               />
             </div>
-          </div>
 
-          {/* Milestones */}
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Milestones (optional)</label>
-            <div className="space-y-3">
-              {milestones.map((m, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  value={m}
-                  onChange={(e) => {
-                    const updated = [...milestones]
-                    updated[i] = e.target.value
-                    setMilestones(updated)
-                  }}
-                  className="input"
-                  placeholder={`Step ${i + 1}`}
-                />
-              ))}
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Why does it matter?</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                className="input min-h-[60px] resize-none"
+                placeholder="Optional motivation..."
+              />
             </div>
-            <button
-              type="button"
-              onClick={() => setMilestones(prev => [...prev, ''])}
-              className="text-body-sm text-forest font-medium mt-3 hover:text-forest-700"
-            >
-              + Add another step
-            </button>
-          </div>
 
-          <div className="pt-4">
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Goal'}
-            </button>
-          </div>
-        </form>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Whose goal?</label>
+                <select
+                  value={form.owner}
+                  onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))}
+                  className="input"
+                >
+                  <option value={user?.role}>Mine</option>
+                  <option value={user?.role === 'shah' ? 'dane' : 'shah'}>{theirName}'s</option>
+                  <option value="shared">Shared</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-body-sm font-medium text-ink-600 block mb-2">Target date</label>
+                <input
+                  type="date"
+                  value={form.target_date}
+                  onChange={(e) => setForm(p => ({ ...p, target_date: e.target.value }))}
+                  className="input"
+                />
+              </div>
+            </div>
+
+            {/* Milestones */}
+            <div>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Milestones (optional)</label>
+              <div className="space-y-2">
+                {milestones.map((m, i) => (
+                  <input
+                    key={i}
+                    type="text"
+                    value={m}
+                    onChange={(e) => {
+                      const updated = [...milestones]
+                      updated[i] = e.target.value
+                      setMilestones(updated)
+                    }}
+                    className="input"
+                    placeholder={`Step ${i + 1}`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setMilestones(prev => [...prev, ''])}
+                className="text-body-sm text-forest font-medium mt-2 hover:text-forest-700"
+              >
+                + Add step
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="p-6 border-t border-cream-200 flex-shrink-0">
+          <button type="submit" form="goal-form" className="btn-primary w-full" disabled={loading}>
+            {loading ? 'Creating...' : 'Create Goal'}
+          </button>
+        </div>
       </div>
     </div>
   )

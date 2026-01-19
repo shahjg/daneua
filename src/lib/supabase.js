@@ -55,6 +55,24 @@ export async function getCountdowns() {
   return data
 }
 
+export async function addCountdown(title, targetDate, emoji = '📅') {
+  const { data, error } = await supabase
+    .from('countdowns')
+    .insert({ title, target_date: targetDate, emoji, is_active: true })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteCountdown(id) {
+  const { error } = await supabase
+    .from('countdowns')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
 // ==================== DUA REQUESTS ====================
 export async function sendDuaRequest(fromUser, message = null) {
   const { data, error } = await supabase
@@ -168,12 +186,10 @@ export async function getLessonResponses(lessonId) {
 }
 
 export async function markLessonComplete(userRole, lessonId) {
-  // Add to progress
   await supabase
     .from('lesson_progress')
     .upsert({ user_role: userRole, lesson_id: lessonId }, { onConflict: 'user_role,lesson_id' })
 
-  // Update streak
   const { error } = await supabase.rpc('update_learning_streak', { p_user_role: userRole })
   if (error) throw error
 }
@@ -397,23 +413,53 @@ export async function getActivityFeed(forUser, limit = 10) {
 }
 
 // ==================== FILE UPLOAD ====================
-export async function uploadAudio(file, path) {
+export async function uploadAudio(blob, fileName) {
+  // Check if bucket exists first
+  const { data: buckets } = await supabase.storage.listBuckets()
+  const audioBucket = buckets?.find(b => b.name === 'audio')
+  
+  if (!audioBucket) {
+    throw new Error('Storage bucket "audio" not found. Please create it in Supabase Storage.')
+  }
+
   const { data, error } = await supabase.storage
     .from('audio')
-    .upload(path, file, { contentType: 'audio/webm' })
-  if (error) throw error
+    .upload(fileName, blob, { 
+      contentType: 'audio/webm',
+      upsert: true 
+    })
+  
+  if (error) {
+    console.error('Upload error:', error)
+    throw new Error(`Upload failed: ${error.message}`)
+  }
 
-  const { data: urlData } = supabase.storage.from('audio').getPublicUrl(path)
+  const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
   return urlData.publicUrl
 }
 
-export async function uploadPhoto(file, path) {
+export async function uploadPhoto(file, fileName) {
+  // Check if bucket exists first
+  const { data: buckets } = await supabase.storage.listBuckets()
+  const photoBucket = buckets?.find(b => b.name === 'photos')
+  
+  if (!photoBucket) {
+    throw new Error('Storage bucket "photos" not found. Please create it in Supabase Storage.')
+  }
+
   const { data, error } = await supabase.storage
     .from('photos')
-    .upload(path, file, { contentType: file.type })
-  if (error) throw error
+    .upload(fileName, file, { 
+      contentType: file.type,
+      upsert: true
+    })
+  
+  if (error) {
+    console.error('Upload error:', error)
+    throw new Error(`Upload failed: ${error.message}`)
+  }
 
-  const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path)
+  const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
   return urlData.publicUrl
 }
 
