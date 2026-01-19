@@ -17,7 +17,7 @@ export default function GoalsPage() {
   const [celebrateGoal, setCelebrateGoal] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const theirName = user?.role === 'shah' ? 'Dane' : 'Shah'
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
   useEffect(() => {
     fetchGoals()
@@ -98,10 +98,10 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-28">
       {/* Header */}
-      <div className="bg-forest px-6 pt-16 pb-10">
-        <div className="stagger">
+      <div className="bg-forest px-6 pt-14 pb-12">
+        <div className="max-w-lg mx-auto text-center">
           <h1 className="font-serif text-display-sm text-cream-50 mb-2">Goals</h1>
           <p className="text-body text-cream-300">Track what matters most</p>
         </div>
@@ -109,7 +109,7 @@ export default function GoalsPage() {
 
       {/* Filters */}
       <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="max-w-lg mx-auto flex justify-center gap-2 flex-wrap">
           {[
             { id: 'all', label: 'All' },
             { id: user?.role, label: 'Mine' },
@@ -120,7 +120,7 @@ export default function GoalsPage() {
               key={tab.id}
               onClick={() => setFilter(tab.id)}
               className={`
-                px-5 py-3 rounded-full text-body-sm font-medium whitespace-nowrap transition-all
+                px-5 py-3 rounded-full text-body-sm font-medium transition-all
                 ${filter === tab.id
                   ? 'bg-forest text-cream-100'
                   : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
@@ -135,123 +135,125 @@ export default function GoalsPage() {
 
       {/* Content */}
       <div className="bg-cream min-h-[60vh] px-6 py-8">
-        {/* Add Button */}
-        <button
-          onClick={() => setShowAddGoal(true)}
-          className="w-full mb-6 py-5 border-2 border-dashed border-cream-400 rounded-2xl text-ink-400 hover:border-forest hover:text-forest transition-all font-medium"
-        >
-          + Add goal
-        </button>
+        <div className="max-w-lg mx-auto">
+          {/* Add Button */}
+          <button
+            onClick={() => setShowAddGoal(true)}
+            className="w-full mb-6 py-5 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium"
+          >
+            + Add goal
+          </button>
 
-        {/* Goals */}
-        {loading ? (
-          <p className="text-center py-12 text-ink-400">Loading...</p>
-        ) : goals.length > 0 ? (
-          <div className="space-y-6 stagger">
-            {goals.map((goal) => (
-              <div
-                key={goal.id}
-                className={`card-elevated transition-all ${goal.status === 'completed' ? 'opacity-70' : ''} ${celebrateGoal === goal.id ? 'ring-4 ring-gold ring-offset-4' : ''}`}
-              >
-                {/* Header */}
-                <div className="flex items-start gap-4">
-                  {/* Progress Circle */}
-                  <div className="flex-shrink-0">
-                    <ProgressCircle progress={goal.progress} size={64} />
-                  </div>
+          {/* Goals */}
+          {loading ? (
+            <p className="text-center py-12 text-ink-400">Loading...</p>
+          ) : goals.length > 0 ? (
+            <div className="space-y-6">
+              {goals.map((goal) => (
+                <div
+                  key={goal.id}
+                  className={`bg-white rounded-3xl p-6 shadow-card transition-all ${goal.status === 'completed' ? 'opacity-70' : ''} ${celebrateGoal === goal.id ? 'ring-4 ring-gold ring-offset-4' : ''}`}
+                >
+                  {/* Header */}
+                  <div className="flex items-start gap-4">
+                    {/* Progress Circle */}
+                    <div className="flex-shrink-0">
+                      <ProgressCircle progress={goal.progress} size={64} />
+                    </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`tag ${getOwnerStyle(goal.owner)}`}>
-                        {getOwnerLabel(goal.owner)}
-                      </span>
-                      {goal.status === 'completed' && (
-                        <span className="tag tag-forest">Complete</span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`tag ${getOwnerStyle(goal.owner)}`}>
+                          {getOwnerLabel(goal.owner)}
+                        </span>
+                        {goal.status === 'completed' && (
+                          <span className="tag tag-forest">Complete</span>
+                        )}
+                      </div>
+                      <h3 className={`font-serif text-title-sm text-forest ${goal.status === 'completed' ? 'line-through' : ''}`}>
+                        {goal.title}
+                      </h3>
+                      {goal.description && (
+                        <p className="text-body-sm text-ink-400 mt-1">{goal.description}</p>
+                      )}
+                      {goal.target_date && (
+                        <p className="text-caption text-ink-300 mt-2">
+                          Target: {new Date(goal.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
                       )}
                     </div>
-                    <h3 className={`font-serif text-title-sm text-forest ${goal.status === 'completed' ? 'line-through' : ''}`}>
-                      {goal.title}
-                    </h3>
-                    {goal.description && (
-                      <p className="text-body-sm text-ink-400 mt-1">{goal.description}</p>
-                    )}
-                    {goal.target_date && (
-                      <p className="text-caption text-ink-300 mt-2">
-                        Target: {new Date(goal.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    )}
-                  </div>
 
-                  {/* Expand */}
-                  <button
-                    onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
-                    className="p-2 text-ink-300 hover:text-ink-500"
-                  >
-                    <svg
-                      className={`w-5 h-5 transition-transform ${expandedGoal === goal.id ? 'rotate-180' : ''}`}
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    {/* Expand */}
+                    <button
+                      onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
+                      className="p-2 text-ink-300 hover:text-ink-500"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Expanded Content */}
-                {expandedGoal === goal.id && (
-                  <div className="mt-6 pt-6 border-t border-cream-200 animate-fade-up">
-                    {/* Milestones */}
-                    {goal.milestones && goal.milestones.length > 0 && (
-                      <div className="space-y-3 mb-6">
-                        <p className="section-label">Milestones</p>
-                        {goal.milestones.map((milestone) => (
-                          <button
-                            key={milestone.id}
-                            onClick={() => handleToggleMilestone(goal.id, milestone.id, milestone.is_completed)}
-                            className="w-full flex items-center gap-3 text-left group"
-                          >
-                            <div className={`
-                              w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
-                              ${milestone.is_completed
-                                ? 'bg-forest border-forest'
-                                : 'border-cream-400 group-hover:border-forest-300'
-                              }
-                            `}>
-                              {milestone.is_completed && (
-                                <svg className="w-4 h-4 text-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className={`text-body ${milestone.is_completed ? 'text-ink-400 line-through' : 'text-ink-600'}`}>
-                              {milestone.title}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Complete Button */}
-                    {goal.status !== 'completed' && (
-                      <button
-                        onClick={() => handleCompleteGoal(goal.id)}
-                        className="btn-gold w-full"
+                      <svg
+                        className={`w-5 h-5 transition-transform ${expandedGoal === goal.id ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                       >
-                        Mark as Complete 🎉
-                      </button>
-                    )}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <span className="text-5xl mb-4 block">🎯</span>
-            <p className="text-body text-ink-400">No goals yet</p>
-            <p className="text-body-sm text-ink-300 mt-1">Add your first one</p>
-          </div>
-        )}
+
+                  {/* Expanded Content */}
+                  {expandedGoal === goal.id && (
+                    <div className="mt-6 pt-6 border-t border-cream-200">
+                      {/* Milestones */}
+                      {goal.milestones && goal.milestones.length > 0 && (
+                        <div className="space-y-3 mb-6">
+                          <p className="section-label">Milestones</p>
+                          {goal.milestones.map((milestone) => (
+                            <button
+                              key={milestone.id}
+                              onClick={() => handleToggleMilestone(goal.id, milestone.id, milestone.is_completed)}
+                              className="w-full flex items-center gap-3 text-left group"
+                            >
+                              <div className={`
+                                w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
+                                ${milestone.is_completed
+                                  ? 'bg-forest border-forest'
+                                  : 'border-cream-400 group-hover:border-forest-300'
+                                }
+                              `}>
+                                {milestone.is_completed && (
+                                  <svg className="w-4 h-4 text-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className={`text-body ${milestone.is_completed ? 'text-ink-400 line-through' : 'text-ink-600'}`}>
+                                {milestone.title}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Complete Button */}
+                      {goal.status !== 'completed' && (
+                        <button
+                          onClick={() => handleCompleteGoal(goal.id)}
+                          className="btn-gold w-full"
+                        >
+                          Mark as Complete 🎉
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <span className="text-5xl mb-4 block">🎯</span>
+              <p className="text-body text-ink-400">No goals yet</p>
+              <p className="text-body-sm text-ink-300 mt-1">Add your first one</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Add Goal Modal */}
@@ -267,15 +269,12 @@ export default function GoalsPage() {
       {/* Celebration Overlay */}
       {celebrateGoal && (
         <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-          <div className="text-center animate-scale-in">
-            <span className="text-8xl block animate-float">🎉</span>
+          <div className="text-center">
+            <span className="text-8xl block">🎉</span>
             <p className="font-serif text-display-sm text-forest mt-4">Goal Complete!</p>
           </div>
         </div>
       )}
-
-      {/* Spacer */}
-      <div className="h-24 bg-cream" />
     </div>
   )
 }
@@ -336,13 +335,13 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
     setLoading(false)
   }
 
-  const addMilestoneField = () => {
-    setMilestones(prev => [...prev, ''])
-  }
-
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
-      <div className="bg-cream w-full rounded-t-4xl p-6 pb-10 max-h-[90vh] overflow-y-auto animate-slide-up safe-bottom" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+      <div 
+        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
+        style={{ maxHeight: '85vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-serif text-title text-forest">Add Goal</h2>
           <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
@@ -352,9 +351,9 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal?</label>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal? *</label>
             <input
               type="text"
               value={form.title}
@@ -421,16 +420,18 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
             </div>
             <button
               type="button"
-              onClick={addMilestoneField}
+              onClick={() => setMilestones(prev => [...prev, ''])}
               className="text-body-sm text-forest font-medium mt-3 hover:text-forest-700"
             >
               + Add another step
             </button>
           </div>
 
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Goal'}
-          </button>
+          <div className="pt-4">
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? 'Creating...' : 'Create Goal'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

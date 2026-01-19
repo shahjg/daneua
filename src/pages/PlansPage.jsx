@@ -5,8 +5,7 @@ import {
   addDateIdea,
   updateDateIdea,
   getCalendarEvents,
-  addCalendarEvent,
-  deleteCalendarEvent
+  addCalendarEvent
 } from '../lib/supabase'
 
 const vibes = [
@@ -60,7 +59,10 @@ export default function PlansPage() {
 
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await updateDateIdea(id, { status: newStatus })
+      await updateDateIdea(id, { 
+        status: newStatus,
+        completed_on: newStatus === 'done' ? new Date().toISOString().split('T')[0] : null
+      })
       setDateIdeas(prev => prev.map(idea => 
         idea.id === id ? { ...idea, status: newStatus } : idea
       ))
@@ -89,35 +91,21 @@ export default function PlansPage() {
     }
   }
 
-  const getVibeStyle = (vibe) => {
-    return vibes.find(v => v.id === vibe)?.color || 'bg-cream-200 text-ink-500'
-  }
-
-  const formatEventDate = (dateStr) => {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    if (date.toDateString() === today.toDateString()) return 'Today'
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  }
+  const getVibeStyle = (vibe) => vibes.find(v => v.id === vibe)?.color || 'bg-cream-200 text-ink-500'
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-28">
       {/* Header */}
-      <div className="bg-gold-100 px-6 pt-16 pb-10">
-        <div className="stagger">
+      <div className="bg-gold-100 px-6 pt-14 pb-12">
+        <div className="max-w-lg mx-auto text-center">
           <h1 className="font-serif text-display-sm text-forest mb-2">Plans</h1>
-          <p className="text-body text-forest-600">Adventures past and future</p>
+          <p className="text-body text-forest-600">Our adventures together</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
-        <div className="flex gap-2">
+        <div className="max-w-lg mx-auto flex justify-center gap-2">
           {[
             { id: 'dates', label: 'Date Ideas' },
             { id: 'calendar', label: 'Calendar' },
@@ -126,7 +114,7 @@ export default function PlansPage() {
               key={tab.id}
               onClick={() => setActiveSection(tab.id)}
               className={`
-                px-5 py-3 rounded-full text-body-sm font-medium transition-all
+                px-6 py-3 rounded-full text-body-sm font-medium transition-all
                 ${activeSection === tab.id 
                   ? 'bg-forest text-cream-100' 
                   : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
@@ -144,128 +132,144 @@ export default function PlansPage() {
         {/* Date Ideas */}
         {activeSection === 'dates' && (
           <div className="px-6 py-8">
-            {/* Filters */}
-            <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
-              <FilterPill label="All" active={!filter} onClick={() => setFilter(null)} />
-              <FilterPill label="Want to do" active={filter === 'want_to_do'} onClick={() => setFilter('want_to_do')} />
-              <FilterPill label="Planned" active={filter === 'planned'} onClick={() => setFilter('planned')} />
-              <FilterPill label="Done" active={filter === 'done'} onClick={() => setFilter('done')} />
+            <div className="max-w-lg mx-auto">
+              {/* Filters */}
+              <div className="flex justify-center gap-2 mb-6 flex-wrap">
+                <FilterPill label="All" active={!filter} onClick={() => setFilter(null)} />
+                <FilterPill label="Want to do" active={filter === 'want_to_do'} onClick={() => setFilter('want_to_do')} />
+                <FilterPill label="Planned" active={filter === 'planned'} onClick={() => setFilter('planned')} />
+                <FilterPill label="Complete" active={filter === 'done'} onClick={() => setFilter('done')} />
+              </div>
+
+              {/* Add Button */}
+              <button 
+                onClick={() => setShowAddDate(true)}
+                className="w-full mb-6 py-5 border-2 border-dashed border-gold-300 rounded-2xl text-gold-600 hover:border-gold-400 hover:bg-gold-50 transition-all font-medium"
+              >
+                + Add date idea
+              </button>
+
+              {/* Ideas */}
+              {loading ? (
+                <p className="text-center py-12 text-ink-400">Loading...</p>
+              ) : dateIdeas.length > 0 ? (
+                <div className="space-y-4">
+                  {dateIdeas.map((idea) => (
+                    <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-serif text-title-sm text-forest">{idea.name}</h3>
+                          <p className="text-caption text-ink-300 mt-1">
+                            Added by {idea.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
+                          </p>
+                        </div>
+                        <span className="text-body font-semibold text-gold-600">
+                          {'$'.repeat(idea.price_level)}
+                        </span>
+                      </div>
+
+                      {idea.description && (
+                        <p className="text-body text-ink-500 mb-4">{idea.description}</p>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>
+                        <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>
+                      </div>
+
+                      {idea.location && (
+                        <p className="text-body-sm text-ink-400 mb-4">📍 {idea.location}</p>
+                      )}
+
+                      {idea.notes && (
+                        <p className="text-body-sm text-ink-400 italic mb-4">"{idea.notes}"</p>
+                      )}
+
+                      {/* Status Buttons */}
+                      <div className="flex gap-2 pt-4 border-t border-cream-200">
+                        {[
+                          { id: 'want_to_do', label: 'Want' },
+                          { id: 'planned', label: 'Planned' },
+                          { id: 'done', label: 'Complete' },
+                        ].map((status) => (
+                          <button
+                            key={status.id}
+                            onClick={() => handleStatusUpdate(idea.id, status.id)}
+                            className={`
+                              flex-1 py-3 rounded-xl text-body-sm font-medium transition-all
+                              ${idea.status === status.id 
+                                ? 'bg-forest text-cream-100' 
+                                : 'bg-cream-100 text-ink-400 hover:bg-cream-200'
+                              }
+                            `}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <span className="text-5xl mb-4 block">💡</span>
+                  <p className="text-body text-ink-400">No date ideas yet</p>
+                  <p className="text-body-sm text-ink-300 mt-1">Add your first one!</p>
+                </div>
+              )}
             </div>
-
-            {/* Add Button */}
-            <button 
-              onClick={() => setShowAddDate(true)}
-              className="w-full mb-6 py-5 border-2 border-dashed border-cream-400 rounded-2xl text-ink-400 hover:border-forest hover:text-forest transition-all font-medium"
-            >
-              + Add date idea
-            </button>
-
-            {/* Ideas */}
-            {loading ? (
-              <p className="text-center py-12 text-ink-400">Loading...</p>
-            ) : dateIdeas.length > 0 ? (
-              <div className="space-y-4 stagger">
-                {dateIdeas.map((idea) => (
-                  <div key={idea.id} className="card-elevated">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-serif text-title-sm text-forest">{idea.name}</h3>
-                      <span className="text-body-sm text-gold-600 font-semibold">
-                        {'$'.repeat(idea.price_level)}
-                      </span>
-                    </div>
-
-                    {idea.description && (
-                      <p className="text-body text-ink-500 mb-4">{idea.description}</p>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>
-                      <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>
-                    </div>
-
-                    {idea.notes && (
-                      <p className="text-body-sm text-ink-400 italic mb-4">"{idea.notes}"</p>
-                    )}
-
-                    {idea.location && (
-                      <p className="text-body-sm text-ink-400 mb-4">📍 {idea.location}</p>
-                    )}
-
-                    {/* Status Buttons */}
-                    <div className="flex gap-2 pt-4 border-t border-cream-200">
-                      {['want_to_do', 'planned', 'done'].map((status) => (
-                        <button
-                          key={status}
-                          onClick={() => handleStatusUpdate(idea.id, status)}
-                          className={`
-                            flex-1 py-2.5 rounded-xl text-body-sm font-medium transition-all
-                            ${idea.status === status 
-                              ? 'bg-forest text-cream-100' 
-                              : 'bg-cream-100 text-ink-400 hover:bg-cream-200'
-                            }
-                          `}
-                        >
-                          {status === 'want_to_do' ? 'Want' : status === 'planned' ? 'Planned' : 'Done'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <span className="text-5xl mb-4 block">🗓️</span>
-                <p className="text-body text-ink-400">No date ideas yet</p>
-                <p className="text-body-sm text-ink-300 mt-1">Add your first one!</p>
-              </div>
-            )}
           </div>
         )}
 
         {/* Calendar */}
         {activeSection === 'calendar' && (
           <div className="px-6 py-8">
-            {/* Add Button */}
-            <button 
-              onClick={() => setShowAddEvent(true)}
-              className="w-full mb-6 py-5 border-2 border-dashed border-cream-400 rounded-2xl text-ink-400 hover:border-forest hover:text-forest transition-all font-medium"
-            >
-              + Add event
-            </button>
+            <div className="max-w-lg mx-auto">
+              {/* Add Event Button */}
+              <button 
+                onClick={() => setShowAddEvent(true)}
+                className="w-full mb-6 py-5 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium"
+              >
+                + Add event
+              </button>
 
-            {/* Events */}
-            {events.length > 0 ? (
-              <div className="space-y-4 stagger">
-                {events.map((event) => (
-                  <div key={event.id} className="card flex items-start gap-4">
-                    <div className="flex-shrink-0 w-16 text-center py-2 bg-forest-50 rounded-xl">
-                      <p className="text-caption text-forest-600">
-                        {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
-                      </p>
-                      <p className="font-serif text-title text-forest">
-                        {new Date(event.start_date).getDate()}
-                      </p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
-                      {event.description && (
-                        <p className="text-body-sm text-ink-400 mt-1">{event.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-2 text-caption text-ink-300">
-                        {event.start_time && <span>🕐 {event.start_time}</span>}
-                        {event.location && <span>📍 {event.location}</span>}
+              {/* Events */}
+              {events.length > 0 ? (
+                <div className="space-y-4">
+                  {events.map((event) => (
+                    <div key={event.id} className="bg-white rounded-2xl p-5 shadow-soft flex items-start gap-4">
+                      <div className="flex-shrink-0 w-16 text-center py-2 bg-forest-50 rounded-xl">
+                        <p className="text-caption text-forest-600">
+                          {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
+                        </p>
+                        <p className="font-serif text-title text-forest">
+                          {new Date(event.start_date).getDate()}
+                        </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
+                        {event.description && (
+                          <p className="text-body-sm text-ink-400 mt-1">{event.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-3 mt-2 text-caption text-ink-300">
+                          {event.start_time && <span>🕐 {event.start_time}</span>}
+                          {event.location && <span>📍 {event.location}</span>}
+                        </div>
+                        <p className="text-caption text-ink-300 mt-2">
+                          By {event.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <span className="text-5xl mb-4 block">📅</span>
-                <p className="text-body text-ink-400">No upcoming events</p>
-                <p className="text-body-sm text-ink-300 mt-1">Add something to look forward to</p>
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <span className="text-5xl mb-4 block">📅</span>
+                  <p className="text-body text-ink-400">No upcoming events</p>
+                  <p className="text-body-sm text-ink-300 mt-1">Add something to look forward to</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -279,9 +283,6 @@ export default function PlansPage() {
       {showAddEvent && (
         <AddEventModal onClose={() => setShowAddEvent(false)} onAdd={handleAddEvent} />
       )}
-
-      {/* Spacer */}
-      <div className="h-24 bg-cream" />
     </div>
   )
 }
@@ -291,7 +292,7 @@ function FilterPill({ label, active, onClick }) {
     <button
       onClick={onClick}
       className={`
-        px-4 py-2 rounded-full text-body-sm font-medium whitespace-nowrap transition-all
+        px-4 py-2 rounded-full text-body-sm font-medium transition-all
         ${active ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}
       `}
     >
@@ -321,8 +322,12 @@ function AddDateModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
-      <div className="bg-cream w-full rounded-t-4xl p-6 pb-10 max-h-[90vh] overflow-y-auto animate-slide-up safe-bottom" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+      <div 
+        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
+        style={{ maxHeight: '85vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
           <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
@@ -332,9 +337,9 @@ function AddDateModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Name</label>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Name *</label>
             <input
               type="text"
               value={form.name}
@@ -350,7 +355,7 @@ function AddDateModal({ onClose, onAdd }) {
             <textarea
               value={form.description}
               onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-              className="input min-h-[100px] resize-none"
+              className="input min-h-[80px] resize-none"
               placeholder="What makes this special?"
             />
           </div>
@@ -374,7 +379,7 @@ function AddDateModal({ onClose, onAdd }) {
                 onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
                 className="input"
               >
-                <option value={1}>$ Budget</option>
+                <option value={1}>$ Free/Cheap</option>
                 <option value={2}>$$ Moderate</option>
                 <option value={3}>$$$ Pricey</option>
                 <option value={4}>$$$$ Splurge</option>
@@ -400,7 +405,7 @@ function AddDateModal({ onClose, onAdd }) {
               value={form.location}
               onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
               className="input"
-              placeholder="Address or area"
+              placeholder="Where?"
             />
           </div>
 
@@ -411,13 +416,15 @@ function AddDateModal({ onClose, onAdd }) {
               value={form.notes}
               onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
               className="input"
-              placeholder="Make reservation first..."
+              placeholder="Make reservation, bring blanket..."
             />
           </div>
 
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Date Idea'}
-          </button>
+          <div className="pt-4">
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Date Idea'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -444,8 +451,12 @@ function AddEventModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
-      <div className="bg-cream w-full rounded-t-4xl p-6 pb-10 max-h-[90vh] overflow-y-auto animate-slide-up safe-bottom" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+      <div 
+        className="bg-cream w-full rounded-t-[2rem] p-6 pb-10 overflow-y-auto"
+        style={{ maxHeight: '85vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-serif text-title text-forest">Add Event</h2>
           <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600">
@@ -455,15 +466,15 @@ function AddEventModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Title</label>
+            <label className="text-body-sm font-medium text-ink-600 block mb-2">Title *</label>
             <input
               type="text"
               value={form.title}
               onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
               className="input"
-              placeholder="Dinner at La Maison"
+              placeholder="Dinner at..."
               required
             />
           </div>
@@ -485,7 +496,7 @@ function AddEventModal({ onClose, onAdd }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Date</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-2">Date *</label>
               <input
                 type="date"
                 value={form.start_date}
@@ -523,13 +534,15 @@ function AddEventModal({ onClose, onAdd }) {
               value={form.description}
               onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
               className="input min-h-[80px] resize-none"
-              placeholder="Any details..."
+              placeholder="Details..."
             />
           </div>
 
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Event'}
-          </button>
+          <div className="pt-4">
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Event'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

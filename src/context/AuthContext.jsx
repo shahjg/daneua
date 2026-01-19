@@ -10,7 +10,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check for saved user
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const { role } = JSON.parse(saved)
@@ -38,12 +37,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  const switchUser = () => {
-    logout()
-  }
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, switchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

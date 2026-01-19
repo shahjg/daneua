@@ -75,11 +75,9 @@ const navItems = [
 ]
 
 export default function Navigation({ currentPage, setCurrentPage }) {
-  const { user } = useAuth()
-
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-cream/95 backdrop-blur-xl border-t border-cream-300 safe-bottom z-50">
-      <div className="flex items-center justify-around py-3 px-4 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 bg-cream/95 backdrop-blur-xl border-t border-cream-300 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+      <div className="flex items-center justify-around py-2 px-2 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = currentPage === item.id
           return (
@@ -87,16 +85,16 @@ export default function Navigation({ currentPage, setCurrentPage }) {
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
               className={`
-                flex flex-col items-center justify-center py-2 px-3 rounded-2xl min-w-[60px]
-                transition-all duration-300
+                flex flex-col items-center justify-center py-2 px-3 rounded-2xl min-w-[56px]
+                transition-all duration-200
                 ${isActive 
                   ? 'text-forest bg-forest-50' 
-                  : 'text-ink-300 hover:text-ink-500'
+                  : 'text-ink-300 hover:text-ink-500 active:scale-95'
                 }
               `}
             >
               {isActive ? item.iconFilled : item.icon}
-              <span className={`text-[10px] mt-1.5 font-semibold tracking-wide uppercase ${
+              <span className={`text-[10px] mt-1 font-semibold tracking-wide uppercase ${
                 isActive ? 'text-forest' : 'text-ink-400'
               }`}>
                 {item.label}

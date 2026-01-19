@@ -9,10 +9,10 @@ import PlansPage from './pages/PlansPage'
 import GoalsPage from './pages/GoalsPage'
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, logout } = useAuth()
   const [currentPage, setCurrentPage] = useState('home')
+  const [showSettings, setShowSettings] = useState(false)
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-forest flex items-center justify-center">
@@ -24,29 +24,66 @@ function AppContent() {
     )
   }
 
-  // Not logged in
   if (!user) {
     return <LoginPage />
   }
 
-  // Logged in - show app
   const renderPage = () => {
     switch (currentPage) {
-      case 'home': return <HomePage />
+      case 'home': return <HomePage onOpenSettings={() => setShowSettings(true)} />
       case 'learn': return <LearnPage />
       case 'us': return <UsPage />
       case 'plans': return <PlansPage />
       case 'goals': return <GoalsPage />
-      default: return <HomePage />
+      default: return <HomePage onOpenSettings={() => setShowSettings(true)} />
     }
   }
 
   return (
     <div className="min-h-screen bg-cream">
-      <main className="pb-24">
+      <main>
         {renderPage()}
       </main>
       <Navigation currentPage={currentPage} setCurrentPage={setCurrentPage} />
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div 
+          className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-6"
+          onClick={() => setShowSettings(false)}
+        >
+          <div 
+            className="bg-cream rounded-3xl p-6 w-full max-w-sm shadow-elevated"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-serif text-title text-forest text-center mb-6">Settings</h2>
+            
+            <div className="space-y-4">
+              <div className="bg-cream-200 rounded-2xl p-4 text-center">
+                <p className="text-body-sm text-ink-400">Logged in as</p>
+                <p className="font-serif text-title-sm text-forest">{user.name}</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  logout()
+                  setShowSettings(false)
+                }}
+                className="w-full py-4 bg-rose-100 text-rose-600 rounded-2xl font-medium hover:bg-rose-200 transition-colors"
+              >
+                Switch User / Logout
+              </button>
+
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-full py-4 bg-cream-200 text-ink-500 rounded-2xl font-medium hover:bg-cream-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

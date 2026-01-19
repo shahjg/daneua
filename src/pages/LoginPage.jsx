@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const [step, setStep] = useState('select') // 'select' | 'pin'
+  const [step, setStep] = useState('select')
   const [selectedRole, setSelectedRole] = useState(null)
   const [pin, setPin] = useState(['', '', '', ''])
   const [error, setError] = useState('')
@@ -23,13 +23,11 @@ export default function LoginPage() {
     newPin[index] = value
     setPin(newPin)
 
-    // Auto-focus next input
     if (value && index < 3) {
       const next = document.getElementById(`pin-${index + 1}`)
       next?.focus()
     }
 
-    // Auto-submit when complete
     if (index === 3 && value) {
       const fullPin = [...newPin.slice(0, 3), value].join('')
       handleSubmit(fullPin)
@@ -69,11 +67,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-forest flex flex-col">
       {/* Top section */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 pt-20 pb-10">
-        <div className="text-center animate-fade-up">
+        <div className="text-center">
           <h1 className="font-serif text-display-sm text-cream-100 mb-4">
             D(ane)ua
           </h1>
-          <div className="line-accent mx-auto mb-6 bg-gold" />
+          <div className="w-12 h-1 bg-gold rounded-full mx-auto mb-6" />
           <p className="text-body text-cream-300">
             Our little world
           </p>
@@ -81,9 +79,9 @@ export default function LoginPage() {
       </div>
 
       {/* Bottom card */}
-      <div className="bg-cream rounded-t-[3rem] px-8 pt-10 pb-12 safe-bottom animate-slide-up">
+      <div className="bg-cream rounded-t-[3rem] px-8 pt-10 pb-12" style={{ paddingBottom: 'max(48px, env(safe-area-inset-bottom))' }}>
         {step === 'select' ? (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-sm mx-auto">
             <div className="text-center mb-8">
               <h2 className="font-serif text-title text-forest mb-2">Welcome back</h2>
               <p className="text-body-sm text-ink-400">Who's this?</p>
@@ -95,7 +93,7 @@ export default function LoginPage() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-serif text-title-sm text-forest group-hover:text-forest-700">Shah</p>
+                  <p className="font-serif text-title-sm text-forest group-hover:text-forest-700">Shahjahan</p>
                   <p className="text-body-sm text-ink-400">The one building this</p>
                 </div>
                 <div className="w-12 h-12 bg-forest-100 rounded-full flex items-center justify-center">
@@ -120,7 +118,7 @@ export default function LoginPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-8 animate-fade-in">
+          <div className="space-y-8 max-w-sm mx-auto">
             <button 
               onClick={handleBack}
               className="text-body-sm text-ink-400 hover:text-forest flex items-center gap-2"
@@ -133,7 +131,7 @@ export default function LoginPage() {
 
             <div className="text-center">
               <h2 className="font-serif text-title text-forest mb-2">
-                Hey {selectedRole === 'shah' ? 'Shah' : 'Dane'}
+                Hey {selectedRole === 'shah' ? 'Shahjahan' : 'Dane'}
               </h2>
               <p className="text-body-sm text-ink-400">Enter your PIN</p>
             </div>
@@ -149,7 +147,7 @@ export default function LoginPage() {
                   value={digit}
                   onChange={(e) => handlePinChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="pin-input"
+                  className="w-14 h-16 text-center text-2xl font-serif bg-white border-2 border-cream-300 rounded-2xl focus:border-forest focus:ring-0 focus:outline-none transition-all"
                   autoFocus={index === 0}
                   disabled={loading}
                 />
@@ -157,13 +155,13 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-center text-rose-500 text-body-sm animate-fade-in">
+              <p className="text-center text-rose-500 text-body-sm">
                 {error}
               </p>
             )}
 
             {loading && (
-              <p className="text-center text-ink-400 text-body-sm animate-pulse-soft">
+              <p className="text-center text-ink-400 text-body-sm animate-pulse">
                 Checking...
               </p>
             )}
