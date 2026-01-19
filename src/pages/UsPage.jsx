@@ -624,4 +624,3 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
     </div>
   )
 }
-}
