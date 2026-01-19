@@ -7,7 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ==================== AUTH ====================
 export async function verifyPin(role, pin) {
-  const { data, error } = await supabase.rpc('verify_pin', { user_role: role, pin })
+  const { data, error } = await supabase.rpc('verify_pin', { user_role: role, input_pin: pin })
   if (error) throw error
   return data
 }
