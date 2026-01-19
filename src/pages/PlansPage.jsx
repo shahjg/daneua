@@ -4,8 +4,10 @@ import {
   getDateIdeas,
   addDateIdea,
   updateDateIdea,
+  deleteDateIdea,
   getCalendarEvents,
-  addCalendarEvent
+  addCalendarEvent,
+  deleteCalendarEvent
 } from '../lib/supabase'
 
 const vibes = [
@@ -86,6 +88,26 @@ export default function PlansPage() {
       const newEvent = await addCalendarEvent({ ...event, added_by: user.role })
       setEvents(prev => [...prev, newEvent].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)))
       setShowAddEvent(false)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleDeleteIdea = async (id) => {
+    if (!confirm('Delete this date idea?')) return
+    try {
+      await deleteDateIdea(id)
+      setDateIdeas(prev => prev.filter(i => i.id !== id))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleDeleteEvent = async (id) => {
+    if (!confirm('Delete this event?')) return
+    try {
+      await deleteCalendarEvent(id)
+      setEvents(prev => prev.filter(e => e.id !== id))
     } catch (error) {
       console.error('Error:', error)
     }
@@ -176,7 +198,17 @@ export default function PlansPage() {
               ) : dateIdeas.length > 0 ? (
                 <div className="space-y-4">
                   {dateIdeas.map((idea) => (
-                    <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card">
+                    <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card relative group">
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDeleteIdea(idea.id)}
+                        className="absolute top-4 right-4 w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <h3 className="font-serif text-title-sm text-forest">{idea.name}</h3>
@@ -251,7 +283,17 @@ export default function PlansPage() {
               {events.length > 0 ? (
                 <div className="space-y-4">
                   {events.map((event) => (
-                    <div key={event.id} className="bg-white rounded-2xl p-5 shadow-soft flex items-start gap-4">
+                    <div key={event.id} className="bg-white rounded-2xl p-5 shadow-soft flex items-start gap-4 relative group">
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDeleteEvent(event.id)}
+                        className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      
                       <div className="flex-shrink-0 w-16 text-center py-2 bg-forest-50 rounded-xl">
                         <p className="text-caption text-forest-600">
                           {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}

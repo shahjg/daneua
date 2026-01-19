@@ -7,6 +7,7 @@ import LearnPage from './pages/LearnPage'
 import UsPage from './pages/UsPage'
 import PlansPage from './pages/PlansPage'
 import GoalsPage from './pages/GoalsPage'
+import IdeasPage from './pages/IdeasPage'
 
 function AppContent() {
   const { user, loading, logout } = useAuth()
@@ -35,6 +36,7 @@ function AppContent() {
       case 'us': return <UsPage />
       case 'plans': return <PlansPage />
       case 'goals': return <GoalsPage />
+      case 'ideas': return <IdeasPage />
       default: return <HomePage onOpenSettings={() => setShowSettings(true)} />
     }
   }

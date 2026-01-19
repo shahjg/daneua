@@ -406,12 +406,21 @@ export default function LearnPage() {
                   </div>
 
                   {/* Browse More */}
-                  <button 
-                    onClick={() => setView('browse')}
-                    className="w-full py-4 text-center text-body text-forest font-medium hover:text-forest-700"
-                  >
-                    Browse more words →
-                  </button>
+                  <div className="bg-gradient-to-br from-gold-100 via-rose-50 to-cream rounded-3xl p-6 shadow-soft">
+                    <p className="text-center text-caption text-gold-700 mb-3">Want to learn more?</p>
+                    <h3 className="font-serif text-title text-forest text-center mb-4">
+                      ✨ Explore {activeTab === 'urdu' ? 'Urdu' : 'Tagalog'}
+                    </h3>
+                    <p className="text-body-sm text-ink-500 text-center mb-5">
+                      Discover words for love, food, family & more
+                    </p>
+                    <button 
+                      onClick={() => setView('browse')}
+                      className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-medium flex items-center justify-center gap-2"
+                    >
+                      <span>📚</span> Start Exploring
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -430,15 +439,45 @@ export default function LearnPage() {
                 Back to today's lesson
               </button>
 
-              <h2 className="font-serif text-title text-forest text-center mb-6">Browse by Category</h2>
+              <div className="text-center mb-8">
+                <h2 className="font-serif text-display-sm text-forest mb-2">
+                  {activeTab === 'urdu' ? '🇵🇰 Urdu' : '🇵🇭 Tagalog'} Library
+                </h2>
+                <p className="text-body text-ink-500">Learn words that matter</p>
+              </div>
 
               {!selectedCategory ? (
-                <div className="grid grid-cols-2 gap-4">
-                  {categories.map((cat) => (
+                <div className="space-y-4">
+                  {/* Vibe Categories */}
+                  {[
+                    { id: 'love', label: 'Love & Endearment', emoji: '💕', desc: 'Sweet words for your Jaan', gradient: 'from-rose-100 to-rose-200' },
+                    { id: 'food', label: 'Food & Dining', emoji: '🍽️', desc: 'Talk about delicious food', gradient: 'from-gold-100 to-gold-200' },
+                    { id: 'family', label: 'Family & Respect', emoji: '👨‍👩‍👧', desc: 'Words for loved ones', gradient: 'from-forest-50 to-forest-100' },
+                    { id: 'daily', label: 'Daily Essentials', emoji: '☀️', desc: 'Common everyday phrases', gradient: 'from-cream-200 to-cream-300' },
+                    { id: 'emotions', label: 'Feelings & Emotions', emoji: '🥰', desc: 'Express how you feel', gradient: 'from-purple-100 to-purple-200' },
+                    { id: 'culture', label: 'Culture & Customs', emoji: '🎊', desc: 'Traditions & etiquette', gradient: 'from-blue-100 to-blue-200' },
+                  ].filter(c => categories.includes(c.id) || categories.length === 0).map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleCategorySelect(cat.id)}
+                      className={`w-full bg-gradient-to-r ${cat.gradient} rounded-2xl p-5 text-left hover:scale-[1.02] transition-transform active:scale-[0.98]`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-4xl">{cat.emoji}</span>
+                        <div>
+                          <p className="font-serif text-title-sm text-forest">{cat.label}</p>
+                          <p className="text-body-sm text-forest-600">{cat.desc}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Show original categories that don't match our presets */}
+                  {categories.filter(c => !['love', 'food', 'family', 'daily', 'emotions', 'culture'].includes(c)).map((cat) => (
                     <button
                       key={cat}
                       onClick={() => handleCategorySelect(cat)}
-                      className="bg-white rounded-2xl p-5 text-center shadow-soft hover:shadow-card transition-shadow capitalize"
+                      className="w-full bg-white rounded-2xl p-5 text-left shadow-soft hover:shadow-card transition-shadow capitalize"
                     >
                       <p className="font-serif text-title-sm text-forest">{cat}</p>
                     </button>

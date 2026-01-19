@@ -173,9 +173,27 @@ export async function answerQuestion(questionId, userRole, answer) {
 
 // ==================== LESSONS ====================
 export async function getDailyLesson(language) {
-  const { data, error } = await supabase.rpc('get_daily_lesson', { lang: language })
+  // Get today's date to create a consistent seed per day per language
+  const today = new Date().toISOString().split('T')[0]
+  const seed = today + '-' + language
+  
+  // Get all lessons for this language
+  const { data: lessons, error } = await supabase
+    .from('lessons')
+    .select('*')
+    .eq('language', language)
+    .eq('is_active', true)
+    .order('id')
+  
   if (error) throw error
-  return data?.[0] || null
+  if (!lessons || lessons.length === 0) return null
+  
+  // Use day of year + language to pick a consistent lesson
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24))
+  const languageOffset = language === 'urdu' ? 0 : language === 'tagalog' ? 100 : 200
+  const index = (dayOfYear + languageOffset) % lessons.length
+  
+  return lessons[index]
 }
 
 export async function getLessonsByCategory(language, category = null) {
@@ -363,6 +381,14 @@ export async function updateDateIdea(id, updates) {
   return data
 }
 
+export async function deleteDateIdea(id) {
+  const { error } = await supabase
+    .from('date_ideas')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
 // ==================== CALENDAR ====================
 export async function getCalendarEvents(startDate, endDate) {
   const { data, error } = await supabase
@@ -426,6 +452,21 @@ export async function updateGoal(id, updates) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function deleteGoal(id) {
+  // First delete milestones
+  await supabase
+    .from('goal_milestones')
+    .delete()
+    .eq('goal_id', id)
+  
+  // Then delete the goal
+  const { error } = await supabase
+    .from('goals')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function addMilestone(goalId, title) {

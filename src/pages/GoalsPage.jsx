@@ -4,6 +4,7 @@ import {
   getGoals,
   addGoal,
   updateGoal,
+  deleteGoal,
   addMilestone,
   toggleMilestone
 } from '../lib/supabase'
@@ -65,6 +66,16 @@ export default function GoalsPage() {
       ))
       setCelebrateGoal(goalId)
       setTimeout(() => setCelebrateGoal(null), 3000)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const handleDeleteGoal = async (goalId) => {
+    if (!confirm('Delete this goal?')) return
+    try {
+      await deleteGoal(goalId)
+      setGoals(prev => prev.filter(g => g.id !== goalId))
     } catch (error) {
       console.error('Error:', error)
     }
@@ -152,8 +163,18 @@ export default function GoalsPage() {
               {goals.map((goal) => (
                 <div
                   key={goal.id}
-                  className={`bg-white rounded-3xl p-6 shadow-card transition-all ${goal.status === 'completed' ? 'opacity-70' : ''} ${celebrateGoal === goal.id ? 'ring-4 ring-gold ring-offset-4' : ''}`}
+                  className={`bg-white rounded-3xl p-6 shadow-card transition-all relative group ${goal.status === 'completed' ? 'opacity-70' : ''} ${celebrateGoal === goal.id ? 'ring-4 ring-gold ring-offset-4' : ''}`}
                 >
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDeleteGoal(goal.id)}
+                    className="absolute top-4 right-4 w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200 z-10"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                  
                   {/* Header */}
                   <div className="flex items-start gap-4">
                     {/* Progress Circle */}

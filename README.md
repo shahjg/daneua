@@ -1,13 +1,25 @@
 # D(ane)ua V3 - Fixed
 
 ## What's Fixed
-- ✅ Voice notes now work on iOS (better codec support)
-- ✅ Voice notes are shared (both can see/hear each other's)
-- ✅ Photos upload on iOS
-- ✅ Add Date/Goal buttons are clearly visible
+- ✅ Pic of Day → Opens camera first, then gallery option
+- ✅ Delete goals and date ideas (hover to see delete button)
+- ✅ Word of the day stays same per language all day
+- ✅ "Explore" section redesigned with vibe-based categories
+- ✅ Voice notes work and are shared between both users
 - ✅ Letters have clear submit button
-- ✅ Daily question stays same all day
-- ✅ Both can see each other's answers
+- ✅ Add Date/Goal buttons clearly visible
+- ✅ **NEW: Ideas tab** - Collaborative notes like Google Docs but cute!
+
+## New Features
+
+### Ideas Tab 💭
+- Post-it style notes with colors
+- Categories: General, Travel, Home, Date Ideas, Bucket List, Food, Gift Ideas
+- Pin important ideas
+- Mark ideas as complete
+- Voice ideas (record & save)
+- Add photos to ideas
+- Live typing indicator (see when partner is adding)
 
 ## CRITICAL: Do This First
 
@@ -15,10 +27,8 @@
 
 1. Go to Supabase → **Storage**
 2. Click **New bucket**
-3. Name: `audio`
-4. Toggle **Public bucket** = ON
-5. Click **Create**
-6. Repeat for bucket named `photos`
+3. Name: `audio` → Toggle **Public bucket** = ON → Create
+4. Repeat for bucket named `photos`
 
 ### Step 2: Run the SQL
 
@@ -27,7 +37,8 @@ Go to Supabase → **SQL Editor** → New Query
 Copy and paste the contents of `setup.sql` and run it.
 
 This will:
-- Create the `voice_notes` table
+- Create `voice_notes` table
+- Create `shared_ideas` table (for Ideas feature)
 - Set up storage policies
 - Update your name to "Shahjahan"
 
@@ -42,16 +53,8 @@ This will:
 - **Shahjahan:** `1111`
 - **Dane:** `2222`
 
-## Troubleshooting
-
-### Voice notes still not sending on iOS?
-- Make sure `audio` bucket exists and is **Public**
-- Run the SQL to create policies
-- Check browser console for errors
-
-### Photos not uploading?
-- Make sure `photos` bucket exists and is **Public**
-- Run the SQL to create policies
-
-### "voice_notes table doesn't exist" error?
-- Run the setup.sql in SQL Editor
+## Upcoming Features (Not in this release)
+- Push notifications for Duas and updates
+- Lesson levels and progress tracking
+- More comprehensive language lessons (Gemini's suggestions)
+- Video support in Ideas
