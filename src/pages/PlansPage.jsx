@@ -1,596 +1,456 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import {
-  getDateIdeas,
-  addDateIdea,
-  updateDateIdea,
-  deleteDateIdea,
-  getCalendarEvents,
-  addCalendarEvent,
-  deleteCalendarEvent
-} from '../lib/supabase'
-
-const vibes = [
-  { id: 'romantic', label: 'Romantic' },
-  { id: 'casual', label: 'Casual' },
-  { id: 'adventure', label: 'Adventure' },
-  { id: 'cozy', label: 'Cozy' },
-  { id: 'fancy', label: 'Fancy' },
-]
-
-const dateTypes = [
-  { id: 'dinner', label: 'Dinner' },
-  { id: 'lunch', label: 'Lunch' },
-  { id: 'cafe', label: 'Cafe' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'day_trip', label: 'Day Trip' },
-  { id: 'at_home', label: 'At Home' },
-]
+import { supabase } from '../lib/supabase'
 
 export default function PlansPage() {
   const { user } = useAuth()
-  const [activeSection, setActiveSection] = useState('dates')
-  const [dateIdeas, setDateIdeas] = useState([])
-  const [events, setEvents] = useState([])
-  const [filter, setFilter] = useState(null)
-  const [showAddDate, setShowAddDate] = useState(false)
-  const [showAddEvent, setShowAddEvent] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchData()
-  }, [filter])
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const [ideas, eventsData] = await Promise.all([
-        getDateIdeas(filter ? { status: filter } : {}),
-        getCalendarEvents(
-          new Date().toISOString().split('T')[0],
-          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        )
-      ])
-      setDateIdeas(ideas || [])
-      setEvents(eventsData || [])
-    } catch (error) {
-      console.error('Error:', error)
-    }
-    setLoading(false)
-  }
-
-  const handleStatusUpdate = async (id, newStatus) => {
-    try {
-      await updateDateIdea(id, { 
-        status: newStatus,
-        completed_on: newStatus === 'done' ? new Date().toISOString().split('T')[0] : null
-      })
-      setDateIdeas(prev => prev.map(idea => 
-        idea.id === id ? { ...idea, status: newStatus } : idea
-      ))
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleAddIdea = async (idea) => {
-    try {
-      const newIdea = await addDateIdea({ ...idea, added_by: user.role })
-      setDateIdeas(prev => [newIdea, ...prev])
-      setShowAddDate(false)
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleAddEvent = async (event) => {
-    try {
-      const newEvent = await addCalendarEvent({ ...event, added_by: user.role })
-      setEvents(prev => [...prev, newEvent].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)))
-      setShowAddEvent(false)
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleDeleteIdea = async (id) => {
-    if (!confirm('Delete this date idea?')) return
-    try {
-      await deleteDateIdea(id)
-      setDateIdeas(prev => prev.filter(i => i.id !== id))
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleDeleteEvent = async (id) => {
-    if (!confirm('Delete this event?')) return
-    try {
-      await deleteCalendarEvent(id)
-      setEvents(prev => prev.filter(e => e.id !== id))
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const getVibeStyle = (vibe) => {
-    const styles = {
-      romantic: 'bg-rose-100 text-rose-600',
-      casual: 'bg-cream-300 text-ink-600',
-      adventure: 'bg-gold-100 text-gold-700',
-      cozy: 'bg-forest-50 text-forest-600',
-      fancy: 'bg-gold-200 text-gold-800',
-    }
-    return styles[vibe] || 'bg-cream-200 text-ink-500'
-  }
+  const [activeTab, setActiveTab] = useState('calendar')
 
   return (
     <div className="min-h-screen pb-28">
-      {/* Header */}
-      <div className="bg-gold-100 px-6 pt-14 pb-12">
+      <div className="bg-forest px-6 pt-14 pb-12">
         <div className="max-w-lg mx-auto text-center">
-          <h1 className="font-serif text-display-sm text-forest mb-2">Plans</h1>
-          <p className="text-body text-forest-600">Our adventures together</p>
+          <h1 className="font-serif text-display-sm text-cream-50 mb-2">Plans</h1>
+          <p className="text-body text-cream-300">Our journey ahead</p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
+      <div className="bg-cream px-4 py-4 sticky top-0 z-20 border-b border-cream-300">
         <div className="max-w-lg mx-auto flex justify-center gap-2">
-          {[
-            { id: 'dates', label: 'Date Ideas' },
-            { id: 'calendar', label: 'Calendar' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSection(tab.id)}
-              className={`
-                px-6 py-3 rounded-full text-body-sm font-medium transition-all
-                ${activeSection === tab.id 
-                  ? 'bg-forest text-cream-100' 
-                  : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
-                }
-              `}
-            >
+          {[{ id: 'calendar', label: 'Calendar' }, { id: 'dates', label: 'Date Ideas' }, { id: 'countdowns', label: 'Countdowns' }].map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-full text-body-sm font-medium transition-all ${activeTab === tab.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'}`}>
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Content */}
       <div className="bg-cream min-h-[60vh]">
-        {/* Date Ideas */}
-        {activeSection === 'dates' && (
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              {/* Filters */}
-              <div className="flex justify-center gap-2 mb-6 flex-wrap">
-                {[
-                  { id: null, label: 'All' },
-                  { id: 'want_to_do', label: 'Want' },
-                  { id: 'planned', label: 'Planned' },
-                  { id: 'done', label: 'Complete' },
-                ].map((f) => (
-                  <button
-                    key={f.id || 'all'}
-                    onClick={() => setFilter(f.id)}
-                    className={`px-4 py-2 rounded-full text-body-sm font-medium transition-all ${
-                      filter === f.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
+        {activeTab === 'calendar' && <CalendarView user={user} />}
+        {activeTab === 'dates' && <DateIdeasView user={user} />}
+        {activeTab === 'countdowns' && <CountdownsView user={user} />}
+      </div>
+    </div>
+  )
+}
 
-              {/* Add Button */}
-              <button 
-                onClick={() => setShowAddDate(true)}
-                className="w-full mb-6 py-5 border-2 border-dashed border-gold-300 rounded-2xl text-gold-600 hover:border-gold-400 hover:bg-gold-50 transition-all font-medium"
-              >
-                + Add date idea
-              </button>
+function CalendarView({ user }) {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [events, setEvents] = useState([])
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [newEvent, setNewEvent] = useState({ title: '', time: '', notes: '' })
+  const [editingEvent, setEditingEvent] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(null)
 
-              {/* Ideas */}
-              {loading ? (
-                <p className="text-center py-12 text-ink-400">Loading...</p>
-              ) : dateIdeas.length > 0 ? (
-                <div className="space-y-4">
-                  {dateIdeas.map((idea) => (
-                    <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card relative group">
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeleteIdea(idea.id)}
-                        className="absolute top-4 right-4 w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                      
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-serif text-title-sm text-forest">{idea.name}</h3>
-                          <p className="text-caption text-ink-300 mt-1">
-                            Added by {idea.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                          </p>
-                        </div>
-                        <span className="text-body font-semibold text-gold-600">
-                          {'$'.repeat(idea.price_level || 1)}
-                        </span>
-                      </div>
+  useEffect(() => {
+    fetchEvents()
+  }, [currentDate])
 
-                      {idea.description && (
-                        <p className="text-body text-ink-500 mb-4">{idea.description}</p>
-                      )}
+  const fetchEvents = async () => {
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+    const { data } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .gte('date', startOfMonth.toISOString().split('T')[0])
+      .lte('date', endOfMonth.toISOString().split('T')[0])
+    setEvents(data || [])
+  }
 
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {idea.vibe && <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>}
-                        {idea.date_type && <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>}
-                      </div>
+  const getDaysInMonth = () => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const days = []
+    for (let i = 0; i < firstDay; i++) days.push(null)
+    for (let i = 1; i <= daysInMonth; i++) days.push(i)
+    return days
+  }
 
-                      {idea.location && (
-                        <p className="text-body-sm text-ink-400 mb-4">📍 {idea.location}</p>
-                      )}
+  const getEventsForDay = (day) => {
+    if (!day) return []
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return events.filter(e => e.date === dateStr)
+  }
 
-                      {/* Status Buttons */}
-                      <div className="flex gap-2 pt-4 border-t border-cream-200">
-                        {[
-                          { id: 'want_to_do', label: 'Want' },
-                          { id: 'planned', label: 'Planned' },
-                          { id: 'done', label: 'Complete' },
-                        ].map((status) => (
-                          <button
-                            key={status.id}
-                            onClick={() => handleStatusUpdate(idea.id, status.id)}
-                            className={`
-                              flex-1 py-3 rounded-xl text-body-sm font-medium transition-all
-                              ${idea.status === status.id 
-                                ? 'bg-forest text-cream-100' 
-                                : 'bg-cream-100 text-ink-400 hover:bg-cream-200'
-                              }
-                            `}
-                          >
-                            {status.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16">
-                  <span className="text-5xl mb-4 block">💡</span>
-                  <p className="text-body text-ink-400">No date ideas yet</p>
-                </div>
-              )}
-            </div>
+  const handleDayClick = (day) => {
+    if (!day) return
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    setSelectedDate(dateStr)
+    setShowAddEvent(true)
+  }
+
+  const addEvent = async () => {
+    if (!newEvent.title.trim() || !selectedDate) return
+    await supabase.from('calendar_events').insert({
+      date: selectedDate,
+      title: newEvent.title,
+      time: newEvent.time || null,
+      notes: newEvent.notes || null,
+      created_by: user.role
+    })
+    setNewEvent({ title: '', time: '', notes: '' })
+    setShowAddEvent(false)
+    setSelectedDate(null)
+    fetchEvents()
+  }
+
+  const updateEvent = async () => {
+    if (!editingEvent?.title.trim()) return
+    await supabase.from('calendar_events').update({
+      title: editingEvent.title,
+      time: editingEvent.time,
+      notes: editingEvent.notes
+    }).eq('id', editingEvent.id)
+    setEditingEvent(null)
+    fetchEvents()
+  }
+
+  const deleteEvent = async (id) => {
+    await supabase.from('calendar_events').delete().eq('id', id)
+    setShowDeleteModal(null)
+    setEditingEvent(null)
+    fetchEvents()
+  }
+
+  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const today = new Date()
+  const isToday = (day) => day && today.getDate() === day && today.getMonth() === currentDate.getMonth() && today.getFullYear() === currentDate.getFullYear()
+
+  return (
+    <div className="px-6 py-6">
+      <div className="max-w-lg mx-auto">
+        {/* Month Navigation */}
+        <div className="flex justify-between items-center mb-4">
+          <button onClick={prevMonth} className="w-10 h-10 bg-cream-200 rounded-full flex items-center justify-center">←</button>
+          <h2 className="font-serif text-title text-forest">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
+          <button onClick={nextMonth} className="w-10 h-10 bg-cream-200 rounded-full flex items-center justify-center">→</button>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="bg-white rounded-2xl p-4 shadow-card mb-6">
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {dayNames.map(d => <div key={d} className="text-center text-caption text-ink-400 py-2">{d}</div>)}
           </div>
-        )}
+          <div className="grid grid-cols-7 gap-1">
+            {getDaysInMonth().map((day, i) => {
+              const dayEvents = getEventsForDay(day)
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleDayClick(day)}
+                  disabled={!day}
+                  className={`aspect-square rounded-lg flex flex-col items-center justify-center text-body-sm relative ${
+                    !day ? 'bg-transparent' :
+                    isToday(day) ? 'bg-forest text-cream-100' :
+                    dayEvents.length > 0 ? 'bg-rose-100 text-forest' :
+                    'bg-cream-100 text-ink-600 hover:bg-cream-200'
+                  }`}
+                >
+                  {day}
+                  {dayEvents.length > 0 && <span className="absolute bottom-1 w-1.5 h-1.5 bg-rose-500 rounded-full" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
-        {/* Calendar */}
-        {activeSection === 'calendar' && (
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              <button 
-                onClick={() => setShowAddEvent(true)}
-                className="w-full mb-6 py-5 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium"
-              >
-                + Add event
+        {/* Events List */}
+        <h3 className="font-serif text-title-sm text-forest mb-3">Upcoming Events</h3>
+        {events.length === 0 ? (
+          <p className="text-ink-400 text-center py-6">No events this month. Tap a date to add one.</p>
+        ) : (
+          <div className="space-y-2">
+            {events.sort((a, b) => a.date.localeCompare(b.date)).map(event => (
+              <button key={event.id} onClick={() => setEditingEvent(event)} className="w-full bg-white rounded-xl p-4 shadow-soft text-left">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium text-forest">{event.title}</p>
+                    <p className="text-body-sm text-ink-400">{new Date(event.date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} {event.time && `at ${event.time}`}</p>
+                  </div>
+                </div>
               </button>
-
-              {events.length > 0 ? (
-                <div className="space-y-4">
-                  {events.map((event) => (
-                    <div key={event.id} className="bg-white rounded-2xl p-5 shadow-soft flex items-start gap-4 relative group">
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                      
-                      <div className="flex-shrink-0 w-16 text-center py-2 bg-forest-50 rounded-xl">
-                        <p className="text-caption text-forest-600">
-                          {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
-                        </p>
-                        <p className="font-serif text-title text-forest">
-                          {new Date(event.start_date).getDate()}
-                        </p>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
-                        {event.description && (
-                          <p className="text-body-sm text-ink-400 mt-1">{event.description}</p>
-                        )}
-                        <div className="flex flex-wrap gap-3 mt-2 text-caption text-ink-300">
-                          {event.start_time && <span>🕐 {event.start_time}</span>}
-                          {event.location && <span>📍 {event.location}</span>}
-                        </div>
-                        <p className="text-caption text-ink-300 mt-2">
-                          By {event.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16">
-                  <span className="text-5xl mb-4 block">📅</span>
-                  <p className="text-body text-ink-400">No upcoming events</p>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
         )}
       </div>
-
-      {/* Add Date Idea Modal */}
-      {showAddDate && (
-        <AddDateModal onClose={() => setShowAddDate(false)} onAdd={handleAddIdea} />
-      )}
 
       {/* Add Event Modal */}
       {showAddEvent && (
-        <AddEventModal onClose={() => setShowAddEvent(false)} onAdd={handleAddEvent} />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-serif text-title text-forest mb-2">Add Event</h3>
+            <p className="text-body-sm text-ink-400 mb-4">{selectedDate && new Date(selectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+            <input type="text" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Event title..." className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <input type="time" value={newEvent.time} onChange={e => setNewEvent({ ...newEvent, time: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <textarea value={newEvent.notes} onChange={e => setNewEvent({ ...newEvent, notes: e.target.value })} placeholder="Notes..." className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-4 h-20 resize-none" />
+            <div className="flex gap-3">
+              <button onClick={() => { setShowAddEvent(false); setNewEvent({ title: '', time: '', notes: '' }); setSelectedDate(null) }} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={addEvent} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-serif text-title text-forest mb-4">Edit Event</h3>
+            <input type="text" value={editingEvent.title} onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <input type="time" value={editingEvent.time || ''} onChange={e => setEditingEvent({ ...editingEvent, time: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <textarea value={editingEvent.notes || ''} onChange={e => setEditingEvent({ ...editingEvent, notes: e.target.value })} placeholder="Notes..." className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-4 h-20 resize-none" />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(editingEvent.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              <button onClick={() => setEditingEvent(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={updateEvent} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Event?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => deleteEvent(showDeleteModal)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-function AddDateModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    vibe: 'casual',
-    price_level: 2,
-    date_type: 'dinner',
-    location: '',
-  })
-  const [loading, setLoading] = useState(false)
+function DateIdeasView({ user }) {
+  const [ideas, setIdeas] = useState([])
+  const [newIdea, setNewIdea] = useState('')
+  const [editingIdea, setEditingIdea] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    setLoading(true)
-    await onAdd(form)
-    setLoading(false)
+  useEffect(() => {
+    fetchIdeas()
+  }, [])
+
+  const fetchIdeas = async () => {
+    const { data } = await supabase.from('date_ideas').select('*').order('created_at', { ascending: false })
+    setIdeas(data || [])
+  }
+
+  const addIdea = async () => {
+    if (!newIdea.trim()) return
+    await supabase.from('date_ideas').insert({ idea: newIdea, added_by: user.role })
+    setNewIdea('')
+    fetchIdeas()
+  }
+
+  const updateIdea = async () => {
+    if (!editingIdea?.idea.trim()) return
+    await supabase.from('date_ideas').update({ idea: editingIdea.idea }).eq('id', editingIdea.id)
+    setEditingIdea(null)
+    fetchIdeas()
+  }
+
+  const deleteIdea = async (id) => {
+    await supabase.from('date_ideas').delete().eq('id', id)
+    setShowDeleteModal(null)
+    setEditingIdea(null)
+    fetchIdeas()
+  }
+
+  const toggleDone = async (idea) => {
+    await supabase.from('date_ideas').update({ done: !idea.done }).eq('id', idea.id)
+    fetchIdeas()
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 bg-gold-100">
-          <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-gold-200">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <div className="px-6 py-6">
+      <div className="max-w-lg mx-auto">
+        <div className="flex gap-2 mb-6">
+          <input type="text" value={newIdea} onChange={e => setNewIdea(e.target.value)} onKeyDown={e => e.key === 'Enter' && addIdea()} placeholder="Add a date idea..." className="flex-1 px-4 py-3 bg-white border border-cream-300 rounded-xl" />
+          <button onClick={addIdea} className="px-4 bg-forest text-cream-100 rounded-xl">Add</button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="max-h-[50vh] overflow-y-auto p-5">
-          <form id="date-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-                className="input"
-                placeholder="Sunset picnic..."
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-                placeholder="What makes this special?"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
-                <select
-                  value={form.vibe}
-                  onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
-                  className="input"
-                >
-                  {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-                </select>
+        {ideas.length === 0 ? (
+          <p className="text-ink-400 text-center py-12">No date ideas yet</p>
+        ) : (
+          <div className="space-y-3">
+            {ideas.map(idea => (
+              <div key={idea.id} className={`bg-white rounded-xl p-4 shadow-soft ${idea.done ? 'opacity-60' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <button onClick={() => toggleDone(idea)} className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center ${idea.done ? 'bg-green-500 border-green-500' : 'border-cream-400'}`}>
+                    {idea.done && <span className="text-white text-xs">✓</span>}
+                  </button>
+                  <div className="flex-1">
+                    <p className={`text-body text-ink-600 ${idea.done ? 'line-through' : ''}`}>{idea.idea}</p>
+                    <p className="text-caption text-ink-300 mt-1">by {idea.added_by === 'shah' ? 'Shahjahan' : 'Dane'}</p>
+                  </div>
+                  <button onClick={() => setEditingIdea(idea)} className="text-ink-300 hover:text-forest p-1">Edit</button>
+                </div>
               </div>
-
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
-                <select
-                  value={form.price_level}
-                  onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
-                  className="input"
-                >
-                  <option value={1}>$ Free</option>
-                  <option value={2}>$$ Moderate</option>
-                  <option value={3}>$$$ Pricey</option>
-                  <option value={4}>$$$$ Splurge</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select
-                value={form.date_type}
-                onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))}
-                className="input"
-              >
-                {dateTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-                className="input"
-                placeholder="Where?"
-              />
-            </div>
-          </form>
-        </div>
-
-        {/* Fixed Footer - Always Visible */}
-        <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="date-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
-            {loading ? 'Adding...' : '✨ Add Date Idea'}
-          </button>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Edit Modal */}
+      {editingIdea && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-serif text-title text-forest mb-4">Edit Date Idea</h3>
+            <textarea value={editingIdea.idea} onChange={e => setEditingIdea({ ...editingIdea, idea: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-4 h-24 resize-none" />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(editingIdea.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              <button onClick={() => setEditingIdea(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={updateIdea} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Idea?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => deleteIdea(showDeleteModal)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function AddEventModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    event_type: 'date',
-    start_date: '',
-    start_time: '',
-    location: '',
-  })
-  const [loading, setLoading] = useState(false)
+function CountdownsView({ user }) {
+  const [countdowns, setCountdowns] = useState([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [newCountdown, setNewCountdown] = useState({ title: '', date: '' })
+  const [editingCountdown, setEditingCountdown] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.title.trim() || !form.start_date) return
-    setLoading(true)
-    await onAdd(form)
-    setLoading(false)
+  useEffect(() => {
+    fetchCountdowns()
+  }, [])
+
+  const fetchCountdowns = async () => {
+    const { data } = await supabase.from('countdowns').select('*').order('date')
+    setCountdowns(data || [])
+  }
+
+  const addCountdown = async () => {
+    if (!newCountdown.title.trim() || !newCountdown.date) return
+    await supabase.from('countdowns').insert({ ...newCountdown, created_by: user.role })
+    setNewCountdown({ title: '', date: '' })
+    setShowAdd(false)
+    fetchCountdowns()
+  }
+
+  const updateCountdown = async () => {
+    if (!editingCountdown?.title.trim()) return
+    await supabase.from('countdowns').update({ title: editingCountdown.title, date: editingCountdown.date }).eq('id', editingCountdown.id)
+    setEditingCountdown(null)
+    fetchCountdowns()
+  }
+
+  const deleteCountdown = async (id) => {
+    await supabase.from('countdowns').delete().eq('id', id)
+    setShowDeleteModal(null)
+    setEditingCountdown(null)
+    fetchCountdowns()
+  }
+
+  const getDaysUntil = (date) => {
+    const diff = new Date(date) - new Date()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 bg-forest">
-          <h2 className="font-serif text-title text-cream-100">Add Event</h2>
-          <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <div className="px-6 py-6">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => setShowAdd(true)} className="w-full bg-forest text-cream-100 rounded-xl p-4 mb-6 font-medium">Add Countdown</button>
 
-        {/* Scrollable Content */}
-        <div className="max-h-[50vh] overflow-y-auto p-5">
-          <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Title *</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
-                className="input"
-                placeholder="Dinner at..."
-                required
-              />
+        {showAdd && (
+          <div className="bg-white rounded-2xl p-6 shadow-card mb-6">
+            <h3 className="font-serif text-title text-forest mb-4">New Countdown</h3>
+            <input type="text" value={newCountdown.title} onChange={e => setNewCountdown({ ...newCountdown, title: e.target.value })} placeholder="What are you counting down to?" className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <input type="date" value={newCountdown.date} onChange={e => setNewCountdown({ ...newCountdown, date: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-4" />
+            <div className="flex gap-3">
+              <button onClick={() => { setShowAdd(false); setNewCountdown({ title: '', date: '' }) }} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={addCountdown} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Create</button>
             </div>
+          </div>
+        )}
 
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select
-                value={form.event_type}
-                onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))}
-                className="input"
-              >
-                <option value="date">Date</option>
-                <option value="trip">Trip</option>
-                <option value="anniversary">Anniversary</option>
-                <option value="reminder">Reminder</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Time</label>
-                <input
-                  type="time"
-                  value={form.start_time}
-                  onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))}
-                className="input"
-                placeholder="Where?"
-              />
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="input min-h-[60px] resize-none"
-                placeholder="Details..."
-              />
-            </div>
-          </form>
-        </div>
-
-        {/* Fixed Footer - Always Visible */}
-        <div className="p-5 bg-cream border-t border-cream-300">
-          <button 
-            type="submit" 
-            form="event-form" 
-            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
-            disabled={loading}
-          >
-            {loading ? 'Adding...' : '📅 Add Event'}
-          </button>
-        </div>
+        {countdowns.length === 0 ? (
+          <p className="text-ink-400 text-center py-12">No countdowns yet</p>
+        ) : (
+          <div className="space-y-4">
+            {countdowns.map(countdown => {
+              const days = getDaysUntil(countdown.date)
+              const isPast = days < 0
+              return (
+                <div key={countdown.id} className={`bg-white rounded-2xl p-5 shadow-card ${isPast ? 'opacity-60' : ''}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-serif text-title-sm text-forest">{countdown.title}</h3>
+                      <p className="text-body-sm text-ink-400">{new Date(countdown.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                    </div>
+                    <button onClick={() => setEditingCountdown(countdown)} className="text-ink-300 hover:text-forest p-1">Edit</button>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="font-serif text-display text-forest">{Math.abs(days)}</p>
+                    <p className="text-body text-ink-500">{isPast ? 'days ago' : 'days to go'}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Edit Modal */}
+      {editingCountdown && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-serif text-title text-forest mb-4">Edit Countdown</h3>
+            <input type="text" value={editingCountdown.title} onChange={e => setEditingCountdown({ ...editingCountdown, title: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-3" />
+            <input type="date" value={editingCountdown.date} onChange={e => setEditingCountdown({ ...editingCountdown, date: e.target.value })} className="w-full px-4 py-3 border border-cream-300 rounded-xl mb-4" />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(editingCountdown.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              <button onClick={() => setEditingCountdown(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={updateCountdown} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Countdown?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => deleteCountdown(showDeleteModal)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

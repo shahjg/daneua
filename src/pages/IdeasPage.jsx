@@ -1,586 +1,370 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
-// Folder structure
-const defaultFolders = [
-  { id: 'business', name: 'Business', emoji: '💼', color: 'bg-blue-100' },
-  { id: 'life', name: 'Life Planning', emoji: '🏠', color: 'bg-green-100' },
-  { id: 'creative', name: 'Creative', emoji: '🎨', color: 'bg-purple-100' },
-  { id: 'other', name: 'Other', emoji: '📁', color: 'bg-cream-200' },
-]
-
 export default function IdeasPage() {
   const { user } = useAuth()
-  const [view, setView] = useState('home') // home | folder | document | quicknotes | draw
-  const [folders, setFolders] = useState(defaultFolders)
+  const [view, setView] = useState('home')
+  const [folders, setFolders] = useState([])
   const [documents, setDocuments] = useState([])
+  const [quickNotes, setQuickNotes] = useState([])
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [selectedDoc, setSelectedDoc] = useState(null)
-  const [quickNotes, setQuickNotes] = useState([])
-  const [partnerTyping, setPartnerTyping] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
+  const [newFolderName, setNewFolderName] = useState('')
+  const [showAddFolder, setShowAddFolder] = useState(false)
 
   useEffect(() => {
-    fetchData()
-    
-    // Subscribe to realtime
-    const channel = supabase
-      .channel('ideas-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'idea_documents' }, handleDocChange)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quick_notes' }, handleNoteChange)
-      .on('broadcast', { event: 'typing' }, ({ payload }) => {
-        if (payload.user !== user?.role && payload.docId === selectedDoc?.id) {
-          setPartnerTyping(true)
-          setTimeout(() => setPartnerTyping(false), 2000)
-        }
-      })
-      .subscribe()
+    fetchFolders()
+    fetchQuickNotes()
+  }, [])
 
-    return () => supabase.removeChannel(channel)
-  }, [user, selectedDoc])
-
-  const handleDocChange = (payload) => {
-    if (payload.eventType === 'INSERT') {
-      setDocuments(prev => [payload.new, ...prev])
-    } else if (payload.eventType === 'UPDATE') {
-      setDocuments(prev => prev.map(d => d.id === payload.new.id ? payload.new : d))
-      if (selectedDoc?.id === payload.new.id) {
-        setSelectedDoc(payload.new)
-      }
-    } else if (payload.eventType === 'DELETE') {
-      setDocuments(prev => prev.filter(d => d.id !== payload.old.id))
-    }
+  const fetchFolders = async () => {
+    const { data } = await supabase.from('idea_folders').select('*').order('created_at')
+    setFolders(data || [])
   }
 
-  const handleNoteChange = (payload) => {
-    if (payload.eventType === 'INSERT') {
-      setQuickNotes(prev => [payload.new, ...prev])
-    } else if (payload.eventType === 'DELETE') {
-      setQuickNotes(prev => prev.filter(n => n.id !== payload.old.id))
-    }
+  const fetchQuickNotes = async () => {
+    const { data } = await supabase.from('quick_notes').select('*').order('created_at', { ascending: false })
+    setQuickNotes(data || [])
   }
 
-  const fetchData = async () => {
-    try {
-      const [docsRes, notesRes] = await Promise.all([
-        supabase.from('idea_documents').select('*').order('updated_at', { ascending: false }),
-        supabase.from('quick_notes').select('*').order('created_at', { ascending: false }).limit(20)
-      ])
-      setDocuments(docsRes.data || [])
-      setQuickNotes(notesRes.data || [])
-    } catch (err) {
-      console.error(err)
-    }
-    setLoading(false)
+  const fetchDocuments = async (folderId) => {
+    const { data } = await supabase.from('idea_documents').select('*').eq('folder_id', folderId).order('updated_at', { ascending: false })
+    setDocuments(data || [])
   }
 
-  const createDocument = async (folderId, title) => {
-    try {
-      const { data, error } = await supabase
-        .from('idea_documents')
-        .insert({
-          folder_id: folderId,
-          title: title || 'Untitled',
-          content: '',
-          created_by: user.role
-        })
-        .select()
-        .single()
-      
-      if (error) throw error
-      setDocuments(prev => [data, ...prev])
-      setSelectedDoc(data)
-      setView('document')
-    } catch (err) {
-      console.error(err)
-      alert('Could not create document')
-    }
+  const addFolder = async () => {
+    if (!newFolderName.trim()) return
+    await supabase.from('idea_folders').insert({ name: newFolderName.trim(), created_by: user.role })
+    setNewFolderName('')
+    setShowAddFolder(false)
+    fetchFolders()
   }
 
   const openFolder = (folder) => {
     setSelectedFolder(folder)
+    fetchDocuments(folder.id)
     setView('folder')
+  }
+
+  const createDocument = async () => {
+    const { data } = await supabase.from('idea_documents').insert({
+      folder_id: selectedFolder.id,
+      title: 'Untitled',
+      content: '',
+      created_by: user.role,
+      last_edited_by: user.role
+    }).select().single()
+    if (data) {
+      setSelectedDoc(data)
+      setView('editor')
+    }
   }
 
   const openDocument = (doc) => {
     setSelectedDoc(doc)
-    setView('document')
+    setView('editor')
   }
 
-  const goHome = () => {
-    setView('home')
-    setSelectedFolder(null)
-    setSelectedDoc(null)
+  if (view === 'editor' && selectedDoc) {
+    return <DocumentEditor doc={selectedDoc} user={user} onBack={() => { setView('folder'); fetchDocuments(selectedFolder.id) }} />
+  }
+
+  if (view === 'folder' && selectedFolder) {
+    return (
+      <div className="min-h-screen pb-28">
+        <div className="bg-forest px-6 pt-14 pb-12">
+          <div className="max-w-lg mx-auto">
+            <button onClick={() => setView('home')} className="text-cream-300 text-body-sm mb-4">← Back</button>
+            <h1 className="font-serif text-display-sm text-cream-50">{selectedFolder.name}</h1>
+          </div>
+        </div>
+        <div className="bg-cream px-6 py-8 min-h-[60vh]">
+          <div className="max-w-lg mx-auto">
+            <button onClick={createDocument} className="w-full bg-forest text-cream-100 rounded-xl p-4 mb-6 font-medium">New Document</button>
+            {documents.length === 0 ? (
+              <p className="text-center text-ink-400 py-12">No documents yet</p>
+            ) : (
+              <div className="space-y-3">
+                {documents.map(doc => (
+                  <button key={doc.id} onClick={() => openDocument(doc)} className="w-full bg-white rounded-xl p-4 shadow-soft text-left">
+                    <p className="font-medium text-forest">{doc.title || 'Untitled'}</p>
+                    <p className="text-body-sm text-ink-400">{new Date(doc.updated_at).toLocaleDateString()}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen pb-28">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-blue-100 via-purple-50 to-pink-50 px-6 pt-14 pb-8">
+      <div className="bg-forest px-6 pt-14 pb-12">
+        <div className="max-w-lg mx-auto text-center">
+          <h1 className="font-serif text-display-sm text-cream-50 mb-2">Ideas</h1>
+          <p className="text-body text-cream-300">Our shared space</p>
+        </div>
+      </div>
+
+      <div className="bg-cream px-6 py-8 min-h-[60vh]">
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between">
-            {view !== 'home' && (
-              <button onClick={goHome} className="p-2 -ml-2 text-forest">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-            <div className={view === 'home' ? 'text-center w-full' : ''}>
-              <h1 className="font-serif text-display-sm text-forest">
-                {view === 'home' ? 'Ideas' : view === 'folder' ? selectedFolder?.name : view === 'document' ? selectedDoc?.title : view === 'quicknotes' ? 'Quick Notes' : 'Sketch'}
-              </h1>
-              {view === 'home' && <p className="text-body text-forest-600">Dream together, build together 💭</p>}
+          {/* Folders */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-serif text-title text-forest">Folders</h2>
+              <button onClick={() => setShowAddFolder(true)} className="text-body-sm text-forest font-medium">+ Add Folder</button>
             </div>
-            {view !== 'home' && <div className="w-10" />}
+
+            {showAddFolder && (
+              <div className="bg-white rounded-xl p-4 shadow-soft mb-4">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  placeholder="Folder name..."
+                  className="w-full px-3 py-2 border border-cream-300 rounded-lg mb-3"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={addFolder} className="flex-1 bg-forest text-cream-100 rounded-lg py-2 text-body-sm">Create</button>
+                  <button onClick={() => { setShowAddFolder(false); setNewFolderName('') }} className="flex-1 bg-cream-200 text-ink-500 rounded-lg py-2 text-body-sm">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {folders.length === 0 ? (
+              <p className="text-ink-400 text-center py-8">No folders yet. Create one to get started.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {folders.map(folder => (
+                  <button key={folder.id} onClick={() => openFolder(folder)} className="bg-white rounded-xl p-4 shadow-soft text-left">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 mb-2">F</div>
+                    <p className="font-medium text-forest">{folder.name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          
-          {partnerTyping && (
-            <div className="mt-4 flex items-center justify-center gap-2 text-body-sm text-forest-600">
-              <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce" />
-                <span className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </span>
-              {theirName} is typing...
+
+          {/* Quick Notes */}
+          <div>
+            <h2 className="font-serif text-title text-forest mb-4">Quick Notes</h2>
+            <QuickNotesSection notes={quickNotes} user={user} onRefresh={fetchQuickNotes} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function QuickNotesSection({ notes, user, onRefresh }) {
+  const [newNote, setNewNote] = useState('')
+
+  const addNote = async () => {
+    if (!newNote.trim()) return
+    await supabase.from('quick_notes').insert({ content: newNote.trim(), added_by: user.role })
+    setNewNote('')
+    onRefresh()
+  }
+
+  const deleteNote = async (id) => {
+    await supabase.from('quick_notes').delete().eq('id', id)
+    onRefresh()
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newNote}
+          onChange={e => setNewNote(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addNote()}
+          placeholder="Add a quick note..."
+          className="flex-1 px-4 py-3 bg-white border border-cream-300 rounded-xl"
+        />
+        <button onClick={addNote} className="px-4 bg-forest text-cream-100 rounded-xl">Add</button>
+      </div>
+      <div className="space-y-2">
+        {notes.map(note => (
+          <div key={note.id} className="bg-white rounded-xl p-4 shadow-soft flex justify-between items-start">
+            <div>
+              <p className="text-body text-ink-600">{note.content}</p>
+              <p className="text-caption text-ink-300 mt-1">by {note.added_by === 'shah' ? 'Shahjahan' : 'Dane'}</p>
+            </div>
+            <button onClick={() => deleteNote(note.id)} className="text-ink-300 hover:text-rose-500 p-1">x</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DocumentEditor({ doc, user, onBack }) {
+  const [title, setTitle] = useState(doc.title || '')
+  const [content, setContent] = useState(doc.content || '')
+  const [saving, setSaving] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [showSketch, setShowSketch] = useState(false)
+  const [sketches, setSketches] = useState(doc.sketches || [])
+  const saveTimeoutRef = useRef(null)
+
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
+
+  useEffect(() => {
+    const channel = supabase.channel(`doc-${doc.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'idea_documents', filter: `id=eq.${doc.id}` }, (payload) => {
+        if (payload.new.last_edited_by !== user.role) {
+          setTitle(payload.new.title || '')
+          setContent(payload.new.content || '')
+          setSketches(payload.new.sketches || [])
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [doc.id, user.role])
+
+  const saveDocument = async (newTitle, newContent, newSketches) => {
+    setSaving(true)
+    await supabase.from('idea_documents').update({
+      title: newTitle,
+      content: newContent,
+      sketches: newSketches,
+      last_edited_by: user.role,
+      updated_at: new Date().toISOString()
+    }).eq('id', doc.id)
+    setSaving(false)
+  }
+
+  const handleTitleChange = (val) => {
+    setTitle(val)
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => saveDocument(val, content, sketches), 500)
+  }
+
+  const handleContentChange = (val) => {
+    setContent(val)
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => saveDocument(title, val, sketches), 500)
+  }
+
+  const deleteDocument = async () => {
+    await supabase.from('idea_documents').delete().eq('id', doc.id)
+    onBack()
+  }
+
+  const saveSketch = (dataUrl) => {
+    const newSketches = [...sketches, { id: Date.now(), dataUrl, createdBy: user.role }]
+    setSketches(newSketches)
+    setShowSketch(false)
+    saveDocument(title, content, newSketches)
+  }
+
+  const deleteSketch = (id) => {
+    const newSketches = sketches.filter(s => s.id !== id)
+    setSketches(newSketches)
+    saveDocument(title, content, newSketches)
+  }
+
+  return (
+    <div className="min-h-screen pb-28">
+      <div className="bg-forest px-6 pt-14 pb-6">
+        <div className="max-w-lg mx-auto flex justify-between items-center">
+          <button onClick={onBack} className="text-cream-300 text-body-sm">← Back</button>
+          <div className="flex items-center gap-3">
+            {saving && <span className="text-cream-400 text-body-sm">Saving...</span>}
+            <button onClick={() => setShowSketch(true)} className="text-cream-300 text-body-sm">Sketch</button>
+            <button onClick={() => setShowDelete(true)} className="text-cream-300 text-body-sm">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-cream px-6 py-6 min-h-[70vh]">
+        <div className="max-w-lg mx-auto">
+          <input
+            type="text"
+            value={title}
+            onChange={e => handleTitleChange(e.target.value)}
+            placeholder="Untitled"
+            className="w-full bg-transparent font-serif text-display-sm text-forest border-none outline-none mb-4"
+          />
+          <textarea
+            value={content}
+            onChange={e => handleContentChange(e.target.value)}
+            placeholder="Start writing..."
+            className="w-full h-64 bg-transparent text-body text-ink-600 border-none outline-none resize-none"
+          />
+
+          {/* Sketches */}
+          {sketches.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-cream-300">
+              <h3 className="font-medium text-forest mb-3">Sketches</h3>
+              <div className="space-y-3">
+                {sketches.map(sketch => (
+                  <div key={sketch.id} className="relative">
+                    <img src={sketch.dataUrl} alt="Sketch" className="w-full rounded-xl border border-cream-300" />
+                    <button onClick={() => deleteSketch(sketch.id)} className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow text-ink-400">x</button>
+                    <p className="text-caption text-ink-300 mt-1">by {sketch.createdBy === 'shah' ? 'Shahjahan' : 'Dane'}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="bg-cream min-h-[60vh]">
-        {view === 'home' && (
-          <HomeView 
-            folders={folders}
-            documents={documents}
-            quickNotes={quickNotes}
-            openFolder={openFolder}
-            openDocument={openDocument}
-            setView={setView}
-            user={user}
-          />
-        )}
-        {view === 'folder' && (
-          <FolderView
-            folder={selectedFolder}
-            documents={documents.filter(d => d.folder_id === selectedFolder?.id)}
-            createDocument={createDocument}
-            openDocument={openDocument}
-          />
-        )}
-        {view === 'document' && (
-          <DocumentView
-            doc={selectedDoc}
-            user={user}
-            theirName={theirName}
-            onUpdate={(updated) => setSelectedDoc(updated)}
-          />
-        )}
-        {view === 'quicknotes' && (
-          <QuickNotesView
-            notes={quickNotes}
-            user={user}
-            onBack={goHome}
-          />
-        )}
-        {view === 'draw' && (
-          <DrawView onBack={goHome} user={user} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// HOME VIEW
-// ============================================
-
-function HomeView({ folders, documents, quickNotes, openFolder, openDocument, setView, user }) {
-  const recentDocs = documents.slice(0, 4)
-
-  return (
-    <div className="px-6 py-6">
-      <div className="max-w-lg mx-auto">
-        {/* Quick Actions */}
-        <div className="flex gap-3 mb-8">
-          <button
-            onClick={() => setView('quicknotes')}
-            className="flex-1 bg-gold-100 rounded-2xl p-4 text-left"
-          >
-            <span className="text-2xl mb-2 block">📝</span>
-            <p className="font-medium text-forest">Quick Notes</p>
-            <p className="text-body-sm text-forest-600">{quickNotes.length} notes</p>
-          </button>
-          <button
-            onClick={() => setView('draw')}
-            className="flex-1 bg-purple-100 rounded-2xl p-4 text-left"
-          >
-            <span className="text-2xl mb-2 block">✏️</span>
-            <p className="font-medium text-forest">Sketch</p>
-            <p className="text-body-sm text-forest-600">Draw ideas</p>
-          </button>
-        </div>
-
-        {/* Folders */}
-        <h2 className="font-serif text-title-sm text-forest mb-4">Folders</h2>
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          {folders.map(folder => {
-            const count = documents.filter(d => d.folder_id === folder.id).length
-            return (
-              <button
-                key={folder.id}
-                onClick={() => openFolder(folder)}
-                className={`${folder.color} rounded-2xl p-5 text-left hover:scale-[1.02] transition-transform`}
-              >
-                <span className="text-3xl mb-2 block">{folder.emoji}</span>
-                <p className="font-serif text-title-sm text-forest">{folder.name}</p>
-                <p className="text-body-sm text-forest-600">{count} docs</p>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Recent Documents */}
-        {recentDocs.length > 0 && (
-          <>
-            <h2 className="font-serif text-title-sm text-forest mb-4">Recent</h2>
-            <div className="space-y-3">
-              {recentDocs.map(doc => (
-                <button
-                  key={doc.id}
-                  onClick={() => openDocument(doc)}
-                  className="w-full bg-white rounded-xl p-4 text-left shadow-soft hover:shadow-card transition-shadow"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-forest">{doc.title}</p>
-                      <p className="text-body-sm text-ink-400">
-                        {doc.content?.substring(0, 50) || 'Empty document'}...
-                      </p>
-                    </div>
-                    <span className="text-ink-300">→</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// FOLDER VIEW
-// ============================================
-
-function FolderView({ folder, documents, createDocument, openDocument }) {
-  const [showNew, setShowNew] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-
-  const handleCreate = () => {
-    if (newTitle.trim()) {
-      createDocument(folder.id, newTitle.trim())
-      setNewTitle('')
-      setShowNew(false)
-    }
-  }
-
-  return (
-    <div className="px-6 py-6">
-      <div className="max-w-lg mx-auto">
-        {/* New Document Button */}
-        <button
-          onClick={() => setShowNew(true)}
-          className="w-full mb-6 py-4 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium flex items-center justify-center gap-2"
-        >
-          <span className="text-xl">+</span> New Document
-        </button>
-
-        {/* New Document Form */}
-        {showNew && (
-          <div className="bg-white rounded-2xl p-4 shadow-card mb-6">
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Document title..."
-              className="input mb-3"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button onClick={() => setShowNew(false)} className="btn-ghost flex-1">Cancel</button>
-              <button onClick={handleCreate} className="btn-primary flex-1">Create</button>
+      {/* Delete Modal */}
+      {showDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Document?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDelete(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={deleteDocument} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Documents */}
-        {documents.length > 0 ? (
-          <div className="space-y-3">
-            {documents.map(doc => (
-              <button
-                key={doc.id}
-                onClick={() => openDocument(doc)}
-                className="w-full bg-white rounded-xl p-4 text-left shadow-soft hover:shadow-card transition-shadow"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-forest">{doc.title}</p>
-                    <p className="text-body-sm text-ink-400">
-                      Updated {new Date(doc.updated_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="text-2xl">📄</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <span className="text-5xl mb-4 block">📁</span>
-            <p className="text-body text-ink-400">No documents yet</p>
-            <p className="text-body-sm text-ink-300">Create your first one!</p>
-          </div>
-        )}
-      </div>
+      {/* Sketch Modal */}
+      {showSketch && <SketchCanvas onSave={saveSketch} onClose={() => setShowSketch(false)} />}
     </div>
   )
 }
 
-// ============================================
-// DOCUMENT VIEW - Real-time collaborative editor
-// ============================================
-
-function DocumentView({ doc, user, theirName, onUpdate }) {
-  const [content, setContent] = useState(doc?.content || '')
-  const [title, setTitle] = useState(doc?.title || '')
-  const [saving, setSaving] = useState(false)
-  const [lastSaved, setLastSaved] = useState(null)
-  const saveTimeoutRef = useRef(null)
-
-  // Auto-save with debounce
-  const saveContent = useCallback(async (newContent, newTitle) => {
-    if (!doc) return
-    setSaving(true)
-    
-    try {
-      const { data, error } = await supabase
-        .from('idea_documents')
-        .update({ 
-          content: newContent, 
-          title: newTitle,
-          updated_at: new Date().toISOString(),
-          last_edited_by: user.role
-        })
-        .eq('id', doc.id)
-        .select()
-        .single()
-      
-      if (error) throw error
-      onUpdate(data)
-      setLastSaved(new Date())
-    } catch (err) {
-      console.error(err)
-    }
-    setSaving(false)
-  }, [doc, user, onUpdate])
-
-  const handleContentChange = (newContent) => {
-    setContent(newContent)
-    
-    // Broadcast typing indicator
-    supabase.channel('ideas-realtime').send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: { user: user.role, docId: doc?.id }
-    })
-    
-    // Debounced save
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(() => saveContent(newContent, title), 1000)
-  }
-
-  const handleTitleChange = (newTitle) => {
-    setTitle(newTitle)
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(() => saveContent(content, newTitle), 1000)
-  }
-
-  const handleDelete = async () => {
-    if (!confirm('Delete this document?')) return
-    try {
-      await supabase.from('idea_documents').delete().eq('id', doc.id)
-      window.history.back()
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  return (
-    <div className="px-6 py-4">
-      <div className="max-w-lg mx-auto">
-        {/* Title */}
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          className="w-full text-2xl font-serif text-forest bg-transparent border-none outline-none mb-4 placeholder:text-ink-300"
-          placeholder="Document title..."
-        />
-
-        {/* Status Bar */}
-        <div className="flex items-center justify-between mb-4 text-body-sm text-ink-400">
-          <span>
-            {saving ? 'Saving...' : lastSaved ? `Saved ${lastSaved.toLocaleTimeString()}` : ''}
-          </span>
-          <button onClick={handleDelete} className="text-rose-500 hover:text-rose-600">
-            Delete
-          </button>
-        </div>
-
-        {/* Editor */}
-        <div className="bg-white rounded-2xl shadow-card min-h-[400px]">
-          <textarea
-            value={content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            className="w-full h-full min-h-[400px] p-6 rounded-2xl resize-none border-none outline-none text-body text-ink-600 leading-relaxed"
-            placeholder="Start writing your ideas..."
-            style={{ fontFamily: 'inherit' }}
-          />
-        </div>
-
-        {/* Footer */}
-        <div className="mt-4 text-center text-body-sm text-ink-400">
-          <p>Both you and {theirName} can edit this document</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// QUICK NOTES VIEW
-// ============================================
-
-function QuickNotesView({ notes, user, onBack }) {
-  const [newNote, setNewNote] = useState('')
-  const [adding, setAdding] = useState(false)
-
-  const addNote = async () => {
-    if (!newNote.trim()) return
-    setAdding(true)
-    
-    try {
-      await supabase.from('quick_notes').insert({
-        content: newNote.trim(),
-        added_by: user.role
-      })
-      setNewNote('')
-    } catch (err) {
-      console.error(err)
-      alert('Could not add note')
-    }
-    setAdding(false)
-  }
-
-  const deleteNote = async (id) => {
-    try {
-      await supabase.from('quick_notes').delete().eq('id', id)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  return (
-    <div className="px-6 py-6">
-      <div className="max-w-lg mx-auto">
-        {/* Add Note */}
-        <div className="bg-yellow-100 rounded-2xl p-4 mb-6 shadow-soft" style={{ transform: 'rotate(-1deg)' }}>
-          <textarea
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Quick thought..."
-            className="w-full bg-transparent border-none outline-none resize-none text-forest min-h-[80px]"
-          />
-          <div className="flex justify-end">
-            <button 
-              onClick={addNote} 
-              disabled={adding || !newNote.trim()}
-              className="px-4 py-2 bg-forest text-cream-100 rounded-xl text-body-sm font-medium disabled:opacity-50"
-            >
-              {adding ? 'Adding...' : '+ Add'}
-            </button>
-          </div>
-        </div>
-
-        {/* Notes List */}
-        <div className="space-y-3">
-          {notes.map((note, i) => {
-            const colors = ['bg-yellow-100', 'bg-pink-100', 'bg-blue-100', 'bg-green-100', 'bg-purple-100']
-            const rotations = ['-1deg', '1deg', '-0.5deg', '0.5deg', '0deg']
-            return (
-              <div
-                key={note.id}
-                className={`${colors[i % colors.length]} rounded-xl p-4 shadow-soft relative group`}
-                style={{ transform: `rotate(${rotations[i % rotations.length]})` }}
-              >
-                <button
-                  onClick={() => deleteNote(note.id)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full shadow-sm flex items-center justify-center text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  ×
-                </button>
-                <p className="text-body text-forest whitespace-pre-wrap">{note.content}</p>
-                <p className="text-caption text-forest-600 mt-2">
-                  — {note.added_by === user?.role ? 'You' : note.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-
-        {notes.length === 0 && (
-          <div className="text-center py-12">
-            <span className="text-5xl mb-4 block">📝</span>
-            <p className="text-body text-ink-400">No quick notes yet</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// DRAW VIEW - Simple canvas for sketching
-// ============================================
-
-function DrawView({ onBack, user }) {
+function SketchCanvas({ onSave, onClose }) {
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [color, setColor] = useState('#2D5A47')
+  const [color, setColor] = useState('#1a3a2f')
   const [brushSize, setBrushSize] = useState(4)
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
-    
     const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#FFFDF8'
+    ctx.fillStyle = '#fff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
   }, [])
 
+  const getPos = (e) => {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    }
+  }
+
   const startDrawing = (e) => {
+    e.preventDefault()
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.touches?.[0]?.clientX || e.clientX) - rect.left
-    const y = (e.touches?.[0]?.clientY || e.clientY) - rect.top
-    
+    const { x, y } = getPos(e)
     ctx.beginPath()
     ctx.moveTo(x, y)
     ctx.strokeStyle = color
@@ -592,83 +376,55 @@ function DrawView({ onBack, user }) {
   const draw = (e) => {
     if (!isDrawing) return
     e.preventDefault()
-    
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.touches?.[0]?.clientX || e.clientX) - rect.left
-    const y = (e.touches?.[0]?.clientY || e.clientY) - rect.top
-    
+    const ctx = canvasRef.current.getContext('2d')
+    const { x, y } = getPos(e)
     ctx.lineTo(x, y)
     ctx.stroke()
   }
 
-  const stopDrawing = () => {
-    setIsDrawing(false)
-  }
+  const stopDrawing = () => setIsDrawing(false)
 
-  const clearCanvas = () => {
+  const clear = () => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#FFFDF8'
+    ctx.fillStyle = '#fff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
   }
 
-  const colors = ['#2D5A47', '#000000', '#E11D48', '#2563EB', '#7C3AED', '#D97706']
+  const save = () => {
+    const dataUrl = canvasRef.current.toDataURL('image/png')
+    onSave(dataUrl)
+  }
 
   return (
-    <div className="px-6 py-4">
-      <div className="max-w-lg mx-auto">
-        {/* Tools */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-2">
-            {colors.map(c => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-forest' : ''}`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-          <button onClick={clearCanvas} className="text-body-sm text-ink-400 hover:text-rose-500">
-            Clear
-          </button>
+    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+      <div className="bg-white px-4 py-3 flex justify-between items-center">
+        <button onClick={onClose} className="text-ink-500">Cancel</button>
+        <div className="flex gap-2">
+          {['#1a3a2f', '#000', '#3b82f6', '#ef4444', '#f59e0b'].map(c => (
+            <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-forest' : ''}`} style={{ backgroundColor: c }} />
+          ))}
         </div>
-
-        {/* Brush Size */}
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-body-sm text-ink-400">Size:</span>
-          <input
-            type="range"
-            min="1"
-            max="20"
-            value={brushSize}
-            onChange={(e) => setBrushSize(parseInt(e.target.value))}
-            className="flex-1"
-          />
-        </div>
-
-        {/* Canvas */}
-        <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            width={350}
-            height={450}
-            className="w-full touch-none"
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={startDrawing}
-            onTouchMove={draw}
-            onTouchEnd={stopDrawing}
-          />
-        </div>
-
-        <p className="text-center text-body-sm text-ink-400 mt-4">
-          Sketch out your ideas ✏️
-        </p>
+        <button onClick={save} className="text-forest font-medium">Save</button>
+      </div>
+      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={600}
+          className="bg-white rounded-xl shadow-lg max-w-full max-h-full touch-none"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+        />
+      </div>
+      <div className="bg-white px-4 py-3 flex justify-center gap-4">
+        <button onClick={clear} className="px-4 py-2 bg-cream-200 rounded-lg text-ink-600">Clear</button>
+        <input type="range" min="2" max="20" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-32" />
       </div>
     </div>
   )
