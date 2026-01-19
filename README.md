@@ -1,48 +1,57 @@
-# D(ane)ua V3 - Fixes
+# D(ane)ua V3 - Fixed
 
 ## What's Fixed
-- ✅ Modals no longer cut off on any screen size
-- ✅ Countdowns can be added and deleted from the app
-- ✅ Name changed to "Shahjahan" everywhere
-- ✅ Better error messages for file uploads
-- ✅ Time-based greeting (Good morning/afternoon/evening)
-- ✅ Settings button to logout/switch users
+- ✅ Voice notes now work on iOS (better codec support)
+- ✅ Voice notes are shared (both can see/hear each other's)
+- ✅ Photos upload on iOS
+- ✅ Add Date/Goal buttons are clearly visible
+- ✅ Letters have clear submit button
+- ✅ Daily question stays same all day
+- ✅ Both can see each other's answers
 
-## Recording Not Working?
+## CRITICAL: Do This First
 
-You need to create storage buckets in Supabase:
+### Step 1: Create Storage Buckets
 
-1. Go to **Supabase Dashboard** → **Storage**
+1. Go to Supabase → **Storage**
 2. Click **New bucket**
-3. Create a bucket named exactly: `audio`
-4. Set it to **Public**
-5. Create another bucket named exactly: `photos`
-6. Set it to **Public**
+3. Name: `audio`
+4. Toggle **Public bucket** = ON
+5. Click **Create**
+6. Repeat for bucket named `photos`
 
-Without these buckets, recording uploads will fail.
+### Step 2: Run the SQL
 
-## Default PINs
-- Shahjahan: `1111`
-- Dane: `2222`
+Go to Supabase → **SQL Editor** → New Query
 
-## To Change PINs
+Copy and paste the contents of `setup.sql` and run it.
 
-Run this in Supabase SQL Editor:
-```sql
-UPDATE users SET pin_hash = 'your-4-digits' WHERE role = 'shah';
-UPDATE users SET pin_hash = 'her-4-digits' WHERE role = 'dane';
-```
-
-## To Update Your Name in Database
-
-```sql
-UPDATE users SET name = 'Shahjahan' WHERE role = 'shah';
-```
+This will:
+- Create the `voice_notes` table
+- Set up storage policies
+- Update your name to "Shahjahan"
 
 ## To Deploy
 
-1. Open GitHub Desktop
-2. Delete all files in local repo
-3. Copy all files from this folder into repo
-4. Commit and push
-5. Wait for Vercel to rebuild
+1. GitHub Desktop → delete everything in your local repo
+2. Extract zip → copy `daneua-v3-fix3` contents into repo  
+3. Commit → Push
+4. Wait for Vercel
+
+## Default PINs
+- **Shahjahan:** `1111`
+- **Dane:** `2222`
+
+## Troubleshooting
+
+### Voice notes still not sending on iOS?
+- Make sure `audio` bucket exists and is **Public**
+- Run the SQL to create policies
+- Check browser console for errors
+
+### Photos not uploading?
+- Make sure `photos` bucket exists and is **Public**
+- Run the SQL to create policies
+
+### "voice_notes table doesn't exist" error?
+- Run the setup.sql in SQL Editor

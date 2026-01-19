@@ -324,7 +324,7 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
     owner: user?.role || 'dane',
     target_date: '',
   })
-  const [milestones, setMilestones] = useState(['', '', ''])
+  const [milestones, setMilestones] = useState(['', ''])
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -337,18 +337,17 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
 
   return (
     <div 
-      className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50"
+      className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div 
-        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
-        style={{ maxHeight: 'calc(100vh - 80px)' }}
+        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
-          <h2 className="font-serif text-title text-forest">Add Goal</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 bg-forest">
+          <h2 className="font-serif text-title text-cream-100">Add Goal</h2>
+          <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -356,10 +355,10 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="goal-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">What's the goal? *</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">What's the goal? *</label>
               <input
                 type="text"
                 value={form.title}
@@ -371,7 +370,7 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Why does it matter?</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Why does it matter?</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
@@ -382,7 +381,7 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Whose goal?</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Whose goal?</label>
                 <select
                   value={form.owner}
                   onChange={(e) => setForm(p => ({ ...p, owner: e.target.value }))}
@@ -395,7 +394,7 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
               </div>
 
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Target date</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Target date</label>
                 <input
                   type="date"
                   value={form.target_date}
@@ -407,7 +406,7 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
 
             {/* Milestones */}
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Milestones (optional)</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Milestones</label>
               <div className="space-y-2">
                 {milestones.map((m, i) => (
                   <input
@@ -435,10 +434,15 @@ function AddGoalModal({ user, theirName, onClose, onAdd }) {
           </form>
         </div>
 
-        {/* Fixed Footer */}
-        <div className="p-6 border-t border-cream-200 flex-shrink-0">
-          <button type="submit" form="goal-form" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Goal'}
+        {/* Fixed Footer - Always Visible */}
+        <div className="p-5 bg-cream border-t border-cream-300">
+          <button 
+            type="submit" 
+            form="goal-form" 
+            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
+            disabled={loading}
+          >
+            {loading ? 'Creating...' : '🎯 Create Goal'}
           </button>
         </div>
       </div>

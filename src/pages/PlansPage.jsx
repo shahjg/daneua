@@ -241,7 +241,6 @@ export default function PlansPage() {
         {activeSection === 'calendar' && (
           <div className="px-6 py-8">
             <div className="max-w-lg mx-auto">
-              {/* Add Event Button */}
               <button 
                 onClick={() => setShowAddEvent(true)}
                 className="w-full mb-6 py-5 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium"
@@ -249,7 +248,6 @@ export default function PlansPage() {
                 + Add event
               </button>
 
-              {/* Events */}
               {events.length > 0 ? (
                 <div className="space-y-4">
                   {events.map((event) => (
@@ -310,7 +308,6 @@ function AddDateModal({ onClose, onAdd }) {
     price_level: 2,
     date_type: 'dinner',
     location: '',
-    notes: '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -323,16 +320,15 @@ function AddDateModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div 
-        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
-        style={{ maxHeight: 'calc(100vh - 80px)' }}
+        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 bg-gold-100">
           <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
+          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-gold-200">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -340,10 +336,10 @@ function AddDateModal({ onClose, onAdd }) {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="date-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Name *</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
               <input
                 type="text"
                 value={form.name}
@@ -355,7 +351,7 @@ function AddDateModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
@@ -366,7 +362,7 @@ function AddDateModal({ onClose, onAdd }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Vibe</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
                 <select
                   value={form.vibe}
                   onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))}
@@ -377,7 +373,7 @@ function AddDateModal({ onClose, onAdd }) {
               </div>
 
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Price</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
                 <select
                   value={form.price_level}
                   onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))}
@@ -392,7 +388,7 @@ function AddDateModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
               <select
                 value={form.date_type}
                 onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))}
@@ -403,7 +399,7 @@ function AddDateModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
               <input
                 type="text"
                 value={form.location}
@@ -412,24 +408,18 @@ function AddDateModal({ onClose, onAdd }) {
                 placeholder="Where?"
               />
             </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Notes</label>
-              <input
-                type="text"
-                value={form.notes}
-                onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
-                className="input"
-                placeholder="Make reservation..."
-              />
-            </div>
           </form>
         </div>
 
-        {/* Fixed Footer */}
-        <div className="p-6 border-t border-cream-200 flex-shrink-0">
-          <button type="submit" form="date-form" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Date Idea'}
+        {/* Fixed Footer - Always Visible */}
+        <div className="p-5 bg-cream border-t border-cream-300">
+          <button 
+            type="submit" 
+            form="date-form" 
+            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
+            disabled={loading}
+          >
+            {loading ? 'Adding...' : '✨ Add Date Idea'}
           </button>
         </div>
       </div>
@@ -457,16 +447,15 @@ function AddEventModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div 
-        className="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-cream rounded-3xl shadow-elevated flex flex-col"
-        style={{ maxHeight: 'calc(100vh - 80px)' }}
+        className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-6 border-b border-cream-200 flex-shrink-0">
-          <h2 className="font-serif text-title text-forest">Add Event</h2>
-          <button onClick={onClose} className="p-2 text-ink-400 hover:text-ink-600 -mr-2">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 bg-forest">
+          <h2 className="font-serif text-title text-cream-100">Add Event</h2>
+          <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -474,10 +463,10 @@ function AddEventModal({ onClose, onAdd }) {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Title *</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Title *</label>
               <input
                 type="text"
                 value={form.title}
@@ -489,7 +478,7 @@ function AddEventModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Type</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
               <select
                 value={form.event_type}
                 onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))}
@@ -504,7 +493,7 @@ function AddEventModal({ onClose, onAdd }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Date *</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Date *</label>
                 <input
                   type="date"
                   value={form.start_date}
@@ -515,7 +504,7 @@ function AddEventModal({ onClose, onAdd }) {
               </div>
 
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-2">Time</label>
+                <label className="text-body-sm font-medium text-ink-600 block mb-1">Time</label>
                 <input
                   type="time"
                   value={form.start_time}
@@ -526,7 +515,7 @@ function AddEventModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Location</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
               <input
                 type="text"
                 value={form.location}
@@ -537,7 +526,7 @@ function AddEventModal({ onClose, onAdd }) {
             </div>
 
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-2">Description</label>
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
@@ -548,10 +537,15 @@ function AddEventModal({ onClose, onAdd }) {
           </form>
         </div>
 
-        {/* Fixed Footer */}
-        <div className="p-6 border-t border-cream-200 flex-shrink-0">
-          <button type="submit" form="event-form" className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Event'}
+        {/* Fixed Footer - Always Visible */}
+        <div className="p-5 bg-cream border-t border-cream-300">
+          <button 
+            type="submit" 
+            form="event-form" 
+            className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg hover:bg-forest-600 transition-colors shadow-lg"
+            disabled={loading}
+          >
+            {loading ? 'Adding...' : '📅 Add Event'}
           </button>
         </div>
       </div>

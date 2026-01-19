@@ -106,20 +106,65 @@ export async function markDuaRead(id) {
 
 // ==================== DAILY QUESTIONS ====================
 export async function getDailyQuestion() {
-  const { data, error } = await supabase.rpc('get_daily_question')
-  if (error) throw error
-  return data?.[0] || null
+  // Use today's date to get a consistent question for the day
+  const today = new Date().toISOString().split('T')[0]
+  
+  // Get all questions
+  const { data: questions, error: qError } = await supabase
+    .from('daily_questions')
+    .select('*')
+    .order('id')
+  
+  if (qError || !questions || questions.length === 0) {
+    return null
+  }
+  
+  // Use the day of year to pick a consistent question
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24))
+  const questionIndex = dayOfYear % questions.length
+  const question = questions[questionIndex]
+  
+  // Get answers for this question
+  const { data: answers } = await supabase
+    .from('question_answers')
+    .select('*')
+    .eq('question_id', question.id)
+  
+  return {
+    ...question,
+    shah_answer: answers?.find(a => a.user_role === 'shah')?.answer || null,
+    dane_answer: answers?.find(a => a.user_role === 'dane')?.answer || null
+  }
 }
 
 export async function answerQuestion(questionId, userRole, answer) {
+  // Check if answer already exists
+  const { data: existing } = await supabase
+    .from('question_answers')
+    .select('*')
+    .eq('question_id', questionId)
+    .eq('user_role', userRole)
+    .maybeSingle()
+  
+  if (existing) {
+    const { data, error } = await supabase
+      .from('question_answers')
+      .update({ answer, answered_at: new Date().toISOString() })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+  
   const { data, error } = await supabase
     .from('question_answers')
-    .upsert({
+    .insert({
       question_id: questionId,
       user_role: userRole,
       answer,
       answered_at: new Date().toISOString()
-    }, { onConflict: 'question_id,user_role' })
+    })
     .select()
     .single()
   if (error) throw error
@@ -160,15 +205,22 @@ export async function getLessonCategories(language) {
 }
 
 export async function addLessonResponse(lessonId, userRole, type, audioUrl = null, comment = null) {
+  // For voice notes without a lesson, we need to handle null lesson_id
+  const insertData = {
+    user_role: userRole,
+    response_type: type,
+    audio_url: audioUrl,
+    comment
+  }
+  
+  // Only add lesson_id if it's not null
+  if (lessonId) {
+    insertData.lesson_id = lessonId
+  }
+  
   const { data, error } = await supabase
     .from('lesson_responses')
-    .insert({
-      lesson_id: lessonId,
-      user_role: userRole,
-      response_type: type,
-      audio_url: audioUrl,
-      comment
-    })
+    .insert(insertData)
     .select()
     .single()
   if (error) throw error
