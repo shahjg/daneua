@@ -384,7 +384,7 @@ export default function HomePage({ onOpenSettings }) {
       {/* Send a Dua */}
       <div className="px-6 py-10 bg-cream-200">
         <div className="max-w-lg mx-auto">
-          <DuaSelector theirName={theirName} />
+          <DuaSelector theirName={theirName} user={user} />
         </div>
       </div>
 
@@ -505,9 +505,10 @@ function getGreeting() {
   return 'Good night'
 }
 
-function DuaSelector({ theirName }) {
+function DuaSelector({ theirName, user }) {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [sent, setSent] = useState(false)
+  const [receivedDuas, setReceivedDuas] = useState([])
 
   const categories = [
     { id: 'prayer', label: 'Prayer', emoji: '🤲', message: `May Allah bless you and keep you safe, ${theirName}. You are always in my prayers.` },
@@ -518,13 +519,85 @@ function DuaSelector({ theirName }) {
     { id: 'peace', label: 'Peace', emoji: '☮️', message: `May peace and tranquility fill your heart today, ${theirName}. I'm sending you calm energy.` },
   ]
 
+  useEffect(() => {
+    fetchReceivedDuas()
+    // Check for new duas every 30 seconds
+    const interval = setInterval(fetchReceivedDuas, 30000)
+    return () => clearInterval(interval)
+  }, [user?.role])
+
+  const fetchReceivedDuas = async () => {
+    if (!user?.role) return
+    try {
+      const { data } = await supabase
+        .from('dua_messages')
+        .select('*')
+        .eq('to_user', user.role)
+        .eq('read', false)
+        .order('created_at', { ascending: false })
+      setReceivedDuas(data || [])
+    } catch (err) {
+      console.error('Error fetching duas:', err)
+    }
+  }
+
   const handleSend = async (cat) => {
+    if (!user?.role) return
     setSelectedCategory(cat)
-    setSent(true)
-    setTimeout(() => {
-      setSent(false)
-      setSelectedCategory(null)
-    }, 4000)
+    
+    try {
+      const toUser = user.role === 'shah' ? 'dane' : 'shah'
+      await supabase.from('dua_messages').insert({
+        from_user: user.role,
+        to_user: toUser,
+        category: cat.id,
+        emoji: cat.emoji,
+        message: cat.message
+      })
+      
+      // Try to send push notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`${user.role === 'shah' ? 'Shahjahan' : 'Dane'} sent you a ${cat.label}`, {
+          body: cat.message,
+          icon: cat.emoji
+        })
+      }
+      
+      setSent(true)
+      setTimeout(() => {
+        setSent(false)
+        setSelectedCategory(null)
+      }, 4000)
+    } catch (err) {
+      console.error('Error sending dua:', err)
+    }
+  }
+
+  const markAsRead = async (duaId) => {
+    await supabase.from('dua_messages').update({ read: true }).eq('id', duaId)
+    setReceivedDuas(prev => prev.filter(d => d.id !== duaId))
+  }
+
+  // Show received dua if there are any unread
+  if (receivedDuas.length > 0) {
+    const dua = receivedDuas[0]
+    const senderName = dua.from_user === 'shah' ? 'Shahjahan' : 'Dane'
+    return (
+      <div className="bg-gradient-to-br from-gold-100 to-rose-100 rounded-3xl p-6 text-center">
+        <span className="text-3xl block mb-3">{dua.emoji}</span>
+        <p className="font-serif text-title-sm text-forest mb-2">{senderName} sent you a message</p>
+        <p className="text-body text-ink-600 mb-4">{dua.message}</p>
+        <button 
+          onClick={() => markAsRead(dua.id)}
+          className="bg-forest text-cream-100 px-6 py-3 rounded-xl font-medium"
+        >
+          Thank you 💚
+        </button>
+        {receivedDuas.length > 1 && (
+          <p className="text-caption text-ink-400 mt-3">+{receivedDuas.length - 1} more</p>
+        )}
+      </div>
+    )
   }
 
   if (sent && selectedCategory) {

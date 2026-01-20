@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS love_notes (
 );
 
 ALTER TABLE love_notes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all love notes" ON love_notes FOR ALL USING (true);
+CREATE POLICY "Allow all love notes" ON love_notes FOR ALL USING (true) WITH CHECK (true);
 
 
 -- 2. VOICE NOTES TABLE
@@ -157,6 +157,23 @@ UPDATE users SET name = 'Shahjahan' WHERE role = 'shah';
 UPDATE users SET name = 'Dane' WHERE role = 'dane';
 
 
+-- 11. DUA MESSAGES TABLE (for Send a Dua feature)
+-- ============================================
+CREATE TABLE IF NOT EXISTS dua_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
+  to_user TEXT NOT NULL CHECK (to_user IN ('shah', 'dane')),
+  category TEXT NOT NULL,
+  emoji TEXT,
+  message TEXT NOT NULL,
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE dua_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all dua messages" ON dua_messages FOR ALL USING (true) WITH CHECK (true);
+
+
 -- ============================================
 -- IF YOU GET ERRORS, RUN THESE FIRST:
 -- ============================================
@@ -178,6 +195,9 @@ UPDATE users SET name = 'Dane' WHERE role = 'dane';
 -- 
 -- DROP POLICY IF EXISTS "Allow all folders" ON idea_folders;
 -- DROP TABLE IF EXISTS idea_folders;
+--
+-- DROP POLICY IF EXISTS "Allow all dua messages" ON dua_messages;
+-- DROP TABLE IF EXISTS dua_messages;
 -- 
 -- DROP POLICY IF EXISTS "Public Audio Read" ON storage.objects;
 -- DROP POLICY IF EXISTS "Public Audio Upload" ON storage.objects;
