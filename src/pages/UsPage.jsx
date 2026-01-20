@@ -11,22 +11,37 @@ import {
 } from '../lib/supabase'
 
 const moods = [
-  { id: 'miss_you', label: 'I miss you', gradient: 'from-rose-100 to-rose-200' },
-  { id: 'need_encouragement', label: 'Need a boost', gradient: 'from-gold-100 to-gold-200' },
-  { id: 'stressed', label: 'Stressed', gradient: 'from-cream-200 to-cream-300' },
-  { id: 'anxious', label: 'Anxious', gradient: 'from-forest-50 to-forest-100' },
-  { id: 'happy', label: 'So happy', gradient: 'from-gold-100 to-rose-100' },
-  { id: 'loved', label: 'Feeling loved', gradient: 'from-rose-100 to-gold-100' },
+  { id: 'miss_you', label: 'I miss you', emoji: '🥺', gradient: 'from-rose-100 to-rose-200' },
+  { id: 'need_encouragement', label: 'Need a boost', emoji: '💪', gradient: 'from-gold-100 to-gold-200' },
+  { id: 'stressed', label: 'Stressed', emoji: '😮‍💨', gradient: 'from-cream-200 to-cream-300' },
+  { id: 'anxious', label: 'Anxious', emoji: '😰', gradient: 'from-forest-50 to-forest-100' },
+  { id: 'happy', label: 'So happy', emoji: '🥰', gradient: 'from-gold-100 to-rose-100' },
+  { id: 'loved', label: 'Feeling loved', emoji: '💕', gradient: 'from-rose-100 to-gold-100' },
 ]
 
+// Get voice notes from database
 async function getVoiceNotes() {
-  const { data, error } = await supabase.from('voice_notes').select('*').order('created_at', { ascending: false }).limit(20)
-  if (error) return []
+  const { data, error } = await supabase
+    .from('voice_notes')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20)
+  
+  if (error) {
+    console.error('Voice notes error:', error)
+    return []
+  }
   return data || []
 }
 
+// Save voice note to database
 async function saveVoiceNote(fromUser, audioUrl) {
-  const { data, error } = await supabase.from('voice_notes').insert({ from_user: fromUser, audio_url: audioUrl }).select().single()
+  const { data, error } = await supabase
+    .from('voice_notes')
+    .insert({ from_user: fromUser, audio_url: audioUrl })
+    .select()
+    .single()
+  
   if (error) throw error
   return data
 }
@@ -42,16 +57,12 @@ export default function UsPage() {
   const [todaysMoments, setTodaysMoments] = useState([])
   const [momentsHistory, setMomentsHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState(null)
 
   const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
-  useEffect(() => { fetchData() }, [])
-
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 4000)
-  }
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -75,9 +86,9 @@ export default function UsPage() {
     setSelectedMood(mood)
     try {
       const message = await getLoveMessage(mood.id)
-      setMoodMessage(message?.content || `${theirName} loves you so much`)
+      setMoodMessage(message?.content || `${theirName} loves you so much 💕`)
     } catch (error) {
-      setMoodMessage(`${theirName} loves you so much`)
+      setMoodMessage(`${theirName} loves you so much 💕`)
     }
   }
 
@@ -86,15 +97,14 @@ export default function UsPage() {
       const newLetter = await addLoveLetter(user.role, title, content)
       setLetters(prev => [newLetter, ...prev])
       setShowWriteLetter(false)
-      showToast('Letter sent!', 'success')
     } catch (error) {
-      showToast('Could not save letter', 'error')
+      console.error('Error:', error)
+      alert('Could not save letter. Please try again.')
     }
   }
 
   const handleVoiceNoteSent = (newNote) => {
     setVoiceNotes(prev => [newNote, ...prev])
-    showToast('Voice note sent!', 'success')
   }
 
   const handlePhotoUpload = async (file) => {
@@ -102,7 +112,12 @@ export default function UsPage() {
       const ext = file.name?.split('.').pop() || 'jpg'
       const fileName = `moments/${user.role}/${Date.now()}.${ext}`
       
-      const { error } = await supabase.storage.from('photos').upload(fileName, file, { contentType: file.type || 'image/jpeg', upsert: true })
+      const { error } = await supabase.storage
+        .from('photos')
+        .upload(fileName, file, { 
+          contentType: file.type || 'image/jpeg',
+          upsert: true
+        })
       
       if (error) throw new Error(error.message)
 
@@ -111,10 +126,10 @@ export default function UsPage() {
       setTodaysMoments(prev => [...prev, newMoment])
       setMomentsHistory(prev => [newMoment, ...prev])
       
-      showToast('Photo uploaded!', 'success')
+      alert('Photo uploaded!')
     } catch (error) {
       console.error('Upload error:', error)
-      showToast('Could not upload. Make sure photos bucket exists in Supabase and is public.', 'error')
+      alert(`Could not upload: ${error.message}\n\nMake sure "photos" bucket exists in Supabase Storage and is set to Public.`)
     }
   }
 
@@ -127,39 +142,51 @@ export default function UsPage() {
 
   return (
     <div className="min-h-screen pb-28">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-lg ${toast.type === 'error' ? 'bg-rose-500 text-white' : toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-forest text-cream-100'}`}>
-          <p className="text-body-sm text-center">{toast.message}</p>
-        </div>
-      )}
-
+      {/* Header */}
       <div className="bg-gradient-to-br from-rose-200 via-gold-100 to-rose-100 px-6 pt-14 pb-12">
         <div className="max-w-lg mx-auto text-center">
           <h1 className="font-serif text-display-sm text-forest mb-2">Us</h1>
-          <p className="text-body text-forest-600">Our little corner</p>
+          <p className="text-body text-forest-600">Our little corner 💕</p>
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="bg-cream px-4 py-4 sticky top-0 z-20 border-b border-cream-300">
         <div className="max-w-lg mx-auto flex justify-center gap-1 flex-wrap">
           {tabs.map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2.5 rounded-full text-body-sm font-medium transition-all ${activeTab === tab.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'}`}>
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2.5 rounded-full text-body-sm font-medium transition-all ${
+                activeTab === tab.id 
+                  ? 'bg-forest text-cream-100' 
+                  : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
+              }`}
+            >
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Content */}
       <div className="bg-cream min-h-[60vh]">
+        {/* How I Feel */}
         {activeTab === 'feel' && (
           <div className="px-6 py-8">
             <div className="max-w-lg mx-auto">
-              <p className="text-body text-ink-500 text-center mb-6">How are you feeling?</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="text-center text-body text-ink-500 mb-6">
+                Tap how you're feeling
+              </p>
+              <div className="grid grid-cols-2 gap-4">
                 {moods.map((mood) => (
-                  <button key={mood.id} onClick={() => handleMoodSelect(mood)} className={`bg-gradient-to-br ${mood.gradient} rounded-2xl p-5 text-left shadow-soft`}>
-                    <p className="font-serif text-title-sm text-forest">{mood.label}</p>
+                  <button
+                    key={mood.id}
+                    onClick={() => handleMoodSelect(mood)}
+                    className={`bg-gradient-to-br ${mood.gradient} rounded-3xl p-6 text-center hover:scale-[1.02] transition-transform active:scale-[0.98]`}
+                  >
+                    <span className="text-4xl mb-3 block">{mood.emoji}</span>
+                    <p className="font-medium text-forest">{mood.label}</p>
                   </button>
                 ))}
               </div>
@@ -167,19 +194,25 @@ export default function UsPage() {
           </div>
         )}
 
+        {/* Voice Notes */}
         {activeTab === 'voice' && (
           <div className="px-6 py-8">
             <div className="max-w-lg mx-auto">
-              <VoiceNoteRecorder user={user} theirName={theirName} onSent={handleVoiceNoteSent} showToast={showToast} />
+              <VoiceNoteRecorder user={user} theirName={theirName} onSent={handleVoiceNoteSent} />
+              
               {voiceNotes.length > 0 && (
                 <div className="mt-8">
-                  <p className="text-body-sm text-ink-400 mb-4">Previous Notes</p>
+                  <p className="section-label mb-4">Previous Notes</p>
                   <div className="space-y-3">
                     {voiceNotes.map((note) => (
                       <div key={note.id} className="bg-white rounded-2xl p-4 shadow-soft">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-body-sm font-medium text-forest">{note.from_user === user?.role ? 'You' : theirName}</p>
-                          <p className="text-caption text-ink-300">{new Date(note.created_at).toLocaleDateString()}</p>
+                          <p className="text-body-sm font-medium text-forest">
+                            {note.from_user === user?.role ? 'You' : theirName}
+                          </p>
+                          <p className="text-caption text-ink-300">
+                            {new Date(note.created_at).toLocaleDateString()}
+                          </p>
                         </div>
                         <audio src={note.audio_url} controls className="w-full h-10" />
                       </div>
@@ -191,34 +224,57 @@ export default function UsPage() {
           </div>
         )}
 
+        {/* Letters */}
         {activeTab === 'letters' && (
           <div className="px-6 py-8">
             <div className="max-w-lg mx-auto">
-              <button onClick={() => setShowWriteLetter(true)} className="w-full mb-6 py-5 border-2 border-dashed border-rose-300 rounded-2xl text-rose-500 font-medium">
-                Write a letter
+              <button
+                onClick={() => setShowWriteLetter(true)}
+                className="w-full mb-6 py-5 border-2 border-dashed border-rose-300 rounded-2xl text-rose-500 hover:border-rose-400 hover:bg-rose-50 transition-all font-medium"
+              >
+                ✍️ Write a letter
               </button>
+
               {letters.length > 0 ? (
                 <div className="space-y-4">
-                  {letters.map((letter) => <LetterCard key={letter.id} letter={letter} currentUser={user?.role} />)}
+                  {letters.map((letter) => (
+                    <LetterCard key={letter.id} letter={letter} currentUser={user?.role} />
+                  ))}
                 </div>
               ) : (
-                <p className="text-center text-ink-400 py-12">No letters yet</p>
+                <div className="text-center py-12">
+                  <span className="text-5xl mb-4 block">💌</span>
+                  <p className="text-body text-ink-400">No letters yet</p>
+                </div>
               )}
             </div>
           </div>
         )}
 
+        {/* Pic of the Day */}
         {activeTab === 'photo' && (
           <div className="px-6 py-8">
             <div className="max-w-lg mx-auto">
               <p className="text-center text-body text-ink-500 mb-6">Share a photo from your day</p>
+
               <div className="grid grid-cols-2 gap-4 mb-8">
-                <PhotoSlot label="Shahjahan" photo={todaysMoments.find(m => m.user_role === 'shah')} canUpload={user?.role === 'shah'} onUpload={handlePhotoUpload} />
-                <PhotoSlot label="Dane" photo={todaysMoments.find(m => m.user_role === 'dane')} canUpload={user?.role === 'dane'} onUpload={handlePhotoUpload} />
+                <PhotoSlot 
+                  label="Shahjahan" 
+                  photo={todaysMoments.find(m => m.user_role === 'shah')}
+                  canUpload={user?.role === 'shah'}
+                  onUpload={handlePhotoUpload}
+                />
+                <PhotoSlot 
+                  label="Dane" 
+                  photo={todaysMoments.find(m => m.user_role === 'dane')}
+                  canUpload={user?.role === 'dane'}
+                  onUpload={handlePhotoUpload}
+                />
               </div>
+
               {momentsHistory.length > 0 && (
                 <div>
-                  <p className="text-body-sm text-ink-400 mb-4">Recent Memories</p>
+                  <p className="section-label mb-4">Recent Memories</p>
                   <div className="grid grid-cols-3 gap-2">
                     {momentsHistory.map((moment) => (
                       <div key={moment.id} className="aspect-square rounded-xl overflow-hidden bg-cream-200">
@@ -233,25 +289,32 @@ export default function UsPage() {
         )}
       </div>
 
+      {/* Mood Message Modal */}
       {selectedMood && (
-        <div className="fixed inset-0 bg-forest-900/50 z-50 flex items-center justify-center p-6" onClick={() => setSelectedMood(null)}>
+        <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setSelectedMood(null)}>
           <div className={`bg-gradient-to-br ${selectedMood.gradient} rounded-3xl p-8 w-full max-w-sm text-center shadow-elevated`} onClick={(e) => e.stopPropagation()}>
-            <p className="font-serif text-title text-forest mb-6">{moodMessage}</p>
-            <button onClick={() => setSelectedMood(null)} className="bg-forest text-cream-100 px-6 py-3 rounded-xl font-medium">I needed that</button>
+            <span className="text-6xl mb-6 block">{selectedMood.emoji}</span>
+            <p className="font-serif text-title text-forest mb-6 text-balance">{moodMessage}</p>
+            <button onClick={() => setSelectedMood(null)} className="btn-primary">I needed that ❤️</button>
           </div>
         </div>
       )}
 
-      {showWriteLetter && <WriteLetterModal user={user} onClose={() => setShowWriteLetter(false)} onSubmit={handleAddLetter} />}
+      {/* Write Letter Modal */}
+      {showWriteLetter && (
+        <WriteLetterModal user={user} onClose={() => setShowWriteLetter(false)} onSubmit={handleAddLetter} />
+      )}
     </div>
   )
 }
 
-function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
+function VoiceNoteRecorder({ user, theirName, onSent }) {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [audioUrl, setAudioUrl] = useState(null)
   const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState(null)
   const [recordingTime, setRecordingTime] = useState(0)
   
   const mediaRecorderRef = useRef(null)
@@ -267,13 +330,16 @@ function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
   }, [])
 
   const startRecording = async () => {
+    setError(null)
     setRecordingTime(0)
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
       streamRef.current = stream
       
+      // Try different mime types for iOS/Android compatibility
       let options = {}
-      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', '']
+      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', '']
       for (const type of types) {
         if (type === '' || MediaRecorder.isTypeSupported(type)) {
           if (type) options = { mimeType: type }
@@ -283,68 +349,104 @@ function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
       
       mediaRecorderRef.current = new MediaRecorder(stream, options)
       chunksRef.current = []
-      
+
       mediaRecorderRef.current.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-      
+
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mediaRecorderRef.current.mimeType || 'audio/webm' })
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: mimeType })
         setAudioBlob(blob)
         setAudioUrl(URL.createObjectURL(blob))
-        streamRef.current?.getTracks().forEach(track => track.stop())
+        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop())
       }
-      
+
       mediaRecorderRef.current.start(1000)
       setIsRecording(true)
-      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000)
+      timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000)
     } catch (err) {
-      showToast('Microphone access is required', 'error')
+      console.error('Recording error:', err)
+      setError(err.name === 'NotAllowedError' ? 'Microphone access denied. Please allow permission.' : `Could not start recording: ${err.message}`)
     }
   }
 
   const stopRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current)
-    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
-    setIsRecording(false)
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
   }
 
   const cancelRecording = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl)
     setAudioBlob(null)
     setAudioUrl(null)
+    setError(null)
     setRecordingTime(0)
   }
 
   const sendVoiceNote = async () => {
     if (!audioBlob) return
     setSending(true)
+    setError(null)
+    
     try {
-      const fileName = `${user.role}_${Date.now()}.webm`
-      const { error: uploadError } = await supabase.storage.from('audio').upload(fileName, audioBlob, { contentType: audioBlob.type })
+      let ext = 'webm'
+      if (audioBlob.type.includes('mp4')) ext = 'mp4'
+      else if (audioBlob.type.includes('aac')) ext = 'aac'
+      
+      const fileName = `voice-notes/${user.role}/${Date.now()}.${ext}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('audio')
+        .upload(fileName, audioBlob, { contentType: audioBlob.type || 'audio/webm', upsert: true })
       
       if (uploadError) throw new Error(uploadError.message)
 
       const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
       const newNote = await saveVoiceNote(user.role, urlData.publicUrl)
       
-      onSent(newNote)
-      cancelRecording()
+      setSent(true)
+      if (audioUrl) URL.revokeObjectURL(audioUrl)
+      setAudioBlob(null)
+      setAudioUrl(null)
+      setRecordingTime(0)
+      if (onSent) onSent(newNote)
+      setTimeout(() => setSent(false), 3000)
     } catch (err) {
-      showToast('Could not send. Make sure audio bucket exists in Supabase and is public.', 'error')
+      console.error('Upload error:', err)
+      setError(`Could not send: ${err.message}\n\nMake sure:\n1. "audio" bucket exists in Supabase Storage\n2. Bucket is set to Public\n3. "voice_notes" table exists`)
     }
     setSending(false)
   }
 
-  const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-card">
-      <h2 className="font-serif text-title text-forest mb-4 text-center">Voice Note</h2>
-      {!audioBlob ? (
-        <div className="text-center">
-          <button onClick={isRecording ? stopRecording : startRecording} className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-all ${isRecording ? 'bg-rose-500 animate-pulse' : 'bg-forest'}`}>
-            <span className="text-white text-3xl">{isRecording ? 'Stop' : 'Rec'}</span>
+    <div className="text-center">
+      <p className="text-body text-ink-500 mb-8">Record a voice message for {theirName}</p>
+
+      {error && <div className="bg-rose-100 text-rose-700 rounded-xl p-4 mb-6 text-body-sm text-left whitespace-pre-wrap">{error}</div>}
+      {sent && <div className="bg-forest text-cream-100 rounded-xl p-4 mb-6 flex items-center justify-center gap-2">✓ Voice note sent!</div>}
+
+      {!audioUrl ? (
+        <div className="space-y-6">
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`w-28 h-28 rounded-full flex items-center justify-center mx-auto transition-all shadow-lg ${
+              isRecording ? 'bg-rose-500 animate-pulse scale-110' : 'bg-forest hover:bg-forest-600 active:scale-95'
+            }`}
+          >
+            {isRecording ? (
+              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+            ) : (
+              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+            )}
           </button>
           {isRecording ? (
             <div>
@@ -362,8 +464,8 @@ function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
             <audio src={audioUrl} controls className="w-full" />
           </div>
           <div className="flex gap-3">
-            <button onClick={cancelRecording} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
-            <button onClick={sendVoiceNote} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl" disabled={sending}>
+            <button onClick={cancelRecording} className="btn-ghost flex-1">Cancel</button>
+            <button onClick={sendVoiceNote} className="btn-primary flex-1" disabled={sending}>
               {sending ? 'Sending...' : `Send to ${theirName}`}
             </button>
           </div>
@@ -387,27 +489,34 @@ function WriteLetterModal({ user, onClose, onSubmit }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-forest-900/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 bg-rose-100">
           <h2 className="font-serif text-title text-forest">Write a Letter</h2>
-          <button onClick={onClose} className="p-2 text-forest rounded-full">X</button>
+          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-rose-200">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
+
         <div className="max-h-[50vh] overflow-y-auto p-5">
           <form id="letter-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-body-sm font-medium text-ink-600 block mb-1">Title (optional)</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-4 py-3 border border-cream-300 rounded-xl" placeholder="My dearest..." />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="input" placeholder="My dearest..." />
             </div>
             <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Your letter</label>
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full px-4 py-3 border border-cream-300 rounded-xl min-h-[150px] resize-none" placeholder="Write from your heart..." required />
+              <label className="text-body-sm font-medium text-ink-600 block mb-1">Your letter *</label>
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} className="input min-h-[150px] resize-none" placeholder="Write from your heart..." required />
             </div>
+            <p className="text-body-sm text-ink-400 text-right">— {user?.role === 'shah' ? 'Shahjahan' : 'Dane'}</p>
           </form>
         </div>
+
         <div className="p-5 bg-cream border-t border-cream-300">
-          <button type="submit" form="letter-form" className="w-full py-4 bg-rose-500 text-white rounded-2xl font-semibold" disabled={loading || !content.trim()}>
-            {loading ? 'Sending...' : 'Send Letter'}
+          <button type="submit" form="letter-form" className="w-full py-4 bg-rose-500 text-white rounded-2xl font-semibold text-lg hover:bg-rose-600 transition-colors shadow-lg" disabled={loading || !content.trim()}>
+            {loading ? 'Sending...' : '💌 Send Letter'}
           </button>
         </div>
       </div>
@@ -420,12 +529,13 @@ function LetterCard({ letter, currentUser }) {
   const senderName = letter.from_user === 'shah' ? 'Shahjahan' : 'Dane'
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-soft cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <div className="bg-white rounded-2xl p-6 shadow-soft cursor-pointer hover:shadow-card transition-shadow" onClick={() => setExpanded(!expanded)}>
       <div className="flex items-start justify-between mb-3">
         <div>
           {letter.title && <h3 className="font-serif text-title-sm text-forest">{letter.title}</h3>}
-          <p className="text-caption text-ink-400">From {senderName} - {new Date(letter.created_at).toLocaleDateString()}</p>
+          <p className="text-caption text-ink-400">From {senderName} • {new Date(letter.created_at).toLocaleDateString()}</p>
         </div>
+        <span className="text-rose-400">{letter.from_user === currentUser ? '📝' : '💌'}</span>
       </div>
       <p className={`text-body text-ink-600 whitespace-pre-wrap ${!expanded && 'line-clamp-3'}`}>{letter.content}</p>
       {letter.content.length > 150 && <p className="text-body-sm text-forest mt-2 font-medium">{expanded ? 'Tap to collapse' : 'Tap to read more...'}</p>}
@@ -435,58 +545,82 @@ function LetterCard({ letter, currentUser }) {
 
 function PhotoSlot({ label, photo, canUpload, onUpload }) {
   const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    
-    setUploading(true)
-    try {
-      const img = new Image()
-      img.src = URL.createObjectURL(file)
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject })
-      
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-      const processedFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      
-      URL.revokeObjectURL(img.src)
-      await onUpload(processedFile)
-    } catch (err) {
+    if (file) {
+      setUploading(true)
+      setShowOptions(false)
       await onUpload(file)
+      setUploading(false)
+      e.target.value = ''
     }
-    setUploading(false)
-    if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
   return (
     <div className="relative">
-      <div className="aspect-square rounded-2xl overflow-hidden bg-cream-200 shadow-soft">
+      <div className="aspect-[3/4] bg-cream-200 rounded-2xl overflow-hidden relative">
         {photo ? (
           <img src={photo.photo_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
-            <span className="text-4xl mb-2">+</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-300">
+            <span className="text-4xl mb-2">📷</span>
             <p className="text-body-sm">{label}</p>
           </div>
         )}
-        {uploading && (
-          <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
-          </div>
+        
+        {canUpload && !photo && (
+          <button
+            onClick={() => setShowOptions(true)}
+            className="absolute inset-0 flex items-center justify-center bg-forest/20 hover:bg-forest/30 transition-colors"
+          >
+            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+              {uploading ? (
+                <div className="w-6 h-6 border-2 border-forest border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-6 h-6 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </div>
+          </button>
         )}
       </div>
-      {canUpload && !photo && (
-        <button onClick={() => cameraInputRef.current?.click()} className="absolute inset-0 w-full h-full" />
-      )}
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
       <p className="text-center text-caption text-ink-400 mt-2">{label}</p>
+
+      {/* Photo Options */}
+      {showOptions && (
+        <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowOptions(false)}>
+          <div className="bg-cream w-full max-w-md rounded-t-3xl p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-title text-forest text-center mb-4">Add Photo</h3>
+            
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-medium flex items-center justify-center gap-3"
+            >
+              📸 Take Photo
+            </button>
+            
+            <button
+              onClick={() => galleryInputRef.current?.click()}
+              className="w-full py-4 bg-cream-200 text-forest rounded-2xl font-medium flex items-center justify-center gap-3"
+            >
+              🖼️ Choose from Gallery
+            </button>
+            
+            <button onClick={() => setShowOptions(false)} className="w-full py-3 text-ink-400 font-medium">
+              Cancel
+            </button>
+          </div>
+          
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+          <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        </div>
+      )}
     </div>
   )
 }
