@@ -1,5 +1,5 @@
 -- ============================================
--- D(ANE)UA V3-FIX10 - DATABASE SETUP
+-- D(ANE)UA V3-FIX11 - DATABASE SETUP
 -- RUN THIS IN SUPABASE SQL EDITOR
 -- ============================================
 
@@ -58,12 +58,42 @@ ALTER TABLE idea_documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all documents" ON idea_documents FOR ALL USING (true);
 
 
--- 5. ADD END_DATE TO CALENDAR_EVENTS (for multi-day events)
+-- 5. MOMENTS TABLE (for Pic of the Day)
+-- ============================================
+CREATE TABLE IF NOT EXISTS moments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_role TEXT NOT NULL CHECK (user_role IN ('shah', 'dane')),
+  photo_url TEXT NOT NULL,
+  caption TEXT,
+  moment_date DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE moments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all moments" ON moments FOR ALL USING (true);
+
+
+-- 6. WORD RECORDINGS TABLE (for Learn page dual recordings)
+-- ============================================
+CREATE TABLE IF NOT EXISTS word_recordings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  word_key TEXT NOT NULL,
+  user_role TEXT NOT NULL CHECK (user_role IN ('shah', 'dane')),
+  audio_url TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(word_key, user_role)
+);
+
+ALTER TABLE word_recordings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all word recordings" ON word_recordings FOR ALL USING (true);
+
+
+-- 7. ADD END_DATE TO CALENDAR_EVENTS (for multi-day events)
 -- ============================================
 ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_date DATE;
 
 
--- 6. STORAGE BUCKET SETUP
+-- 8. STORAGE BUCKET SETUP
 -- ============================================
 -- IMPORTANT: Create these buckets manually in Supabase Storage UI:
 -- 
@@ -103,7 +133,7 @@ CREATE POLICY "Public Photos Delete" ON storage.objects
   FOR DELETE USING (bucket_id = 'photos');
 
 
--- 7. UPDATE USER NAMES
+-- 9. UPDATE USER NAMES
 -- ============================================
 UPDATE users SET name = 'Shahjahan' WHERE role = 'shah';
 UPDATE users SET name = 'Dane' WHERE role = 'dane';
@@ -118,6 +148,9 @@ UPDATE users SET name = 'Dane' WHERE role = 'dane';
 -- 
 -- DROP POLICY IF EXISTS "Allow all voice notes" ON voice_notes;
 -- DROP TABLE IF EXISTS voice_notes;
+-- 
+-- DROP POLICY IF EXISTS "Allow all word recordings" ON word_recordings;
+-- DROP TABLE IF EXISTS word_recordings;
 -- 
 -- DROP POLICY IF EXISTS "Allow all documents" ON idea_documents;
 -- DROP TABLE IF EXISTS idea_documents;

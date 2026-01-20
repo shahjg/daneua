@@ -1,27 +1,48 @@
-# D(ane)ua V3 - Fixed
+# D(ane)ua V3-FIX11
 
-## What's Fixed
-- ✅ Pic of Day → Opens camera first, then gallery option
-- ✅ Delete goals and date ideas (hover to see delete button)
-- ✅ Word of the day stays same per language all day
-- ✅ "Explore" section redesigned with vibe-based categories
-- ✅ Voice notes work and are shared between both users
-- ✅ Letters have clear submit button
-- ✅ Add Date/Goal buttons clearly visible
-- ✅ **NEW: Ideas tab** - Collaborative notes like Google Docs but cute!
+## What's New in This Version
+- ✅ **Word of the Day** - Featured on Learn page with dual recording
+- ✅ **Dual Recording System** - Both Shahjahan & Dane can record vocab practice, visible to each other
+- ✅ **Photo of the Day** - Working photo sharing feature in Us page
+- ✅ **Live Calendar** - Calendar grid in Plans page with navigation
+- ✅ **Ideas Persistence** - Documents auto-save every 3 seconds
+- ✅ **Dua Selector** - 6 message categories: Prayer, Affirmation, Love, Sincerity, Gratitude, Peace
+- ✅ **Expanded Vocabulary** - Arabic, Urdu, Tagalog with categories
 
-## New Features
+## Features
 
-### Ideas Tab 💭
-- Post-it style notes with colors
-- Categories: General, Travel, Home, Date Ideas, Bucket List, Food, Gift Ideas
-- Pin important ideas
-- Mark ideas as complete
-- Voice ideas (record & save)
-- Add photos to ideas
-- Live typing indicator (see when partner is adding)
+### Learn Page
+- Word of the Day (rotates daily)
+- Dual voice recording (practice together)
+- Arabic: Greetings, Love, Family, Daily, Islamic phrases
+- Urdu: Greetings, Love, Family, Daily phrases
+- Tagalog: Greetings, Love, Family, Daily phrases
 
-## CRITICAL: Do This First
+### Plans Page
+- Date Ideas with vibes (Romantic, Casual, Adventure, etc.)
+- Live Calendar with holidays
+- Add custom events
+- Multi-day event support
+
+### Us Page
+- How I Feel mood selector with messages
+- Voice Notes (record and share)
+- Love Letters
+- Pic of the Day (daily photos)
+
+### Ideas Page
+- Folder organization
+- Rich text document editor
+- Auto-save functionality
+- Word processing features (bold, italic, colors, lists, etc.)
+
+### HomePage
+- Countdowns to special events
+- Daily Question
+- Love Notes
+- Dua Selector (6 categories)
+
+## CRITICAL: Setup Required
 
 ### Step 1: Create Storage Buckets
 
@@ -36,25 +57,21 @@ Go to Supabase → **SQL Editor** → New Query
 
 Copy and paste the contents of `setup.sql` and run it.
 
-This will:
-- Create `voice_notes` table
-- Create `shared_ideas` table (for Ideas feature)
-- Set up storage policies
-- Update your name to "Shahjahan"
+This creates:
+- `love_notes` table
+- `voice_notes` table
+- `word_recordings` table (NEW - for dual voice practice)
+- `idea_folders` & `idea_documents` tables
+- `moments` table (for Pic of Day)
+- Storage policies for audio & photos buckets
 
 ## To Deploy
 
 1. GitHub Desktop → delete everything in your local repo
-2. Extract zip → copy `daneua-v3-fix3` contents into repo  
+2. Extract zip → copy contents into repo  
 3. Commit → Push
 4. Wait for Vercel
 
 ## Default PINs
 - **Shahjahan:** `1111`
 - **Dane:** `2222`
-
-## Upcoming Features (Not in this release)
-- Push notifications for Duas and updates
-- Lesson levels and progress tracking
-- More comprehensive language lessons (Gemini's suggestions)
-- Video support in Ideas

@@ -266,8 +266,10 @@ function DocumentEditor({ doc, onSave, onBack, onDelete }) {
   const [title, setTitle] = useState(doc.title || 'Untitled')
   const [hasChanges, setHasChanges] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState(null)
   const [showColorPicker, setShowColorPicker] = useState(null)
   const editorRef = useRef(null)
+  const autoSaveTimer = useRef(null)
 
   useEffect(() => {
     if (editorRef.current && doc.content) {
@@ -275,10 +277,31 @@ function DocumentEditor({ doc, onSave, onBack, onDelete }) {
     }
   }, [])
 
+  // Auto-save every 3 seconds when there are changes
+  useEffect(() => {
+    if (hasChanges) {
+      autoSaveTimer.current = setTimeout(() => {
+        handleSave()
+      }, 3000)
+    }
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    }
+  }, [hasChanges, title])
+
+  // Save on back button
+  const handleBack = async () => {
+    if (hasChanges) {
+      await handleSave()
+    }
+    onBack()
+  }
+
   const handleSave = async () => {
     setSaving(true)
     await onSave(title, editorRef.current?.innerHTML || '')
     setHasChanges(false)
+    setLastSaved(new Date())
     setSaving(false)
   }
 
@@ -312,7 +335,7 @@ function DocumentEditor({ doc, onSave, onBack, onDelete }) {
       <div className="bg-forest px-4 pt-12 pb-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <button onClick={onBack} className="flex items-center gap-2 text-cream-200 hover:text-cream-100">
+            <button onClick={handleBack} className="flex items-center gap-2 text-cream-200 hover:text-cream-100">
               <div className="w-10 h-10 rounded-full bg-forest-600 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -321,13 +344,15 @@ function DocumentEditor({ doc, onSave, onBack, onDelete }) {
               <span className="font-medium">Back</span>
             </button>
             <div className="flex items-center gap-2">
-              {hasChanges && <span className="text-gold text-sm">Unsaved changes</span>}
+              {saving && <span className="text-gold text-sm">Saving...</span>}
+              {!saving && lastSaved && <span className="text-cream-300 text-sm">Saved</span>}
+              {!saving && hasChanges && <span className="text-gold text-sm">Unsaved</span>}
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="px-6 py-2 bg-gold text-forest rounded-full font-semibold hover:bg-gold-400 transition-colors"
               >
-                {saving ? 'Saving...' : '💾 Save'}
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>

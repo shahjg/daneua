@@ -318,29 +318,7 @@ export default function HomePage({ onOpenSettings }) {
       {/* Send a Dua */}
       <div className="px-6 py-10 bg-cream-200">
         <div className="max-w-lg mx-auto">
-          <button
-            onClick={handleSendDua}
-            disabled={duaSent}
-            className={`w-full py-6 rounded-3xl transition-all duration-500 ${duaSent 
-              ? 'bg-forest text-cream-100' 
-              : 'bg-gradient-to-r from-gold-200 via-rose-200 to-gold-200 text-forest hover:shadow-elevated active:scale-[0.98]'
-            }`}
-          >
-            {duaSent ? (
-              <span className="flex items-center justify-center gap-3">
-                <span className="text-2xl">✓</span>
-                <span className="font-serif text-title-sm">Dua sent to {theirName}</span>
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-3">
-                <span className="text-2xl">🤲</span>
-                <span className="font-serif text-title-sm">Send a Dua</span>
-              </span>
-            )}
-          </button>
-          <p className="text-center text-body-sm text-ink-400 mt-4">
-            Let {theirName} know you're thinking of them
-          </p>
+          <DuaSelector theirName={theirName} />
         </div>
       </div>
 
@@ -439,6 +417,57 @@ function getGreeting() {
   if (hour < 17) return 'Good afternoon'
   if (hour < 21) return 'Good evening'
   return 'Good night'
+}
+
+function DuaSelector({ theirName }) {
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [sent, setSent] = useState(false)
+
+  const categories = [
+    { id: 'prayer', label: 'Prayer', emoji: '🤲', message: `May Allah bless you and keep you safe, ${theirName}. You are always in my prayers.` },
+    { id: 'affirmation', label: 'Affirmation', emoji: '💪', message: `You are capable of amazing things, ${theirName}. I believe in you completely.` },
+    { id: 'love', label: 'Love', emoji: '💕', message: `My heart is full of love for you, ${theirName}. You mean everything to me.` },
+    { id: 'sincerity', label: 'Sincerity', emoji: '🤍', message: `I want you to know how much I appreciate you, ${theirName}. My love for you is pure and true.` },
+    { id: 'gratitude', label: 'Gratitude', emoji: '🙏', message: `I thank Allah every day for bringing you into my life, ${theirName}. Alhamdulillah.` },
+    { id: 'peace', label: 'Peace', emoji: '☮️', message: `May peace and tranquility fill your heart today, ${theirName}. I'm sending you calm energy.` },
+  ]
+
+  const handleSend = async (cat) => {
+    setSelectedCategory(cat)
+    setSent(true)
+    setTimeout(() => {
+      setSent(false)
+      setSelectedCategory(null)
+    }, 4000)
+  }
+
+  if (sent && selectedCategory) {
+    return (
+      <div className="bg-forest rounded-3xl p-6 text-center">
+        <span className="text-3xl block mb-3">{selectedCategory.emoji}</span>
+        <p className="font-serif text-title-sm text-cream-100 mb-2">Sent to {theirName}</p>
+        <p className="text-body text-cream-300">{selectedCategory.message}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p className="section-label text-center mb-4">Send {theirName} a...</p>
+      <div className="grid grid-cols-3 gap-3">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => handleSend(cat)}
+            className="bg-gradient-to-b from-white to-cream-100 rounded-2xl p-4 shadow-soft hover:shadow-card transition-all text-center"
+          >
+            <span className="text-2xl block mb-2">{cat.emoji}</span>
+            <span className="text-body-sm font-medium text-forest">{cat.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function getDaysUntil(dateStr) {

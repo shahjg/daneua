@@ -351,6 +351,9 @@ export default function PlansPage() {
                 + Add event
               </button>
 
+              {/* Live Calendar Grid */}
+              <CalendarGrid events={events} holidays={holidays} onAddEvent={() => setShowAddEvent(true)} />
+
               {/* Upcoming Holidays */}
               <div className="mb-8">
                 <p className="section-label mb-4">Upcoming Holidays</p>
@@ -701,6 +704,95 @@ function AddEventModal({ onClose, onAdd }) {
             {loading ? 'Adding...' : '📅 Add Event'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function CalendarGrid({ events, holidays }) {
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  
+  const getDaysInMonth = () => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const startingDay = firstDay.getDay()
+    
+    const days = []
+    for (let i = 0; i < startingDay; i++) days.push(null)
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(i)
+    return days
+  }
+
+  const formatDateKey = (day) => {
+    const y = currentMonth.getFullYear()
+    const m = String(currentMonth.getMonth() + 1).padStart(2, '0')
+    const d = String(day).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  const getEventsForDay = (day) => {
+    if (!day) return []
+    const dateKey = formatDateKey(day)
+    return events.filter(e => e.start_date === dateKey || (e.end_date && dateKey >= e.start_date && dateKey <= e.end_date))
+  }
+
+  const getHolidayForDay = (day) => {
+    if (!day) return null
+    const dateKey = formatDateKey(day)
+    return holidays.find(h => h.date === dateKey)
+  }
+
+  const today = new Date()
+  const isToday = (day) => {
+    return day && 
+      today.getDate() === day && 
+      today.getMonth() === currentMonth.getMonth() && 
+      today.getFullYear() === currentMonth.getFullYear()
+  }
+
+  return (
+    <div className="bg-white rounded-3xl shadow-card p-4 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+          className="w-10 h-10 rounded-full bg-cream-100 flex items-center justify-center text-forest hover:bg-cream-200"
+        >←</button>
+        <h3 className="font-serif text-title text-forest">
+          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+        </h3>
+        <button
+          onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+          className="w-10 h-10 rounded-full bg-cream-100 flex items-center justify-center text-forest hover:bg-cream-200"
+        >→</button>
+      </div>
+      <div className="grid grid-cols-7 mb-2">
+        {dayNames.map(d => (<div key={d} className="text-center text-caption text-ink-400 font-medium py-2">{d}</div>))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {getDaysInMonth().map((day, i) => {
+          const dayEvents = getEventsForDay(day)
+          const holiday = getHolidayForDay(day)
+          return (
+            <div key={i} className={`aspect-square rounded-lg flex flex-col items-center justify-center relative ${isToday(day) ? 'bg-forest text-cream-100' : 'hover:bg-cream-50'} ${!day ? '' : 'cursor-pointer'}`}>
+              {day && (<>
+                <span className="text-body-sm">{day}</span>
+                <div className="flex gap-0.5 mt-0.5 absolute bottom-1">
+                  {holiday && <div className="w-1.5 h-1.5 rounded-full bg-gold" />}
+                  {dayEvents.length > 0 && <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
+                </div>
+              </>)}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-center gap-4 mt-4 text-caption text-ink-400">
+        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-gold" /><span>Holiday</span></div>
+        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-400" /><span>Event</span></div>
       </div>
     </div>
   )
