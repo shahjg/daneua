@@ -99,12 +99,19 @@ export default function UsPage() {
 
   const handlePhotoUpload = async (file) => {
     try {
-      const ext = file.name?.split('.').pop() || 'jpg'
-      const fileName = `moments/${user.role}/${Date.now()}.${ext}`
+      // Simple filename - no subfolders
+      const fileName = `${user.role}_${Date.now()}.jpg`
       
-      const { error } = await supabase.storage.from('photos').upload(fileName, file, { contentType: file.type || 'image/jpeg', upsert: true })
+      const { error } = await supabase.storage.from('photos').upload(fileName, file, { 
+        contentType: 'image/jpeg', 
+        upsert: true 
+      })
       
-      if (error) throw new Error(error.message)
+      if (error) {
+        console.error('Storage error:', error)
+        showToast(`Upload failed: ${error.message}`, 'error')
+        return
+      }
 
       const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
       const newMoment = await addMoment(user.role, urlData.publicUrl)
@@ -114,7 +121,7 @@ export default function UsPage() {
       showToast('Photo uploaded!', 'success')
     } catch (error) {
       console.error('Upload error:', error)
-      showToast('Could not upload. Make sure photos bucket exists in Supabase and is public.', 'error')
+      showToast(`Error: ${error.message}`, 'error')
     }
   }
 
@@ -443,22 +450,52 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
     
     setUploading(true)
     try {
+      // Create image and wait for load
       const img = new Image()
-      img.src = URL.createObjectURL(file)
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject })
+      const objectUrl = URL.createObjectURL(file)
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = objectUrl
+      })
+      
+      // Use a reasonable max size to avoid memory issues
+      const maxSize = 1200
+      let width = img.width
+      let height = img.height
+      
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = (height / width) * maxSize
+          width = maxSize
+        } else {
+          width = (width / height) * maxSize
+          height = maxSize
+        }
+      }
       
       const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
+      canvas.width = width
+      canvas.height = height
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
       
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+      // Fill white background (in case of transparency)
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, height)
+      
+      // Draw image - browser should auto-correct EXIF in modern versions
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      URL.revokeObjectURL(objectUrl)
+      
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
       const processedFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
       
-      URL.revokeObjectURL(img.src)
       await onUpload(processedFile)
     } catch (err) {
+      console.error('Image processing error:', err)
+      // Fallback: upload original file
       await onUpload(file)
     }
     setUploading(false)
@@ -469,7 +506,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
     <div className="relative">
       <div className="aspect-square rounded-2xl overflow-hidden bg-cream-200 shadow-soft">
         {photo ? (
-          <img src={photo.photo_url} alt="" className="w-full h-full object-cover" />
+          <img src={photo.photo_url} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
             <span className="text-4xl mb-2">+</span>
@@ -485,7 +522,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
       {canUpload && !photo && (
         <button onClick={() => cameraInputRef.current?.click()} className="absolute inset-0 w-full h-full" />
       )}
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+      <input ref={cameraInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
       <p className="text-center text-caption text-ink-400 mt-2">{label}</p>
     </div>
   )
