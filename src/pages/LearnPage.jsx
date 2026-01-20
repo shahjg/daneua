@@ -2,433 +2,759 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
-// ============================================
-// VOCABULARY LIBRARIES (same content)
-// ============================================
-const arabicLibrary = {
-  greetings: [
-    { arabic: 'السلام عليكم', roman: 'As-salamu alaykum', english: 'Peace be upon you', usage: 'Standard Islamic greeting' },
-    { arabic: 'وعليكم السلام', roman: 'Wa alaykum as-salam', english: 'And peace be upon you', usage: 'Response to greeting' },
-    { arabic: 'صباح الخير', roman: 'Sabah al-khayr', english: 'Good morning', usage: 'Morning greeting' },
-    { arabic: 'مساء الخير', roman: 'Masa al-khayr', english: 'Good evening', usage: 'Evening greeting' },
-    { arabic: 'مرحباً', roman: 'Marhaba', english: 'Hello', usage: 'Casual greeting' },
-    { arabic: 'كيف حالك؟', roman: 'Kayf haluk?', english: 'How are you?', usage: 'Asking about wellbeing' },
-    { arabic: 'الحمد لله', roman: 'Alhamdulillah', english: 'Praise be to God', usage: 'Response: I am well' },
-    { arabic: 'مع السلامة', roman: "Ma'a salama", english: 'Goodbye', usage: 'Farewell' },
-  ],
-  love: [
-    { arabic: 'أحبك', roman: 'Uhibbuk', english: 'I love you', usage: 'Expressing love' },
-    { arabic: 'حبيبي', roman: 'Habibi', english: 'My love (m)', usage: 'Term of endearment' },
-    { arabic: 'حبيبتي', roman: 'Habibti', english: 'My love (f)', usage: 'Term of endearment' },
-    { arabic: 'قلبي', roman: 'Qalbi', english: 'My heart', usage: 'Affectionate term' },
-    { arabic: 'عمري', roman: 'Omri', english: 'My life', usage: 'Deep affection' },
-    { arabic: 'روحي', roman: 'Ruhi', english: 'My soul', usage: 'Deep love' },
-    { arabic: 'نور عيني', roman: 'Noor ayni', english: 'Light of my eyes', usage: 'Precious one' },
-    { arabic: 'أشتاق إليك', roman: 'Ashtaq ilayk', english: 'I miss you', usage: 'Expressing longing' },
-  ],
-  family: [
-    { arabic: 'عائلة', roman: "Aa'ila", english: 'Family', usage: 'The family unit' },
-    { arabic: 'أب', roman: 'Ab', english: 'Father', usage: 'Parent' },
-    { arabic: 'أم', roman: 'Umm', english: 'Mother', usage: 'Parent' },
-    { arabic: 'ابن', roman: 'Ibn', english: 'Son', usage: 'Child' },
-    { arabic: 'بنت', roman: 'Bint', english: 'Daughter', usage: 'Child' },
-    { arabic: 'أخ', roman: 'Akh', english: 'Brother', usage: 'Sibling' },
-    { arabic: 'أخت', roman: 'Ukht', english: 'Sister', usage: 'Sibling' },
-    { arabic: 'زوج', roman: 'Zawj', english: 'Husband', usage: 'Spouse' },
-    { arabic: 'زوجة', roman: 'Zawja', english: 'Wife', usage: 'Spouse' },
-  ],
-  daily: [
-    { arabic: 'نعم', roman: "Na'am", english: 'Yes', usage: 'Affirmation' },
-    { arabic: 'لا', roman: 'La', english: 'No', usage: 'Negation' },
-    { arabic: 'شكراً', roman: 'Shukran', english: 'Thank you', usage: 'Gratitude' },
-    { arabic: 'عفواً', roman: 'Afwan', english: "You're welcome", usage: 'Response to thanks' },
-    { arabic: 'من فضلك', roman: 'Min fadlak', english: 'Please', usage: 'Polite request' },
-    { arabic: 'آسف', roman: 'Asif', english: 'Sorry', usage: 'Apology' },
-  ],
-  islamic: [
-    { arabic: 'الله', roman: 'Allah', english: 'God', usage: 'The one God' },
-    { arabic: 'إنشاء الله', roman: "Insha'Allah", english: 'God willing', usage: 'Future plans' },
-    { arabic: 'ما شاء الله', roman: "Masha'Allah", english: 'God has willed', usage: 'Expressing amazement' },
-    { arabic: 'سبحان الله', roman: "Subhan'Allah", english: 'Glory to God', usage: 'Praise' },
-    { arabic: 'أستغفر الله', roman: 'Astaghfirullah', english: 'I seek forgiveness', usage: 'Repentance' },
-    { arabic: 'الحمد لله', roman: 'Alhamdulillah', english: 'Praise be to God', usage: 'Gratitude' },
-  ]
-}
-
+// URDU LIBRARY - Massive
 const urduLibrary = {
-  greetings: [
-    { native: 'السلام علیکم', roman: 'Assalamu alaikum', english: 'Peace be upon you' },
-    { native: 'خوش آمدید', roman: 'Khush amdeed', english: 'Welcome' },
-    { native: 'کیسے ہو؟', roman: 'Kaise ho?', english: 'How are you?' },
-    { native: 'ٹھیک ہوں', roman: 'Theek hoon', english: 'I am fine' },
-    { native: 'شکریہ', roman: 'Shukriya', english: 'Thank you' },
-    { native: 'خدا حافظ', roman: 'Khuda hafiz', english: 'Goodbye' },
-  ],
   love: [
-    { native: 'میں تم سے پیار کرتا ہوں', roman: 'Main tum se pyar karta hoon', english: 'I love you (m)' },
-    { native: 'میں تم سے پیار کرتی ہوں', roman: 'Main tum se pyar karti hoon', english: 'I love you (f)' },
-    { native: 'جان', roman: 'Jaan', english: 'My life/dear' },
-    { native: 'میری جان', roman: 'Meri jaan', english: 'My love' },
-    { native: 'تم بہت خوبصورت ہو', roman: 'Tum bohat khoobsurat ho', english: 'You are very beautiful' },
-    { native: 'مجھے تمہاری یاد آتی ہے', roman: 'Mujhe tumhari yaad aati hai', english: 'I miss you' },
+    { native: 'میں تم سے پیار کرتا ہوں', roman: 'Main tum se pyar karta hoon', english: 'I love you (male)' },
+    { native: 'میں تم سے پیار کرتی ہوں', roman: 'Main tum se pyar karti hoon', english: 'I love you (female)' },
+    { native: 'تم میری زندگی ہو', roman: 'Tum meri zindagi ho', english: 'You are my life' },
+    { native: 'تم میری جان ہو', roman: 'Tum meri jaan ho', english: 'You are my soul' },
+    { native: 'میرا دل تمہارا ہے', roman: 'Mera dil tumhara hai', english: 'My heart is yours' },
+    { native: 'تم بہت خاص ہو', roman: 'Tum bohat khaas ho', english: 'You are very special' },
+    { native: 'میں تمہارے بغیر نہیں رہ سکتا', roman: 'Main tumhare baghair nahi reh sakta', english: 'I cannot live without you' },
+    { native: 'تم میری دنیا ہو', roman: 'Tum meri duniya ho', english: 'You are my world' },
+    { native: 'تمہاری یاد آتی ہے', roman: 'Tumhari yaad aati hai', english: 'I miss you' },
+    { native: 'میں تمہارا انتظار کر رہا ہوں', roman: 'Main tumhara intezaar kar raha hoon', english: 'I am waiting for you' },
+  ],
+  endearment: [
+    { native: 'میری جان', roman: 'Meri Jaan', english: 'My life/soul' },
+    { native: 'جانو', roman: 'Jaanu', english: 'Sweetheart' },
+    { native: 'جانی', roman: 'Jaani', english: 'Darling' },
+    { native: 'سونا', roman: 'Sona', english: 'Gold (term of endearment)' },
+    { native: 'شہزادی', roman: 'Shehzadi', english: 'Princess' },
+    { native: 'شہزادا', roman: 'Shehzada', english: 'Prince' },
+    { native: 'میری گڑیا', roman: 'Meri Gudiya', english: 'My doll' },
+    { native: 'پیارے', roman: 'Pyaare', english: 'Dear one' },
+  ],
+  greetings: [
+    { native: 'السلام علیکم', roman: 'Assalamu Alaikum', english: 'Peace be upon you' },
+    { native: 'وعلیکم السلام', roman: 'Walaikum Assalam', english: 'And upon you peace' },
+    { native: 'کیا حال ہے؟', roman: 'Kya haal hai?', english: 'How are you?' },
+    { native: 'میں ٹھیک ہوں', roman: 'Main theek hoon', english: 'I am fine' },
+    { native: 'صبح بخیر', roman: 'Subah bakhair', english: 'Good morning' },
+    { native: 'شب بخیر', roman: 'Shab bakhair', english: 'Good night' },
+    { native: 'خدا حافظ', roman: 'Khuda Hafiz', english: 'Goodbye' },
+    { native: 'پھر ملیں گے', roman: 'Phir milenge', english: 'See you again' },
+    { native: 'خوش آمدید', roman: 'Khush Aamdeed', english: 'Welcome' },
+  ],
+  compliments: [
+    { native: 'تم بہت خوبصورت ہو', roman: 'Tum bohat khubsurat ho', english: 'You are very beautiful' },
+    { native: 'تم بہت پیاری ہو', roman: 'Tum bohat pyaari ho', english: 'You are very lovely' },
+    { native: 'شاباش', roman: 'Shabaash', english: 'Well done' },
+    { native: 'کمال کر دیا', roman: 'Kamaal kar diya', english: 'You did amazing' },
+    { native: 'تم بہت ہوشیار ہو', roman: 'Tum bohat hoshiyaar ho', english: 'You are very smart' },
+    { native: 'بہت خوب', roman: 'Bohat khoob', english: 'Excellent' },
+  ],
+  food: [
+    { native: 'کھانا', roman: 'Khana', english: 'Food' },
+    { native: 'پانی', roman: 'Paani', english: 'Water' },
+    { native: 'چائے', roman: 'Chai', english: 'Tea' },
+    { native: 'دودھ', roman: 'Doodh', english: 'Milk' },
+    { native: 'روٹی', roman: 'Roti', english: 'Bread' },
+    { native: 'چاول', roman: 'Chawal', english: 'Rice' },
+    { native: 'گوشت', roman: 'Gosht', english: 'Meat' },
+    { native: 'مرغی', roman: 'Murghi', english: 'Chicken' },
+    { native: 'سبزی', roman: 'Sabzi', english: 'Vegetables' },
+    { native: 'پھل', roman: 'Phal', english: 'Fruit' },
+    { native: 'بریانی', roman: 'Biryani', english: 'Biryani' },
+    { native: 'نہاری', roman: 'Nihari', english: 'Nihari' },
+    { native: 'مزیدار', roman: 'Mazedaar', english: 'Delicious' },
+    { native: 'بھوک لگی ہے', roman: 'Bhook lagi hai', english: 'I am hungry' },
+    { native: 'پیاس لگی ہے', roman: 'Pyaas lagi hai', english: 'I am thirsty' },
   ],
   family: [
-    { native: 'ابو/ابا', roman: 'Abu/Abba', english: 'Father' },
-    { native: 'امی/اماں', roman: 'Ami/Amaan', english: 'Mother' },
+    { native: 'امی', roman: 'Ami', english: 'Mother' },
+    { native: 'ابو', roman: 'Abu', english: 'Father' },
     { native: 'بھائی', roman: 'Bhai', english: 'Brother' },
-    { native: 'بہن', roman: 'Behan', english: 'Sister' },
-    { native: 'بیٹا', roman: 'Beta', english: 'Son' },
-    { native: 'بیٹی', roman: 'Beti', english: 'Daughter' },
+    { native: 'بہن', roman: 'Behn', english: 'Sister' },
+    { native: 'دادا', roman: 'Dada', english: 'Paternal grandfather' },
+    { native: 'دادی', roman: 'Dadi', english: 'Paternal grandmother' },
+    { native: 'نانا', roman: 'Nana', english: 'Maternal grandfather' },
+    { native: 'نانی', roman: 'Nani', english: 'Maternal grandmother' },
+    { native: 'بیوی', roman: 'Biwi', english: 'Wife' },
+    { native: 'شوہر', roman: 'Shohar', english: 'Husband' },
+    { native: 'خاندان', roman: 'Khandaan', english: 'Family' },
   ],
   daily: [
     { native: 'ہاں', roman: 'Haan', english: 'Yes' },
     { native: 'نہیں', roman: 'Nahi', english: 'No' },
+    { native: 'شکریہ', roman: 'Shukriya', english: 'Thank you' },
+    { native: 'معاف کیجیے', roman: 'Maaf kijiye', english: 'Sorry' },
     { native: 'ٹھیک ہے', roman: 'Theek hai', english: 'Okay' },
-    { native: 'معاف کیجیے', roman: 'Maaf kijiye', english: 'Excuse me/Sorry' },
-  ]
+    { native: 'آج', roman: 'Aaj', english: 'Today' },
+    { native: 'کل', roman: 'Kal', english: 'Yesterday/Tomorrow' },
+    { native: 'ابھی', roman: 'Abhi', english: 'Now' },
+    { native: 'بعد میں', roman: 'Baad mein', english: 'Later' },
+  ],
+  questions: [
+    { native: 'کیا؟', roman: 'Kya?', english: 'What?' },
+    { native: 'کیوں؟', roman: 'Kyun?', english: 'Why?' },
+    { native: 'کب؟', roman: 'Kab?', english: 'When?' },
+    { native: 'کہاں؟', roman: 'Kahan?', english: 'Where?' },
+    { native: 'کون؟', roman: 'Kaun?', english: 'Who?' },
+    { native: 'کیسے؟', roman: 'Kaise?', english: 'How?' },
+    { native: 'کتنا؟', roman: 'Kitna?', english: 'How much?' },
+  ],
+  verbs: [
+    { native: 'کھانا', roman: 'Khana', english: 'To eat' },
+    { native: 'پینا', roman: 'Peena', english: 'To drink' },
+    { native: 'سونا', roman: 'Sona', english: 'To sleep' },
+    { native: 'جاگنا', roman: 'Jaagna', english: 'To wake up' },
+    { native: 'چلنا', roman: 'Chalna', english: 'To walk' },
+    { native: 'دوڑنا', roman: 'Daurna', english: 'To run' },
+    { native: 'بیٹھنا', roman: 'Baithna', english: 'To sit' },
+    { native: 'دیکھنا', roman: 'Dekhna', english: 'To see' },
+    { native: 'سننا', roman: 'Sunna', english: 'To hear' },
+    { native: 'بولنا', roman: 'Bolna', english: 'To speak' },
+    { native: 'پڑھنا', roman: 'Parhna', english: 'To read' },
+    { native: 'لکھنا', roman: 'Likhna', english: 'To write' },
+    { native: 'کرنا', roman: 'Karna', english: 'To do' },
+    { native: 'آنا', roman: 'Aana', english: 'To come' },
+    { native: 'جانا', roman: 'Jaana', english: 'To go' },
+  ],
+  pronouns: [
+    { native: 'میں', roman: 'Main', english: 'I' },
+    { native: 'تم', roman: 'Tum', english: 'You (informal)' },
+    { native: 'آپ', roman: 'Aap', english: 'You (formal)' },
+    { native: 'وہ', roman: 'Woh', english: 'He/She/That' },
+    { native: 'ہم', roman: 'Hum', english: 'We' },
+    { native: 'میرا', roman: 'Mera', english: 'My (masc)' },
+    { native: 'میری', roman: 'Meri', english: 'My (fem)' },
+    { native: 'تمہارا', roman: 'Tumhara', english: 'Your' },
+  ],
+  adjectives: [
+    { native: 'اچھا', roman: 'Acha', english: 'Good' },
+    { native: 'برا', roman: 'Bura', english: 'Bad' },
+    { native: 'بڑا', roman: 'Bara', english: 'Big' },
+    { native: 'چھوٹا', roman: 'Chota', english: 'Small' },
+    { native: 'گرم', roman: 'Garam', english: 'Hot' },
+    { native: 'ٹھنڈا', roman: 'Thanda', english: 'Cold' },
+    { native: 'خوبصورت', roman: 'Khubsurat', english: 'Beautiful' },
+    { native: 'خوش', roman: 'Khush', english: 'Happy' },
+    { native: 'اداس', roman: 'Udaas', english: 'Sad' },
+  ],
+  badwords: [
+    { native: 'پاگل', roman: 'Pagal', english: 'Crazy/Idiot' },
+    { native: 'بے وقوف', roman: 'Bewakoof', english: 'Stupid' },
+    { native: 'گدھا', roman: 'Gadha', english: 'Donkey (idiot)' },
+    { native: 'چپ کر', roman: 'Chup kar', english: 'Shut up' },
+    { native: 'دفع ہو', roman: 'Dafa ho', english: 'Get lost' },
+  ],
 }
 
+const urduNumbers = [
+  { native: '۰', roman: 'Sifar', english: '0' },
+  { native: '۱', roman: 'Aik', english: '1' },
+  { native: '۲', roman: 'Do', english: '2' },
+  { native: '۳', roman: 'Teen', english: '3' },
+  { native: '۴', roman: 'Chaar', english: '4' },
+  { native: '۵', roman: 'Paanch', english: '5' },
+  { native: '۶', roman: 'Chay', english: '6' },
+  { native: '۷', roman: 'Saat', english: '7' },
+  { native: '۸', roman: 'Aath', english: '8' },
+  { native: '۹', roman: 'Nau', english: '9' },
+  { native: '۱۰', roman: 'Das', english: '10' },
+  { native: '۲۰', roman: 'Bees', english: '20' },
+  { native: '۵۰', roman: 'Pachaas', english: '50' },
+  { native: '۱۰۰', roman: 'Sau', english: '100' },
+]
+
+const urduAlphabet = [
+  { letter: 'ا', name: 'Alif', sound: 'a' },
+  { letter: 'ب', name: 'Bay', sound: 'b' },
+  { letter: 'پ', name: 'Pay', sound: 'p' },
+  { letter: 'ت', name: 'Tay', sound: 't' },
+  { letter: 'ٹ', name: 'Ttay', sound: 'hard t' },
+  { letter: 'ث', name: 'Say', sound: 's' },
+  { letter: 'ج', name: 'Jeem', sound: 'j' },
+  { letter: 'چ', name: 'Chay', sound: 'ch' },
+  { letter: 'ح', name: 'Bari Hey', sound: 'h' },
+  { letter: 'خ', name: 'Khay', sound: 'kh' },
+  { letter: 'د', name: 'Daal', sound: 'd' },
+  { letter: 'ڈ', name: 'Ddaal', sound: 'hard d' },
+  { letter: 'ذ', name: 'Zaal', sound: 'z' },
+  { letter: 'ر', name: 'Ray', sound: 'r' },
+  { letter: 'ڑ', name: 'Rray', sound: 'flapped r' },
+  { letter: 'ز', name: 'Zay', sound: 'z' },
+  { letter: 'س', name: 'Seen', sound: 's' },
+  { letter: 'ش', name: 'Sheen', sound: 'sh' },
+  { letter: 'ص', name: 'Swad', sound: 's' },
+  { letter: 'ض', name: 'Zwad', sound: 'z' },
+  { letter: 'ط', name: 'Toy', sound: 't' },
+  { letter: 'ظ', name: 'Zoy', sound: 'z' },
+  { letter: 'ع', name: 'Ain', sound: 'a' },
+  { letter: 'غ', name: 'Ghain', sound: 'gh' },
+  { letter: 'ف', name: 'Fay', sound: 'f' },
+  { letter: 'ق', name: 'Qaaf', sound: 'q' },
+  { letter: 'ک', name: 'Kaaf', sound: 'k' },
+  { letter: 'گ', name: 'Gaaf', sound: 'g' },
+  { letter: 'ل', name: 'Laam', sound: 'l' },
+  { letter: 'م', name: 'Meem', sound: 'm' },
+  { letter: 'ن', name: 'Noon', sound: 'n' },
+  { letter: 'و', name: 'Wao', sound: 'w' },
+  { letter: 'ہ', name: 'Choti Hey', sound: 'h' },
+  { letter: 'ی', name: 'Choti Yay', sound: 'y' },
+  { letter: 'ے', name: 'Bari Yay', sound: 'ay' },
+]
+
+// TAGALOG LIBRARY
 const tagalogLibrary = {
-  greetings: [
-    { native: 'Kamusta', english: 'Hello/How are you' },
-    { native: 'Magandang umaga', english: 'Good morning' },
-    { native: 'Magandang hapon', english: 'Good afternoon' },
-    { native: 'Magandang gabi', english: 'Good evening' },
-    { native: 'Salamat', english: 'Thank you' },
-    { native: 'Paalam', english: 'Goodbye' },
-  ],
   love: [
-    { native: 'Mahal kita', english: 'I love you' },
-    { native: 'Mahal ko', english: 'My love' },
-    { native: 'Miss na kita', english: 'I miss you' },
-    { native: 'Ikaw ang buhay ko', english: 'You are my life' },
-    { native: 'Maganda ka', english: 'You are beautiful' },
-    { native: 'Gwapo ka', english: 'You are handsome' },
+    { roman: 'Mahal kita', english: 'I love you' },
+    { roman: 'Mahal na mahal kita', english: 'I love you so much' },
+    { roman: 'Ikaw ang buhay ko', english: 'You are my life' },
+    { roman: 'Ikaw lang ang mahal ko', english: 'You are my only love' },
+    { roman: 'Miss na miss kita', english: 'I miss you so much' },
+    { roman: 'Lagi kitang iniisip', english: 'I always think of you' },
+  ],
+  endearment: [
+    { roman: 'Mahal', english: 'Love/Dear' },
+    { roman: 'Mahal ko', english: 'My love' },
+    { roman: 'Sinta', english: 'Beloved' },
+    { roman: 'Buhay ko', english: 'My life' },
+  ],
+  greetings: [
+    { roman: 'Kumusta', english: 'Hello' },
+    { roman: 'Magandang umaga', english: 'Good morning' },
+    { roman: 'Magandang hapon', english: 'Good afternoon' },
+    { roman: 'Magandang gabi', english: 'Good evening' },
+    { roman: 'Paalam', english: 'Goodbye' },
+    { roman: 'Ingat', english: 'Take care' },
+    { roman: 'Salamat', english: 'Thank you' },
+  ],
+  compliments: [
+    { roman: 'Ang ganda mo', english: 'You are beautiful' },
+    { roman: 'Ang galing mo', english: 'You are amazing' },
+    { roman: 'Ang bait mo', english: 'You are so kind' },
+  ],
+  food: [
+    { roman: 'Pagkain', english: 'Food' },
+    { roman: 'Tubig', english: 'Water' },
+    { roman: 'Kanin', english: 'Rice' },
+    { roman: 'Adobo', english: 'Adobo' },
+    { roman: 'Sinigang', english: 'Sour soup' },
+    { roman: 'Masarap', english: 'Delicious' },
+    { roman: 'Gutom ako', english: 'I am hungry' },
   ],
   family: [
-    { native: 'Tatay/Papa', english: 'Father' },
-    { native: 'Nanay/Mama', english: 'Mother' },
-    { native: 'Kuya', english: 'Older brother' },
-    { native: 'Ate', english: 'Older sister' },
-    { native: 'Anak', english: 'Child' },
-    { native: 'Lolo', english: 'Grandfather' },
-    { native: 'Lola', english: 'Grandmother' },
+    { roman: 'Nanay', english: 'Mother' },
+    { roman: 'Tatay', english: 'Father' },
+    { roman: 'Kuya', english: 'Older brother' },
+    { roman: 'Ate', english: 'Older sister' },
+    { roman: 'Lolo', english: 'Grandfather' },
+    { roman: 'Lola', english: 'Grandmother' },
   ],
   daily: [
-    { native: 'Oo', english: 'Yes' },
-    { native: 'Hindi', english: 'No' },
-    { native: 'Sige', english: 'Okay/Go ahead' },
-    { native: 'Teka', english: 'Wait' },
-  ]
+    { roman: 'Oo', english: 'Yes' },
+    { roman: 'Hindi', english: 'No' },
+    { roman: 'Salamat', english: 'Thank you' },
+    { roman: 'Pasensya na', english: 'Sorry' },
+    { roman: 'Sige', english: 'Okay' },
+  ],
+  questions: [
+    { roman: 'Ano?', english: 'What?' },
+    { roman: 'Bakit?', english: 'Why?' },
+    { roman: 'Kailan?', english: 'When?' },
+    { roman: 'Saan?', english: 'Where?' },
+    { roman: 'Sino?', english: 'Who?' },
+    { roman: 'Paano?', english: 'How?' },
+  ],
+  verbs: [
+    { roman: 'Kumain', english: 'To eat' },
+    { roman: 'Uminom', english: 'To drink' },
+    { roman: 'Matulog', english: 'To sleep' },
+    { roman: 'Lumakad', english: 'To walk' },
+    { roman: 'Tumakbo', english: 'To run' },
+    { roman: 'Magsalita', english: 'To speak' },
+  ],
+  pronouns: [
+    { roman: 'Ako', english: 'I' },
+    { roman: 'Ikaw', english: 'You' },
+    { roman: 'Siya', english: 'He/She' },
+    { roman: 'Tayo', english: 'We' },
+    { roman: 'Sila', english: 'They' },
+  ],
+  badwords: [
+    { roman: 'Gago', english: 'Stupid' },
+    { roman: 'Tanga', english: 'Idiot' },
+    { roman: 'Bobo', english: 'Dumb' },
+  ],
 }
 
-// Get all words as flat array for Word of Day
-const getAllWords = () => {
-  const words = []
-  Object.entries(arabicLibrary).forEach(([cat, items]) => {
-    items.forEach(w => words.push({ ...w, language: 'arabic', category: cat }))
-  })
-  Object.entries(urduLibrary).forEach(([cat, items]) => {
-    items.forEach(w => words.push({ ...w, language: 'urdu', category: cat }))
-  })
-  Object.entries(tagalogLibrary).forEach(([cat, items]) => {
-    items.forEach(w => words.push({ ...w, language: 'tagalog', category: cat }))
-  })
-  return words
+const tagalogNumbers = [
+  { roman: 'Isa', english: '1' },
+  { roman: 'Dalawa', english: '2' },
+  { roman: 'Tatlo', english: '3' },
+  { roman: 'Apat', english: '4' },
+  { roman: 'Lima', english: '5' },
+  { roman: 'Anim', english: '6' },
+  { roman: 'Pito', english: '7' },
+  { roman: 'Walo', english: '8' },
+  { roman: 'Siyam', english: '9' },
+  { roman: 'Sampu', english: '10' },
+]
+
+const tagalogAlphabet = [
+  { letter: 'A', name: 'A', sound: 'ah' },
+  { letter: 'B', name: 'Ba', sound: 'bah' },
+  { letter: 'K', name: 'Ka', sound: 'kah' },
+  { letter: 'D', name: 'Da', sound: 'dah' },
+  { letter: 'E', name: 'E', sound: 'eh' },
+  { letter: 'G', name: 'Ga', sound: 'gah' },
+  { letter: 'H', name: 'Ha', sound: 'hah' },
+  { letter: 'I', name: 'I', sound: 'ee' },
+  { letter: 'L', name: 'La', sound: 'lah' },
+  { letter: 'M', name: 'Ma', sound: 'mah' },
+  { letter: 'N', name: 'Na', sound: 'nah' },
+  { letter: 'NG', name: 'Nga', sound: 'ngah' },
+  { letter: 'O', name: 'O', sound: 'oh' },
+  { letter: 'P', name: 'Pa', sound: 'pah' },
+  { letter: 'R', name: 'Ra', sound: 'rah' },
+  { letter: 'S', name: 'Sa', sound: 'sah' },
+  { letter: 'T', name: 'Ta', sound: 'tah' },
+  { letter: 'U', name: 'U', sound: 'oo' },
+  { letter: 'W', name: 'Wa', sound: 'wah' },
+  { letter: 'Y', name: 'Ya', sound: 'yah' },
+]
+
+// ISLAMIC/ARABIC
+const arabicLibrary = {
+  greetings: [
+    { arabic: 'السَّلَامُ عَلَيْكُمْ', roman: 'Assalamu Alaikum', english: 'Peace be upon you' },
+    { arabic: 'وَعَلَيْكُمُ السَّلَامُ', roman: 'Wa Alaikum Assalam', english: 'And upon you peace' },
+    { arabic: 'مَرْحَبًا', roman: 'Marhaba', english: 'Hello' },
+    { arabic: 'شُكْرًا', roman: 'Shukran', english: 'Thank you' },
+  ],
+  phrases: [
+    { arabic: 'إِنْ شَاءَ اللَّهُ', roman: 'Inshallah', english: 'God willing' },
+    { arabic: 'مَا شَاءَ اللَّهُ', roman: 'Mashallah', english: 'As Allah willed' },
+    { arabic: 'سُبْحَانَ اللَّهِ', roman: 'SubhanAllah', english: 'Glory be to Allah' },
+    { arabic: 'الْحَمْدُ لِلَّهِ', roman: 'Alhamdulillah', english: 'Praise be to Allah' },
+    { arabic: 'اللَّهُ أَكْبَرُ', roman: 'Allahu Akbar', english: 'Allah is Greatest' },
+    { arabic: 'بِسْمِ اللَّهِ', roman: 'Bismillah', english: 'In the name of Allah' },
+    { arabic: 'جَزَاكَ اللَّهُ خَيْرًا', roman: 'JazakAllahu Khayran', english: 'May Allah reward you' },
+  ],
+  daily: [
+    { arabic: 'نَعَمْ', roman: 'Naam', english: 'Yes' },
+    { arabic: 'لَا', roman: 'La', english: 'No' },
+    { arabic: 'مِنْ فَضْلِكَ', roman: 'Min fadlik', english: 'Please' },
+  ],
 }
 
-// Get word of the day based on date
-const getWordOfDay = () => {
-  const words = getAllWords()
-  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24))
-  return words[dayOfYear % words.length]
+const islamicLessons = {
+  level1: { title: 'Social Phrases', description: 'Essential Islamic greetings', words: [
+    { arabic: 'السَّلَامُ عَلَيْكُمْ', roman: 'Assalamu Alaikum', english: 'Peace be upon you', usage: 'Greeting Muslims' },
+    { arabic: 'إِنْ شَاءَ اللَّهُ', roman: 'Inshallah', english: 'God willing', usage: 'Future plans' },
+    { arabic: 'مَا شَاءَ اللَّهُ', roman: 'Mashallah', english: 'What Allah willed', usage: 'Admiration' },
+  ]},
+  level2: { title: 'Dhikr', description: 'Phrases of remembrance', words: [
+    { arabic: 'سُبْحَانَ اللَّهِ', roman: 'SubhanAllah', english: 'Glory be to Allah', usage: 'Praising Allah' },
+    { arabic: 'الْحَمْدُ لِلَّهِ', roman: 'Alhamdulillah', english: 'All praise to Allah', usage: 'Gratitude' },
+    { arabic: 'اللَّهُ أَكْبَرُ', roman: 'Allahu Akbar', english: 'Allah is Greatest', usage: 'Proclaiming greatness' },
+  ]},
+  level3: { title: 'Daily Duas', description: 'Everyday supplications', words: [
+    { arabic: 'بِسْمِ اللَّهِ', roman: 'Bismillah', english: 'In Allah\'s name', usage: 'Before starting' },
+    { arabic: 'جَزَاكَ اللَّهُ خَيْرًا', roman: 'JazakAllah Khair', english: 'May Allah reward you', usage: 'Thanking' },
+  ]},
+  level4: { title: 'Spiritual Concepts', description: 'Deep values', words: [
+    { arabic: 'صَبْر', roman: 'Sabr', english: 'Patience', usage: 'Steadfastness' },
+    { arabic: 'تَوَكُّل', roman: 'Tawakkul', english: 'Trust in Allah', usage: 'Relying on Allah' },
+    { arabic: 'شُكْر', roman: 'Shukr', english: 'Gratitude', usage: 'Being thankful' },
+  ]},
+}
+
+const arabicAlphabet = [
+  { letter: 'ا', name: 'Alif', sound: 'a' },
+  { letter: 'ب', name: 'Ba', sound: 'b' },
+  { letter: 'ت', name: 'Ta', sound: 't' },
+  { letter: 'ث', name: 'Tha', sound: 'th' },
+  { letter: 'ج', name: 'Jeem', sound: 'j' },
+  { letter: 'ح', name: 'Ha', sound: 'h' },
+  { letter: 'خ', name: 'Kha', sound: 'kh' },
+  { letter: 'د', name: 'Dal', sound: 'd' },
+  { letter: 'ذ', name: 'Dhal', sound: 'dh' },
+  { letter: 'ر', name: 'Ra', sound: 'r' },
+  { letter: 'ز', name: 'Zay', sound: 'z' },
+  { letter: 'س', name: 'Seen', sound: 's' },
+  { letter: 'ش', name: 'Sheen', sound: 'sh' },
+  { letter: 'ص', name: 'Sad', sound: 's' },
+  { letter: 'ض', name: 'Dad', sound: 'd' },
+  { letter: 'ط', name: 'Ta', sound: 't' },
+  { letter: 'ظ', name: 'Dha', sound: 'dh' },
+  { letter: 'ع', name: 'Ain', sound: 'a' },
+  { letter: 'غ', name: 'Ghain', sound: 'gh' },
+  { letter: 'ف', name: 'Fa', sound: 'f' },
+  { letter: 'ق', name: 'Qaf', sound: 'q' },
+  { letter: 'ك', name: 'Kaf', sound: 'k' },
+  { letter: 'ل', name: 'Lam', sound: 'l' },
+  { letter: 'م', name: 'Meem', sound: 'm' },
+  { letter: 'ن', name: 'Noon', sound: 'n' },
+  { letter: 'ه', name: 'Ha', sound: 'h' },
+  { letter: 'و', name: 'Waw', sound: 'w' },
+  { letter: 'ي', name: 'Ya', sound: 'y' },
+]
+
+const arabicNumbers = [
+  { arabic: '٠', roman: 'Sifr', english: '0' },
+  { arabic: '١', roman: 'Wahid', english: '1' },
+  { arabic: '٢', roman: 'Ithnan', english: '2' },
+  { arabic: '٣', roman: 'Thalatha', english: '3' },
+  { arabic: '٤', roman: 'Arba\'a', english: '4' },
+  { arabic: '٥', roman: 'Khamsa', english: '5' },
+  { arabic: '٦', roman: 'Sitta', english: '6' },
+  { arabic: '٧', roman: 'Sab\'a', english: '7' },
+  { arabic: '٨', roman: 'Thamaniya', english: '8' },
+  { arabic: '٩', roman: 'Tis\'a', english: '9' },
+  { arabic: '١٠', roman: 'Ashara', english: '10' },
+]
+
+const grammarLessons = {
+  urdu: {
+    title: 'Urdu Sentence Structure',
+    subtitle: 'SOV - Subject Object Verb',
+    explanation: 'In Urdu, the verb comes at the END. Basic order: Subject + Object + Verb.',
+    examples: [
+      { english: 'I eat food', local: 'Main khana khata hoon', breakdown: 'I + food + eat' },
+      { english: 'She drinks water', local: 'Woh paani peeti hai', breakdown: 'She + water + drinks' },
+    ],
+    tips: ['Verb always at end', 'Male verbs end in -ta, female in -ti', 'Use "aap" for respect'],
+  },
+  tagalog: {
+    title: 'Tagalog Sentence Structure',
+    subtitle: 'VSO - Verb Subject Object',
+    explanation: 'In Tagalog, the verb comes FIRST. Description before noun.',
+    examples: [
+      { english: 'I am beautiful', local: 'Maganda ako', breakdown: 'Beautiful + I' },
+      { english: 'I love you', local: 'Mahal kita', breakdown: 'Love + I-you' },
+    ],
+    tips: ['Po/Opo adds respect', 'Ang marks subject', 'Ng marks object'],
+  },
+}
+
+const categoryConfig = {
+  love: { label: 'Love', color: 'bg-rose-50' },
+  endearment: { label: 'Sweet Names', color: 'bg-pink-50' },
+  greetings: { label: 'Greetings', color: 'bg-amber-50' },
+  compliments: { label: 'Compliments', color: 'bg-purple-50' },
+  food: { label: 'Food and Dining', color: 'bg-orange-50' },
+  family: { label: 'Family', color: 'bg-blue-50' },
+  daily: { label: 'Daily Essentials', color: 'bg-green-50' },
+  questions: { label: 'Questions', color: 'bg-cyan-50' },
+  verbs: { label: 'Verbs', color: 'bg-indigo-50' },
+  pronouns: { label: 'Pronouns', color: 'bg-teal-50' },
+  adjectives: { label: 'Adjectives', color: 'bg-lime-50' },
+  badwords: { label: 'Bad Words', color: 'bg-red-50' },
+  phrases: { label: 'Phrases', color: 'bg-emerald-50' },
 }
 
 export default function LearnPage() {
   const { user } = useAuth()
-  const [view, setView] = useState('main')
-  const [selectedLanguage, setSelectedLanguage] = useState(null)
+  const [activeTab, setActiveTab] = useState('urdu')
+  const [view, setView] = useState('daily')
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [recordings, setRecordings] = useState({})
-  const [recording, setRecording] = useState(false)
-  const [currentRecordingWord, setCurrentRecordingWord] = useState(null)
-  const mediaRecorder = useRef(null)
-  const audioChunks = useRef([])
+  const [selectedLevel, setSelectedLevel] = useState(null)
+  const [alphabetIndex, setAlphabetIndex] = useState(0)
+
+  const handleTabChange = (newTab) => {
+    setView('daily')
+    setSelectedCategory(null)
+    setSelectedLevel(null)
+    setAlphabetIndex(0)
+    setActiveTab(newTab)
+  }
+
+  const getWordOfDay = () => {
+    if (activeTab === 'islam') {
+      const allWords = Object.values(islamicLessons).flatMap(l => l.words)
+      const day = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+      return allWords[day % allWords.length]
+    }
+    const library = activeTab === 'urdu' ? urduLibrary : tagalogLibrary
+    const allWords = Object.values(library).flat()
+    const day = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+    return allWords[(day + (activeTab === 'urdu' ? 0 : 100)) % allWords.length]
+  }
 
   const wordOfDay = getWordOfDay()
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
-  useEffect(() => {
-    loadRecordings()
-  }, [])
+  return (
+    <div className="min-h-screen pb-28">
+      <div className="bg-forest px-6 pt-14 pb-12">
+        <div className="max-w-lg mx-auto text-center">
+          <h1 className="font-serif text-display-sm text-cream-50 mb-2">Learn</h1>
+          <p className="text-body text-cream-300">Growing together</p>
+        </div>
+      </div>
 
-  const loadRecordings = async () => {
-    const { data } = await supabase
-      .from('word_recordings')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (data) {
-      const grouped = {}
-      data.forEach(r => {
-        if (!grouped[r.word_key]) grouped[r.word_key] = {}
-        grouped[r.word_key][r.user_role] = r.audio_url
-      })
-      setRecordings(grouped)
-    }
+      <div className="bg-cream px-4 py-4 sticky top-0 z-20 border-b border-cream-300">
+        <div className="max-w-lg mx-auto flex justify-center gap-2">
+          {[{ id: 'urdu', label: 'Urdu' }, { id: 'tagalog', label: 'Tagalog' }, { id: 'islam', label: 'Islam' }].map((lang) => (
+            <button key={lang.id} onClick={() => handleTabChange(lang.id)} className={`px-5 py-3 rounded-full text-body-sm font-medium transition-all ${activeTab === lang.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500'}`}>
+              {lang.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-cream min-h-[60vh]">
+        {view === 'daily' && <DailyView word={wordOfDay} language={activeTab} setView={setView} user={user} theirName={theirName} />}
+        {view === 'library' && <LibraryView library={activeTab === 'urdu' ? urduLibrary : activeTab === 'tagalog' ? tagalogLibrary : arabicLibrary} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} setView={setView} user={user} theirName={theirName} />}
+        {view === 'grammar' && <GrammarView grammar={grammarLessons[activeTab === 'islam' ? 'urdu' : activeTab]} setView={setView} />}
+        {view === 'alphabet' && <AlphabetView alphabet={activeTab === 'urdu' ? urduAlphabet : activeTab === 'tagalog' ? tagalogAlphabet : arabicAlphabet} index={alphabetIndex} setIndex={setAlphabetIndex} setView={setView} rtl={activeTab !== 'tagalog'} />}
+        {view === 'numbers' && <NumbersView numbers={activeTab === 'urdu' ? urduNumbers : activeTab === 'tagalog' ? tagalogNumbers : arabicNumbers} setView={setView} rtl={activeTab !== 'tagalog'} />}
+        {view === 'islamic' && <IslamicView selectedLevel={selectedLevel} setSelectedLevel={setSelectedLevel} setView={setView} user={user} theirName={theirName} />}
+      </div>
+    </div>
+  )
+}
+
+function VoicePractice({ word, user, theirName }) {
+  const [recordings, setRecordings] = useState([])
+  const [isRecording, setIsRecording] = useState(false)
+  const mediaRef = useRef(null)
+  const chunksRef = useRef([])
+  const wordKey = word?.roman?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
+
+  useEffect(() => { fetchRecordings() }, [wordKey])
+
+  const fetchRecordings = async () => {
+    try {
+      const { data } = await supabase.from('word_recordings').select('*').eq('word_key', wordKey)
+      setRecordings(data || [])
+    } catch (err) { console.error(err) }
   }
 
-  const startRecording = async (wordKey) => {
+  const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {}
-      mediaRecorder.current = new MediaRecorder(stream, options)
-      audioChunks.current = []
-      
-      mediaRecorder.current.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.current.push(e.data)
+      mediaRef.current = new MediaRecorder(stream)
+      chunksRef.current = []
+      mediaRef.current.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data)
+      mediaRef.current.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        stream.getTracks().forEach(t => t.stop())
+        await uploadRecording(blob)
       }
-      
-      mediaRecorder.current.onstop = async () => {
-        const blob = new Blob(audioChunks.current, { type: 'audio/webm' })
-        stream.getTracks().forEach(track => track.stop())
-        
-        // Upload to Supabase
-        const fileName = `${user.role}_${wordKey}_${Date.now()}.webm`
-        const { error: uploadError } = await supabase.storage
-          .from('audio')
-          .upload(fileName, blob)
-        
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
-          
-          // Save to database
-          await supabase.from('word_recordings').insert({
-            word_key: wordKey,
-            user_role: user.role,
-            audio_url: urlData.publicUrl
-          })
-          
-          loadRecordings()
-        }
-      }
-      
-      mediaRecorder.current.start()
-      setRecording(true)
-      setCurrentRecordingWord(wordKey)
-    } catch (err) {
-      console.error('Recording error:', err)
-      alert('Could not access microphone')
-    }
+      mediaRef.current.start()
+      setIsRecording(true)
+    } catch { alert('Microphone access needed') }
   }
 
-  const stopRecording = () => {
-    if (mediaRecorder.current && recording) {
-      mediaRecorder.current.stop()
-      setRecording(false)
-      setCurrentRecordingWord(null)
-    }
+  const stopRecording = () => { mediaRef.current?.stop(); setIsRecording(false) }
+
+  const uploadRecording = async (blob) => {
+    try {
+      const filename = `${wordKey}_${user.role}_${Date.now()}.webm`
+      const { error: uploadError } = await supabase.storage.from('audio').upload(filename, blob)
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
+      await supabase.from('word_recordings').insert({ word_key: wordKey, user_role: user.role, audio_url: publicUrl })
+      fetchRecordings()
+    } catch (err) { console.error(err) }
   }
 
-  const BackButton = ({ onClick }) => (
-    <button onClick={onClick} className="flex items-center gap-3 mb-6 text-forest">
-      <div className="w-10 h-10 rounded-full bg-forest flex items-center justify-center">
-        <svg className="w-5 h-5 text-cream-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
+  const shahRec = recordings.find(r => r.user_role === 'shah')
+  const daneRec = recordings.find(r => r.user_role === 'dane')
+
+  return (
+    <div className="mt-6 pt-6 border-t border-cream-200">
+      <p className="text-body-sm text-ink-400 text-center mb-4">Practice Together</p>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="text-center">
+          <p className="text-body-sm font-medium text-forest mb-2">Shahjahan</p>
+          {shahRec ? <audio controls src={shahRec.audio_url} className="w-full h-10" /> : <p className="text-caption text-ink-300">Not recorded</p>}
+        </div>
+        <div className="text-center">
+          <p className="text-body-sm font-medium text-forest mb-2">Dane</p>
+          {daneRec ? <audio controls src={daneRec.audio_url} className="w-full h-10" /> : <p className="text-caption text-ink-300">Not recorded</p>}
+        </div>
       </div>
-      <span className="text-body font-medium">Back</span>
-    </button>
+      <div className="flex justify-center">
+        <button onClick={isRecording ? stopRecording : startRecording} className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${isRecording ? 'bg-rose-500 animate-pulse' : 'bg-forest'}`}>
+          <span className="text-white text-sm font-medium">{isRecording ? 'Stop' : 'Record'}</span>
+        </button>
+      </div>
+    </div>
   )
+}
 
-  const RecordingSection = ({ wordKey }) => {
-    const shahRecording = recordings[wordKey]?.shah
-    const daneRecording = recordings[wordKey]?.dane
-    const isRecordingThis = currentRecordingWord === wordKey
-
-    return (
-      <div className="mt-4 pt-4 border-t border-cream-200">
-        <p className="text-caption text-ink-400 mb-3 text-center">Voice Practice</p>
-        
+function DailyView({ word, language, setView, user, theirName }) {
+  if (!word) return null
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <div className="bg-white rounded-3xl p-8 shadow-card mb-6">
+          <p className="text-center text-body-sm text-forest font-medium mb-6">Word of the Day</p>
+          <div className="text-center py-4">
+            {(word.native || word.arabic) && <p className="text-4xl text-forest mb-4" dir="rtl">{word.native || word.arabic}</p>}
+            <h2 className="font-serif text-display-sm text-forest mb-3">{word.roman}</h2>
+            <p className="text-body-lg text-ink-500">{word.english}</p>
+            {word.usage && <p className="text-body-sm text-ink-400 mt-2 italic">{word.usage}</p>}
+          </div>
+          <VoicePractice word={word} user={user} theirName={theirName} />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          {/* Shahjahan's Recording */}
-          <div className="text-center">
-            <p className="text-body-sm font-medium text-forest mb-2">Shahjahan</p>
-            {shahRecording ? (
-              <audio controls src={shahRecording} className="w-full h-10" />
-            ) : user?.role === 'shah' ? (
-              <button
-                onClick={() => isRecordingThis ? stopRecording() : startRecording(wordKey)}
-                className={`w-full py-2 rounded-lg text-body-sm ${
-                  isRecordingThis 
-                    ? 'bg-rose-500 text-white animate-pulse' 
-                    : 'bg-forest text-cream-100'
-                }`}
-              >
-                {isRecordingThis ? 'Stop' : 'Record'}
-              </button>
-            ) : (
-              <p className="text-caption text-ink-300">Not recorded yet</p>
-            )}
-          </div>
-
-          {/* Dane's Recording */}
-          <div className="text-center">
-            <p className="text-body-sm font-medium text-forest mb-2">Dane</p>
-            {daneRecording ? (
-              <audio controls src={daneRecording} className="w-full h-10" />
-            ) : user?.role === 'dane' ? (
-              <button
-                onClick={() => isRecordingThis ? stopRecording() : startRecording(wordKey)}
-                className={`w-full py-2 rounded-lg text-body-sm ${
-                  isRecordingThis 
-                    ? 'bg-rose-500 text-white animate-pulse' 
-                    : 'bg-forest text-cream-100'
-                }`}
-              >
-                {isRecordingThis ? 'Stop' : 'Record'}
-              </button>
-            ) : (
-              <p className="text-caption text-ink-300">Not recorded yet</p>
-            )}
-          </div>
+          <button onClick={() => setView('library')} className="bg-rose-50 rounded-2xl p-5 text-left"><p className="font-serif text-title-sm text-forest">Word Library</p><p className="text-body-sm text-forest-600">All words</p></button>
+          {language !== 'islam' && <button onClick={() => setView('grammar')} className="bg-amber-50 rounded-2xl p-5 text-left"><p className="font-serif text-title-sm text-forest">Grammar</p><p className="text-body-sm text-forest-600">Structure</p></button>}
+          <button onClick={() => setView('alphabet')} className="bg-purple-50 rounded-2xl p-5 text-left"><p className="font-serif text-title-sm text-forest">Alphabet</p><p className="text-body-sm text-forest-600">Letters</p></button>
+          <button onClick={() => setView('numbers')} className="bg-blue-50 rounded-2xl p-5 text-left"><p className="font-serif text-title-sm text-forest">Numbers</p><p className="text-body-sm text-forest-600">Counting</p></button>
+          {language === 'islam' && <button onClick={() => setView('islamic')} className="bg-green-50 rounded-2xl p-5 text-left col-span-2"><p className="font-serif text-title-sm text-forest">Islamic Lessons</p><p className="text-body-sm text-forest-600">4 levels</p></button>}
         </div>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
-  // Main Menu
-  if (view === 'main') {
-    return (
-      <div className="min-h-screen bg-cream pb-28">
-        <div className="bg-forest px-6 pt-14 pb-10">
-          <div className="max-w-lg mx-auto text-center">
-            <h1 className="font-serif text-display-sm text-cream-50 mb-2">Learn</h1>
-            <p className="text-body text-cream-300">Languages & Islam</p>
-          </div>
-        </div>
-        
-        <div className="px-6 py-8 max-w-lg mx-auto">
-          {/* Word of the Day */}
-          <div className="bg-gradient-to-br from-gold-100 to-rose-100 rounded-3xl p-6 mb-6 shadow-card">
-            <p className="section-label text-center mb-3">Word of the Day</p>
-            <p className="text-3xl text-forest mb-2 text-center" dir={wordOfDay.language === 'arabic' || wordOfDay.language === 'urdu' ? 'rtl' : 'ltr'}>
-              {wordOfDay.arabic || wordOfDay.native}
-            </p>
-            {wordOfDay.roman && <p className="font-serif text-title-sm text-forest text-center">{wordOfDay.roman}</p>}
-            <p className="text-body text-ink-500 text-center mb-3">{wordOfDay.english}</p>
-            <div className="bg-white/50 rounded-xl p-3">
-              <p className="text-body-sm text-forest text-center">{wordOfDay.usage || `Category: ${wordOfDay.category}`}</p>
-            </div>
-            <RecordingSection wordKey={`wod_${wordOfDay.english.toLowerCase().replace(/\s/g, '_')}`} />
-          </div>
-
-          {/* Language Selection */}
-          <div className="space-y-4">
-            <button onClick={() => { setSelectedLanguage('arabic'); setView('language') }} className="w-full bg-white rounded-2xl p-6 shadow-soft text-left hover:shadow-card transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-forest rounded-xl flex items-center justify-center text-cream-100 font-serif text-title">ع</div>
-                <div>
-                  <h3 className="font-serif text-title-sm text-forest">Arabic</h3>
-                  <p className="text-body-sm text-ink-400">Essential words & Islamic phrases</p>
-                </div>
-              </div>
-            </button>
-            
-            <button onClick={() => { setSelectedLanguage('urdu'); setView('language') }} className="w-full bg-white rounded-2xl p-6 shadow-soft text-left hover:shadow-card transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-forest rounded-xl flex items-center justify-center text-cream-100 font-serif text-title">ا</div>
-                <div>
-                  <h3 className="font-serif text-title-sm text-forest">Urdu</h3>
-                  <p className="text-body-sm text-ink-400">Essential phrases & vocabulary</p>
-                </div>
-              </div>
-            </button>
-            
-            <button onClick={() => { setSelectedLanguage('tagalog'); setView('language') }} className="w-full bg-white rounded-2xl p-6 shadow-soft text-left hover:shadow-card transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-forest rounded-xl flex items-center justify-center text-cream-100 font-serif text-title">T</div>
-                <div>
-                  <h3 className="font-serif text-title-sm text-forest">Tagalog</h3>
-                  <p className="text-body-sm text-ink-400">Filipino expressions & love words</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Language View - Category Selection
-  if (view === 'language') {
-    const library = selectedLanguage === 'arabic' ? arabicLibrary 
-                  : selectedLanguage === 'urdu' ? urduLibrary 
-                  : tagalogLibrary
-    const languageName = selectedLanguage === 'arabic' ? 'Arabic' 
-                       : selectedLanguage === 'urdu' ? 'Urdu' 
-                       : 'Tagalog'
-
-    if (!selectedCategory) {
-      return (
-        <div className="min-h-screen bg-cream pb-28">
-          <div className="bg-forest px-6 pt-14 pb-10">
-            <div className="max-w-lg mx-auto">
-              <h1 className="font-serif text-display-sm text-cream-50 mb-2">{languageName}</h1>
-            </div>
-          </div>
-          <div className="px-6 py-8 max-w-lg mx-auto">
-            <BackButton onClick={() => setView('main')} />
-            <div className="grid grid-cols-2 gap-3">
+function LibraryView({ library, selectedCategory, setSelectedCategory, setView, user, theirName }) {
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => selectedCategory ? setSelectedCategory(null) : setView('daily')} className="text-body-sm text-ink-400 mb-6">← Back</button>
+        {!selectedCategory ? (
+          <>
+            <h2 className="font-serif text-title text-forest text-center mb-6">Word Library</h2>
+            <div className="space-y-3">
               {Object.keys(library).map(cat => (
-                <button key={cat} onClick={() => setSelectedCategory(cat)} className="bg-white rounded-xl p-4 shadow-soft text-left">
-                  <p className="font-serif text-title-sm text-forest capitalize">{cat}</p>
-                  <p className="text-caption text-ink-400">{library[cat].length} words</p>
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`w-full ${categoryConfig[cat]?.color || 'bg-cream-200'} rounded-xl p-4 text-left flex justify-between items-center`}>
+                  <div><p className="font-medium text-forest">{categoryConfig[cat]?.label || cat}</p><p className="text-body-sm text-forest-600">{library[cat].length} words</p></div>
+                  <span className="text-forest-400">→</span>
                 </button>
               ))}
             </div>
-          </div>
-        </div>
-      )
-    }
+          </>
+        ) : (
+          <>
+            <h3 className="font-serif text-title text-forest mb-4">{categoryConfig[selectedCategory]?.label}</h3>
+            <div className="space-y-3">
+              {library[selectedCategory].map((word, i) => <WordCard key={i} word={word} user={user} theirName={theirName} />)}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
-    // Show words in category
-    const words = library[selectedCategory]
-    const isRTL = selectedLanguage === 'arabic' || selectedLanguage === 'urdu'
+function WordCard({ word, user, theirName }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="bg-white rounded-xl shadow-soft overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full p-4 text-left">
+        {(word.native || word.arabic) && <p className="text-xl text-forest mb-1" dir="rtl">{word.native || word.arabic}</p>}
+        <p className="font-serif text-title-sm text-forest">{word.roman}</p>
+        <p className="text-body text-ink-500">{word.english}</p>
+      </button>
+      {expanded && <div className="px-4 pb-4 border-t border-cream-200"><VoicePractice word={word} user={user} theirName={theirName} /></div>}
+    </div>
+  )
+}
 
-    return (
-      <div className="min-h-screen bg-cream pb-28">
-        <div className="bg-forest px-6 pt-14 pb-10">
-          <div className="max-w-lg mx-auto">
-            <h1 className="font-serif text-display-sm text-cream-50 capitalize">{selectedCategory}</h1>
-            <p className="text-body text-cream-300">{words.length} words</p>
-          </div>
+function GrammarView({ grammar, setView }) {
+  if (!grammar) return null
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => setView('daily')} className="text-body-sm text-ink-400 mb-6">← Back</button>
+        <div className="bg-white rounded-2xl p-6 shadow-card mb-6">
+          <h2 className="font-serif text-title text-forest mb-2">{grammar.title}</h2>
+          <p className="text-body-lg text-amber-600 font-medium mb-3">{grammar.subtitle}</p>
+          <p className="text-body text-ink-600">{grammar.explanation}</p>
         </div>
-        <div className="px-6 py-8 max-w-lg mx-auto">
-          <BackButton onClick={() => setSelectedCategory(null)} />
-          <div className="space-y-4">
-            {words.map((word, i) => {
-              const wordKey = `${selectedLanguage}_${selectedCategory}_${i}`
-              return (
-                <div key={i} className="bg-white rounded-2xl p-5 shadow-soft">
-                  <p className="text-3xl text-forest mb-2 text-center" dir={isRTL ? 'rtl' : 'ltr'}>
-                    {word.arabic || word.native}
-                  </p>
-                  {word.roman && <p className="font-serif text-title-sm text-forest text-center">{word.roman}</p>}
-                  <p className="text-body text-ink-500 text-center mb-2">{word.english}</p>
-                  {word.usage && (
-                    <div className="bg-gold-50 rounded-xl p-3">
-                      <p className="text-body-sm text-gold-700 text-center">{word.usage}</p>
-                    </div>
-                  )}
-                  <RecordingSection wordKey={wordKey} />
-                </div>
-              )
-            })}
-          </div>
+        <h3 className="font-serif text-title-sm text-forest mb-3">Examples</h3>
+        <div className="space-y-3 mb-6">
+          {grammar.examples?.map((ex, i) => (
+            <div key={i} className="bg-amber-50 rounded-xl p-4">
+              <p className="text-body text-ink-600">"{ex.english}"</p>
+              <p className="font-serif text-title-sm text-forest">→ {ex.local}</p>
+              <p className="text-body-sm text-amber-700">{ex.breakdown}</p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-forest-50 rounded-xl p-5">
+          <h3 className="font-medium text-forest mb-3">Tips</h3>
+          <ul className="space-y-2">{grammar.tips?.map((tip, i) => <li key={i} className="text-body text-forest-700">• {tip}</li>)}</ul>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
-  return null
+function AlphabetView({ alphabet, index, setIndex, setView, rtl }) {
+  const current = alphabet[index]
+  const next = () => setIndex((index + 1) % alphabet.length)
+  const prev = () => setIndex((index - 1 + alphabet.length) % alphabet.length)
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => setView('daily')} className="text-body-sm text-ink-400 mb-6">← Back</button>
+        <h2 className="font-serif text-title text-forest text-center mb-2">Alphabet</h2>
+        <p className="text-body-sm text-ink-400 text-center mb-6">{index + 1} of {alphabet.length}</p>
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={prev} className="w-12 h-12 bg-cream-200 rounded-full flex items-center justify-center text-forest">←</button>
+          <div className="flex-1 bg-white rounded-3xl p-8 shadow-card text-center">
+            <p className="text-8xl text-forest mb-4" dir={rtl ? 'rtl' : 'ltr'}>{current.letter}</p>
+            <p className="font-serif text-title text-forest mb-2">{current.name}</p>
+            <p className="text-body text-ink-500">Sound: "{current.sound}"</p>
+          </div>
+          <button onClick={next} className="w-12 h-12 bg-cream-200 rounded-full flex items-center justify-center text-forest">→</button>
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {alphabet.map((item, i) => (
+            <button key={i} onClick={() => setIndex(i)} className={`aspect-square rounded-lg flex items-center justify-center text-lg ${i === index ? 'bg-forest text-cream-100' : 'bg-white text-forest shadow-soft'}`}>{item.letter}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NumbersView({ numbers, setView, rtl }) {
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => setView('daily')} className="text-body-sm text-ink-400 mb-6">← Back</button>
+        <h2 className="font-serif text-title text-forest text-center mb-6">Numbers</h2>
+        <div className="space-y-3">
+          {numbers.map((num, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 shadow-soft flex items-center justify-between">
+              <div><p className="font-serif text-title-sm text-forest">{num.roman}</p><p className="text-body-sm text-ink-500">{num.english}</p></div>
+              {(num.native || num.arabic) && <p className="text-3xl text-forest" dir={rtl ? 'rtl' : 'ltr'}>{num.native || num.arabic}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IslamicView({ selectedLevel, setSelectedLevel, setView, user, theirName }) {
+  const levels = Object.entries(islamicLessons)
+  return (
+    <div className="px-6 py-8">
+      <div className="max-w-lg mx-auto">
+        <button onClick={() => selectedLevel ? setSelectedLevel(null) : setView('daily')} className="text-body-sm text-ink-400 mb-6">← Back</button>
+        {!selectedLevel ? (
+          <>
+            <h2 className="font-serif text-title text-forest text-center mb-6">Islamic Lessons</h2>
+            <div className="space-y-3">
+              {levels.map(([key, level], i) => (
+                <button key={key} onClick={() => setSelectedLevel(key)} className="w-full bg-white rounded-xl p-4 shadow-soft text-left flex items-center gap-4">
+                  <div className="w-10 h-10 bg-forest rounded-full flex items-center justify-center text-cream-100 font-serif">{i + 1}</div>
+                  <div><p className="font-medium text-forest">{level.title}</p><p className="text-body-sm text-ink-400">{level.description}</p></div>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="font-serif text-title text-forest mb-2">{islamicLessons[selectedLevel].title}</h2>
+            <div className="space-y-4">
+              {islamicLessons[selectedLevel].words.map((word, i) => <WordCard key={i} word={word} user={user} theirName={theirName} />)}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }

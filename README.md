@@ -1,76 +1,81 @@
 # D(ane)ua V3-FIX11
 
-## What's New in This Version
-- ✅ **Word of the Day** - Featured on Learn page with dual recording
-- ✅ **Dual Recording System** - Both Shahjahan & Dane can record vocab practice, visible to each other
-- ✅ **Photo of the Day** - Working photo sharing feature in Us page
-- ✅ **Live Calendar** - Calendar grid in Plans page with navigation
-- ✅ **Ideas Persistence** - Documents auto-save every 3 seconds
-- ✅ **Dua Selector** - 6 message categories: Prayer, Affirmation, Love, Sincerity, Gratitude, Peace
-- ✅ **Expanded Vocabulary** - Arabic, Urdu, Tagalog with categories
+## What's Fixed in This Version
+- ✅ **Learn Page** - Restored original design with Urdu, Tagalog, Islam tabs
+- ✅ **Voice Recording** - Fixed recording in Learn page AND Us page (Voice Notes)
+- ✅ **Photo Orientation** - Fixed inverted photos with canvas redraw
+- ✅ **Ideas Save** - Real-time sync with auto-save (500ms debounce)
+- ✅ **Word of the Day** - Consistent per-language daily word
+- ✅ **Dual Recording** - Both can record vocab, visible to each other
 
 ## Features
 
-### Learn Page
-- Word of the Day (rotates daily)
-- Dual voice recording (practice together)
-- Arabic: Greetings, Love, Family, Daily, Islamic phrases
-- Urdu: Greetings, Love, Family, Daily phrases
-- Tagalog: Greetings, Love, Family, Daily phrases
-
-### Plans Page
-- Date Ideas with vibes (Romantic, Casual, Adventure, etc.)
-- Live Calendar with holidays
-- Add custom events
-- Multi-day event support
-
-### Us Page
-- How I Feel mood selector with messages
-- Voice Notes (record and share)
-- Love Letters
-- Pic of the Day (daily photos)
+### Learn Page (Tabs: Urdu, Tagalog, Islam)
+- Word of the Day with voice practice
+- Word Library with categories (Love, Greetings, Food, Family, etc.)
+- Grammar lessons
+- Alphabet browser
+- Numbers
+- Islamic lessons (4 levels)
 
 ### Ideas Page
-- Folder organization
-- Rich text document editor
-- Auto-save functionality
-- Word processing features (bold, italic, colors, lists, etc.)
+- Folders for organization  
+- Documents with real-time sync
+- Quick Notes section
+- Sketch canvas feature
+- Auto-save while typing
 
-### HomePage
-- Countdowns to special events
-- Daily Question
-- Love Notes
-- Dua Selector (6 categories)
+### Us Page
+- How I Feel mood selector
+- Voice Notes (working!)
+- Love Letters
+- Pic of the Day (fixed orientation!)
 
-## CRITICAL: Setup Required
+### Plans Page
+- Date Ideas with vibes
+- Live Calendar with holidays
+- Multi-day event support
 
-### Step 1: Create Storage Buckets
-
-1. Go to Supabase → **Storage**
-2. Click **New bucket**
-3. Name: `audio` → Toggle **Public bucket** = ON → Create
-4. Repeat for bucket named `photos`
-
-### Step 2: Run the SQL
+## CRITICAL: Run This SQL
 
 Go to Supabase → **SQL Editor** → New Query
 
-Copy and paste the contents of `setup.sql` and run it.
+```sql
+-- Add quick_notes table
+CREATE TABLE IF NOT EXISTS quick_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  added_by TEXT NOT NULL CHECK (added_by IN ('shah', 'dane')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+ALTER TABLE quick_notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all quick notes" ON quick_notes FOR ALL USING (true);
 
-This creates:
-- `love_notes` table
-- `voice_notes` table
-- `word_recordings` table (NEW - for dual voice practice)
-- `idea_folders` & `idea_documents` tables
-- `moments` table (for Pic of Day)
-- Storage policies for audio & photos buckets
+-- Add sketches column to idea_documents
+ALTER TABLE idea_documents ADD COLUMN IF NOT EXISTS sketches JSONB DEFAULT '[]';
+ALTER TABLE idea_documents ADD COLUMN IF NOT EXISTS last_edited_by TEXT;
 
-## To Deploy
+-- Enable realtime for idea_documents
+ALTER PUBLICATION supabase_realtime ADD TABLE idea_documents;
 
-1. GitHub Desktop → delete everything in your local repo
-2. Extract zip → copy contents into repo  
-3. Commit → Push
-4. Wait for Vercel
+-- Word recordings table
+CREATE TABLE IF NOT EXISTS word_recordings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  word_key TEXT NOT NULL,
+  user_role TEXT NOT NULL CHECK (user_role IN ('shah', 'dane')),
+  audio_url TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(word_key, user_role)
+);
+ALTER TABLE word_recordings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all word recordings" ON word_recordings FOR ALL USING (true);
+```
+
+## Storage Buckets Required
+
+1. Go to Supabase → **Storage**
+2. Create bucket `audio` - set to PUBLIC
+3. Create bucket `photos` - set to PUBLIC
 
 ## Default PINs
 - **Shahjahan:** `1111`
