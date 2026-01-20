@@ -1,86 +1,172 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [pin, setPin] = useState('')
-  const [error, setError] = useState('')
   const { login } = useAuth()
-  const navigate = useNavigate()
+  const [step, setStep] = useState('select')
+  const [selectedRole, setSelectedRole] = useState(null)
+  const [pin, setPin] = useState(['', '', '', ''])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handlePinInput = (digit) => {
-    if (pin.length < 4) {
-      const newPin = pin + digit
-      setPin(newPin)
-      setError('')
-      if (newPin.length === 4) {
-        if (login(selectedUser, newPin)) {
-          navigate('/')
-        } else {
-          setError('Wrong PIN')
-          setPin('')
-        }
-      }
-    }
-  }
-
-  const handleDelete = () => {
-    setPin(pin.slice(0, -1))
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role)
+    setStep('pin')
     setError('')
   }
 
-  if (!selectedUser) {
-    return (
-      <div className="min-h-screen bg-forest flex flex-col items-center justify-center p-6">
-        <h1 className="font-serif text-display text-cream-100 mb-2 text-center">D(ane)ua</h1>
-        <p className="text-body text-cream-200/70 mb-12">Our little world</p>
-        
-        <div className="w-full max-w-xs space-y-4">
-          <button
-            onClick={() => setSelectedUser('shahjahan')}
-            className="w-full bg-cream-100 text-forest py-4 px-6 rounded-2xl font-serif text-title hover:bg-cream-50 transition-colors"
-          >
-            I'm Shahjahan
-          </button>
-          <button
-            onClick={() => setSelectedUser('dane')}
-            className="w-full bg-cream-100/10 text-cream-100 py-4 px-6 rounded-2xl font-serif text-title border border-cream-100/30 hover:bg-cream-100/20 transition-colors"
-          >
-            I'm Dane
-          </button>
-        </div>
-      </div>
-    )
+  const handlePinChange = (index, value) => {
+    if (value.length > 1) return
+    if (value && !/^\d$/.test(value)) return
+
+    const newPin = [...pin]
+    newPin[index] = value
+    setPin(newPin)
+
+    if (value && index < 3) {
+      const next = document.getElementById(`pin-${index + 1}`)
+      next?.focus()
+    }
+
+    if (index === 3 && value) {
+      const fullPin = [...newPin.slice(0, 3), value].join('')
+      handleSubmit(fullPin)
+    }
+  }
+
+  const handleKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+      const prev = document.getElementById(`pin-${index - 1}`)
+      prev?.focus()
+    }
+  }
+
+  const handleSubmit = async (fullPin) => {
+    setLoading(true)
+    setError('')
+
+    try {
+      await login(selectedRole, fullPin)
+    } catch (err) {
+      setError('Wrong PIN. Try again.')
+      setPin(['', '', '', ''])
+      document.getElementById('pin-0')?.focus()
+    }
+
+    setLoading(false)
+  }
+
+  const handleBack = () => {
+    setStep('select')
+    setSelectedRole(null)
+    setPin(['', '', '', ''])
+    setError('')
   }
 
   return (
-    <div className="min-h-screen bg-forest flex flex-col items-center justify-center p-6">
-      <button onClick={() => { setSelectedUser(null); setPin(''); setError('') }} className="absolute top-6 left-6 text-cream-100/70 text-body-sm">← Back</button>
-      
-      <h2 className="font-serif text-title text-cream-100 mb-2">Hi, {selectedUser === 'shahjahan' ? 'Shahjahan' : 'Dane'}</h2>
-      <p className="text-body-sm text-cream-200/70 mb-8">Enter your PIN</p>
-
-      <div className="flex gap-3 mb-8">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`w-4 h-4 rounded-full transition-all ${pin.length > i ? 'bg-gold' : 'bg-cream-100/30'}`} />
-        ))}
+    <div className="min-h-screen bg-forest flex flex-col">
+      {/* Top section */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 pt-20 pb-10">
+        <div className="text-center">
+          <h1 className="font-serif text-display-sm text-cream-100 mb-4">
+            D(ane)ua
+          </h1>
+          <div className="w-12 h-1 bg-gold rounded-full mx-auto mb-6" />
+          <p className="text-body text-cream-300">
+            Our little world
+          </p>
+        </div>
       </div>
 
-      {error && <p className="text-rose-300 text-body-sm mb-4">{error}</p>}
+      {/* Bottom card */}
+      <div className="bg-cream rounded-t-[3rem] px-8 pt-10 pb-12" style={{ paddingBottom: 'max(48px, env(safe-area-inset-bottom))' }}>
+        {step === 'select' ? (
+          <div className="space-y-6 max-w-sm mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="font-serif text-title text-forest mb-2">Welcome back</h2>
+              <p className="text-body-sm text-ink-400">Who's this?</p>
+            </div>
 
-      <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((item, i) => (
-          item === null ? <div key={i} /> : (
             <button
-              key={i}
-              onClick={() => item === 'del' ? handleDelete() : handlePinInput(String(item))}
-              className="aspect-square rounded-full bg-cream-100/10 text-cream-100 font-serif text-title flex items-center justify-center hover:bg-cream-100/20 transition-colors"
+              onClick={() => handleRoleSelect('shah')}
+              className="w-full bg-white rounded-2xl p-6 text-left shadow-soft hover:shadow-card transition-all duration-200 group"
             >
-              {item === 'del' ? '⌫' : item}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-serif text-title-sm text-forest group-hover:text-forest-700">Shahjahan</p>
+                  <p className="text-body-sm text-ink-400">The one building this</p>
+                </div>
+                <div className="w-12 h-12 bg-forest-100 rounded-full flex items-center justify-center">
+                  <span className="text-xl">👨‍💻</span>
+                </div>
+              </div>
             </button>
-          )
-        ))}
+
+            <button
+              onClick={() => handleRoleSelect('dane')}
+              className="w-full bg-white rounded-2xl p-6 text-left shadow-soft hover:shadow-card transition-all duration-200 group"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-serif text-title-sm text-forest group-hover:text-forest-700">Dane</p>
+                  <p className="text-body-sm text-ink-400">The reason it exists</p>
+                </div>
+                <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center">
+                  <span className="text-xl">💕</span>
+                </div>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-8 max-w-sm mx-auto">
+            <button 
+              onClick={handleBack}
+              className="text-body-sm text-ink-400 hover:text-forest flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+
+            <div className="text-center">
+              <h2 className="font-serif text-title text-forest mb-2">
+                Hey {selectedRole === 'shah' ? 'Shahjahan' : 'Dane'}
+              </h2>
+              <p className="text-body-sm text-ink-400">Enter your PIN</p>
+            </div>
+
+            <div className="flex justify-center gap-4">
+              {pin.map((digit, index) => (
+                <input
+                  key={index}
+                  id={`pin-${index}`}
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handlePinChange(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  className="w-14 h-16 text-center text-2xl font-serif bg-white border-2 border-cream-300 rounded-2xl focus:border-forest focus:ring-0 focus:outline-none transition-all"
+                  autoFocus={index === 0}
+                  disabled={loading}
+                />
+              ))}
+            </div>
+
+            {error && (
+              <p className="text-center text-rose-500 text-body-sm">
+                {error}
+              </p>
+            )}
+
+            {loading && (
+              <p className="text-center text-ink-400 text-body-sm animate-pulse">
+                Checking...
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
