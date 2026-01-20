@@ -590,9 +590,10 @@ export async function getLoveNotes() {
 }
 
 export async function addLoveNote(fromUser, note) {
+  const toUser = fromUser === 'shah' ? 'dane' : 'shah'
   const { data, error } = await supabase
     .from('love_notes')
-    .insert({ from_user: fromUser, note })
+    .insert({ from_user: fromUser, to_user: toUser, note })
     .select()
     .single()
   if (error) throw error

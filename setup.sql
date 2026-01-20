@@ -8,6 +8,7 @@
 CREATE TABLE IF NOT EXISTS love_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
+  to_user TEXT NOT NULL CHECK (to_user IN ('shah', 'dane')),
   note TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
