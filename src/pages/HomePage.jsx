@@ -1,450 +1,247 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { 
-  getCountdowns,
-  addCountdown,
-  deleteCountdown,
-  getDailyQuestion, 
-  answerQuestion,
-  sendDuaRequest,
-  getLoveNotes,
-  addLoveNote
-} from '../lib/supabase'
 
-export default function HomePage({ onOpenSettings }) {
-  const { user } = useAuth()
-  const [countdowns, setCountdowns] = useState([])
-  const [question, setQuestion] = useState(null)
-  const [answer, setAnswer] = useState('')
-  const [showAnswerInput, setShowAnswerInput] = useState(false)
-  const [duaSent, setDuaSent] = useState(false)
-  const [showAddCountdown, setShowAddCountdown] = useState(false)
+const DAILY_QUESTIONS = [
+  "What's one thing you're grateful for today?",
+  "What made you smile recently?",
+  "What's something you're looking forward to?",
+  "What's a memory of us that makes you happy?",
+  "What's something you wish we did more often?",
+  "What's one thing you love about our relationship?",
+  "What's a goal you want us to achieve together?",
+  "What's something new you'd like to try with me?",
+  "What's your favorite thing about today?",
+  "What's one way I can support you better?",
+  "What's a dream date you'd like to have?",
+  "What's something you've learned about yourself recently?",
+  "What's a song that reminds you of us?",
+  "What's one thing that always makes you feel loved?",
+  "What's your current mood in one word?"
+]
+
+const DUAS = {
+  love: ["Ya Allah, bless our love and keep us united.", "May our bond grow stronger each day.", "Grant us patience and understanding with each other."],
+  prayer: ["Ya Allah, guide us on the straight path.", "Accept our prayers and forgive our shortcomings.", "Make us among those who are grateful."],
+  work: ["Ya Allah, bless our efforts and grant us success.", "Help us work hard with good intentions.", "Make our work a means of barakah."],
+  health: ["Ya Allah, grant us health and wellness.", "Protect us from illness and harm.", "Give us strength in body and mind."],
+  peace: ["Ya Allah, grant us peace in our hearts.", "Remove anxiety and worry from our lives.", "Fill our home with tranquility."],
+  gratitude: ["Alhamdulillah for all Your blessings.", "Thank You for bringing us together.", "We are grateful for every moment."]
+}
+
+export default function HomePage() {
+  const { user, supabase, getPartner } = useAuth()
+  const [toast, setToast] = useState(null)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
-  const [loveNotes, setLoveNotes] = useState([])
-  const [newNote, setNewNote] = useState('')
-  const [showAddNote, setShowAddNote] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  const greeting = getGreeting()
-  const userName = user?.name || 'Love'
-  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
+  const [question, setQuestion] = useState('')
+  const [myAnswer, setMyAnswer] = useState('')
+  const [partnerAnswer, setPartnerAnswer] = useState('')
+  const [answerInput, setAnswerInput] = useState('')
+  const [hasAnswered, setHasAnswered] = useState(false)
+  const [selectedDuaCategory, setSelectedDuaCategory] = useState(null)
+  const [loveNote, setLoveNote] = useState('')
+  const [showNoteInput, setShowNoteInput] = useState(false)
+  const partner = getPartner()
 
   useEffect(() => {
-    fetchData()
-    checkNotificationPermission()
-  }, [user])
-
-  const checkNotificationPermission = () => {
+    // Check notification permission
     if ('Notification' in window) {
-      const enabled = Notification.permission === 'granted'
-      setNotificationsEnabled(enabled)
-      setShowNotificationPrompt(Notification.permission === 'default')
+      setNotificationsEnabled(Notification.permission === 'granted')
     }
+    
+    // Get daily question based on day of year
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+    setQuestion(DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length])
+    
+    loadAnswers()
+  }, [])
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
-  const handleEnableNotifications = async () => {
+  const enableNotifications = async () => {
     if ('Notification' in window) {
       const permission = await Notification.requestPermission()
       if (permission === 'granted') {
         setNotificationsEnabled(true)
-        setShowNotificationPrompt(false)
+        showToast('Notifications enabled!', 'success')
       }
     }
   }
 
-  const fetchData = async () => {
-    try {
-      const [countdownData, questionData, notesData] = await Promise.all([
-        getCountdowns(),
-        getDailyQuestion(),
-        getLoveNotes ? getLoveNotes() : []
-      ])
-      setCountdowns(countdownData || [])
-      setQuestion(questionData)
-      setLoveNotes(notesData || [])
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    }
-    setLoading(false)
-  }
-
-  const handleSendDua = async () => {
-    if (duaSent) return
-    try {
-      await sendDuaRequest(user.role)
-      setDuaSent(true)
-      setTimeout(() => setDuaSent(false), 5000)
-    } catch (error) {
-      console.error('Error sending dua:', error)
+  const loadAnswers = async () => {
+    if (!supabase) return
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data } = await supabase
+      .from('daily_answers')
+      .select('*')
+      .eq('date', today)
+    
+    if (data) {
+      const mine = data.find(a => a.user_id === user.id)
+      const theirs = data.find(a => a.user_id === partner?.id)
+      if (mine) {
+        setMyAnswer(mine.answer)
+        setHasAnswered(true)
+      }
+      if (theirs) setPartnerAnswer(theirs.answer)
     }
   }
 
-  const handleAnswerSubmit = async () => {
-    if (!answer.trim() || !question) return
-    try {
-      await answerQuestion(question.id, user.role, answer)
-      setQuestion(prev => ({
-        ...prev,
-        [user.role === 'shah' ? 'shah_answer' : 'dane_answer']: answer
-      }))
-      setShowAnswerInput(false)
-      setAnswer('')
-    } catch (error) {
-      console.error('Error submitting answer:', error)
+  const submitAnswer = async () => {
+    if (!answerInput.trim() || !supabase) return
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { error } = await supabase.from('daily_answers').upsert({
+      user_id: user.id,
+      date: today,
+      question,
+      answer: answerInput.trim()
+    }, { onConflict: 'user_id,date' })
+    
+    if (!error) {
+      setMyAnswer(answerInput.trim())
+      setHasAnswered(true)
+      setAnswerInput('')
+      showToast('Answer saved!', 'success')
+      loadAnswers()
     }
   }
 
-  const handleAddCountdown = async (title, targetDate, emoji) => {
-    try {
-      const newCountdown = await addCountdown(title, targetDate, emoji)
-      setCountdowns(prev => [...prev, newCountdown])
-      setShowAddCountdown(false)
-    } catch (error) {
-      console.error('Error adding countdown:', error)
-    }
+  const sendLoveNote = async () => {
+    if (!loveNote.trim() || !supabase) return
+    
+    await supabase.from('love_notes').insert({
+      from_user: user.id,
+      to_user: partner?.id,
+      note: loveNote.trim()
+    })
+    
+    setLoveNote('')
+    setShowNoteInput(false)
+    showToast('Love note sent! 💕', 'success')
   }
-
-  const handleDeleteCountdown = async (id) => {
-    try {
-      await deleteCountdown(id)
-      setCountdowns(prev => prev.filter(c => c.id !== id))
-    } catch (error) {
-      console.error('Error deleting countdown:', error)
-    }
-  }
-
-  const handleAddNote = async () => {
-    if (!newNote.trim()) return
-    try {
-      const note = await addLoveNote(user.role, newNote)
-      setLoveNotes(prev => [note, ...prev])
-      setNewNote('')
-      setShowAddNote(false)
-    } catch (error) {
-      console.error('Error adding note:', error)
-    }
-  }
-
-  const myAnswer = user?.role === 'shah' ? question?.shah_answer : question?.dane_answer
-  const theirAnswer = user?.role === 'shah' ? question?.dane_answer : question?.shah_answer
 
   return (
-    <div className="min-h-screen pb-28">
-      {/* Hero Section */}
-      <div className="bg-forest text-cream-100 px-6 pt-14 pb-12">
-        <div className="max-w-lg mx-auto">
-          <div className="flex justify-end mb-4">
-            <button 
-              onClick={onOpenSettings}
-              className="p-2 rounded-full hover:bg-forest-500 transition-colors"
-            >
-              <svg className="w-6 h-6 text-cream-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-body text-cream-300 mb-2">{greeting}</p>
-            <h1 className="font-serif text-display-sm text-cream-50 mb-6">{userName}</h1>
-          </div>
-        </div>
-      </div>
-
-      {/* Notification Prompt - disappears after enabling */}
-      {showNotificationPrompt && !notificationsEnabled && (
-        <div className="bg-gold-100 px-6 py-4">
-          <div className="max-w-lg mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🔔</span>
-              <p className="text-body-sm text-forest">Enable notifications?</p>
-            </div>
-            <button
-              onClick={handleEnableNotifications}
-              className="px-4 py-2 bg-forest text-cream-100 rounded-full text-body-sm font-medium"
-            >
-              Enable
-            </button>
-          </div>
+    <div className="min-h-screen bg-cream-100">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-card ${toast.type === 'success' ? 'bg-forest text-cream-100' : toast.type === 'error' ? 'bg-rose-500 text-white' : 'bg-ink-700 text-white'}`}>
+          {toast.message}
         </div>
       )}
 
-      {/* Countdowns */}
-      <div className="px-6 py-10 bg-cream">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <p className="section-label">Counting Down</p>
-            <button 
-              onClick={() => setShowAddCountdown(true)}
-              className="text-body-sm text-forest font-medium hover:text-forest-700"
-            >
-              + Add
-            </button>
+      {/* Header */}
+      <div className="bg-forest p-6 pb-8 rounded-b-3xl">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <p className="text-cream-200/70 text-body-sm">Welcome back,</p>
+            <h1 className="font-serif text-display-sm text-cream-100">{user?.name}</h1>
           </div>
+          {!notificationsEnabled && (
+            <button onClick={enableNotifications} className="bg-cream-100/10 text-cream-100 px-4 py-2 rounded-xl text-body-sm">
+              🔔 Enable
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6 -mt-4">
+        {/* Daily Question Card */}
+        <div className="bg-white rounded-2xl p-6 shadow-soft">
+          <h2 className="font-serif text-title-sm text-forest mb-2">Today's Question</h2>
+          <p className="text-body text-ink-600 mb-4">{question}</p>
           
-          {countdowns.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              {countdowns.map((countdown) => {
-                const days = getDaysUntil(countdown.target_date)
-                return (
-                  <div key={countdown.id} className="bg-gold-100 rounded-3xl p-6 text-center relative group">
-                    <button
-                      onClick={() => handleDeleteCountdown(countdown.id)}
-                      className="absolute top-3 right-3 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-ink-400 hover:text-rose-500"
-                    >
-                      ×
-                    </button>
-                    <span className="text-3xl mb-3 block">{countdown.emoji || '📅'}</span>
-                    <p className="font-serif text-display-sm text-forest">{days}</p>
-                    <p className="text-caption text-gold-700 uppercase tracking-widest">days</p>
-                    <p className="text-body-sm text-gold-600 mt-2">{countdown.title}</p>
-                  </div>
-                )
-              })}
+          {!hasAnswered ? (
+            <div className="space-y-3">
+              <textarea
+                value={answerInput}
+                onChange={(e) => setAnswerInput(e.target.value)}
+                placeholder="Your answer..."
+                className="w-full p-4 bg-cream-50 rounded-xl text-body text-ink-600 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-forest/20"
+              />
+              <button onClick={submitAnswer} className="w-full bg-forest text-cream-100 py-3 rounded-xl font-medium">
+                Submit Answer
+              </button>
             </div>
           ) : (
-            <button 
-              onClick={() => setShowAddCountdown(true)}
-              className="w-full py-8 border-2 border-dashed border-gold-300 rounded-3xl text-gold-600 hover:border-gold-400 hover:bg-gold-50 transition-all"
-            >
-              <span className="text-3xl block mb-2">📅</span>
-              <span className="text-body">Add a countdown</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Daily Question */}
-      {question && (
-        <div className="bg-cream-200 px-6 py-10">
-          <div className="max-w-lg mx-auto">
-            <p className="section-label text-center mb-4">Today's Question</p>
-            <h2 className="font-serif text-title text-forest mb-8 text-center text-balance">
-              {question.question}
-            </h2>
-
-            {theirAnswer && (
-              <div className="bg-white rounded-2xl p-5 mb-4">
-                <p className="text-caption text-ink-400 mb-2">{theirName}</p>
-                <p className="text-body text-ink-600">{theirAnswer}</p>
+            <div className="space-y-4">
+              <div className="bg-cream-50 rounded-xl p-4">
+                <p className="text-caption text-ink-400 mb-1">Your answer</p>
+                <p className="text-body text-ink-600">{myAnswer}</p>
               </div>
-            )}
-
-            {myAnswer ? (
-              <div className="bg-forest rounded-2xl p-5">
-                <p className="text-caption text-forest-200 mb-2">You</p>
-                <p className="text-body text-cream-100">{myAnswer}</p>
-              </div>
-            ) : showAnswerInput ? (
-              <div className="space-y-4">
-                <textarea
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Your answer..."
-                  className="input min-h-[120px] resize-none"
-                  autoFocus
-                />
-                <div className="flex gap-3">
-                  <button onClick={handleAnswerSubmit} className="btn-primary flex-1">Submit</button>
-                  <button onClick={() => setShowAnswerInput(false)} className="btn-ghost">Cancel</button>
+              {partnerAnswer ? (
+                <div className="bg-rose-50 rounded-xl p-4">
+                  <p className="text-caption text-rose-400 mb-1">{partner?.name}'s answer</p>
+                  <p className="text-body text-ink-600">{partnerAnswer}</p>
                 </div>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setShowAnswerInput(true)}
-                className="w-full py-5 border-2 border-dashed border-cream-400 rounded-2xl text-ink-400 hover:border-forest hover:text-forest transition-all"
-              >
-                Tap to answer
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Love Notes */}
-      <div className="px-6 py-10 bg-cream">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <p className="section-label">Love Notes</p>
-            <button 
-              onClick={() => setShowAddNote(true)}
-              className="text-body-sm text-forest font-medium hover:text-forest-700"
-            >
-              + Send
-            </button>
-          </div>
-
-          {showAddNote && (
-            <div className="bg-rose-50 rounded-2xl p-4 mb-4">
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder={`Write something sweet for ${theirName}...`}
-                className="input min-h-[80px] resize-none mb-3"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button onClick={handleAddNote} className="btn-primary flex-1 py-2">Send 💕</button>
-                <button onClick={() => { setShowAddNote(false); setNewNote('') }} className="btn-ghost py-2">Cancel</button>
-              </div>
+              ) : (
+                <p className="text-body-sm text-ink-400 text-center">Waiting for {partner?.name}'s answer...</p>
+              )}
             </div>
           )}
-
-          {loveNotes.length > 0 ? (
-            <div className="space-y-3">
-              {loveNotes.slice(0, 3).map((note) => (
-                <div key={note.id} className={`rounded-2xl p-4 ${note.from_user === user?.role ? 'bg-forest text-cream-100' : 'bg-rose-100 text-rose-800'}`}>
-                  <p className="text-caption opacity-70 mb-1">
-                    {note.from_user === user?.role ? 'You' : theirName}
-                  </p>
-                  <p className="text-body">{note.note}</p>
-                </div>
-              ))}
-            </div>
-          ) : !showAddNote && (
-            <button 
-              onClick={() => setShowAddNote(true)}
-              className="w-full py-6 border-2 border-dashed border-rose-200 rounded-2xl text-rose-400 hover:border-rose-300 hover:bg-rose-50 transition-all"
-            >
-              <span className="text-2xl block mb-2">💕</span>
-              <span className="text-body">Send a love note</span>
-            </button>
-          )}
         </div>
-      </div>
 
-      {/* Send a Dua */}
-      <div className="px-6 py-10 bg-cream-200">
-        <div className="max-w-lg mx-auto">
-          <button
-            onClick={handleSendDua}
-            disabled={duaSent}
-            className={`w-full py-6 rounded-3xl transition-all duration-500 ${duaSent 
-              ? 'bg-forest text-cream-100' 
-              : 'bg-gradient-to-r from-gold-200 via-rose-200 to-gold-200 text-forest hover:shadow-elevated active:scale-[0.98]'
-            }`}
-          >
-            {duaSent ? (
-              <span className="flex items-center justify-center gap-3">
-                <span className="text-2xl">✓</span>
-                <span className="font-serif text-title-sm">Dua sent to {theirName}</span>
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-3">
-                <span className="text-2xl">🤲</span>
-                <span className="font-serif text-title-sm">Send a Dua</span>
-              </span>
-            )}
-          </button>
-          <p className="text-center text-body-sm text-ink-400 mt-4">
-            Let {theirName} know you're thinking of them
-          </p>
-        </div>
-      </div>
-
-      {/* Add Countdown Modal */}
-      {showAddCountdown && (
-        <AddCountdownModal 
-          onClose={() => setShowAddCountdown(false)} 
-          onAdd={handleAddCountdown}
-        />
-      )}
-    </div>
-  )
-}
-
-function AddCountdownModal({ onClose, onAdd }) {
-  const [title, setTitle] = useState('')
-  const [targetDate, setTargetDate] = useState('')
-  const [emoji, setEmoji] = useState('🎯')
-  const [loading, setLoading] = useState(false)
-
-  const emojis = ['🎯', '✈️', '🏖️', '💍', '🎂', '🎄', '🎉', '💪', '📅', '❤️']
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!title.trim() || !targetDate) return
-    setLoading(true)
-    await onAdd(title, targetDate, emoji)
-    setLoading(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-forest-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div 
-        className="bg-cream rounded-3xl p-6 w-full max-w-sm shadow-elevated"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="font-serif text-title text-forest text-center mb-6">Add Countdown</h2>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">What are you counting down to?</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="input"
-              placeholder="Summer vacation..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Date</label>
-            <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="input"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-body-sm font-medium text-ink-600 block mb-2">Emoji</label>
-            <div className="flex flex-wrap gap-2">
-              {emojis.map((e) => (
+        {/* Send a Dua */}
+        <div className="bg-white rounded-2xl p-6 shadow-soft">
+          <h2 className="font-serif text-title-sm text-forest mb-4">Send a Dua</h2>
+          
+          {!selectedDuaCategory ? (
+            <div className="grid grid-cols-3 gap-3">
+              {Object.keys(DUAS).map((cat) => (
                 <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(e)}
-                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${
-                    emoji === e ? 'bg-forest text-white scale-110' : 'bg-cream-200 hover:bg-cream-300'
-                  }`}
+                  key={cat}
+                  onClick={() => setSelectedDuaCategory(cat)}
+                  className="bg-cream-50 hover:bg-cream-100 py-3 px-2 rounded-xl text-body-sm text-ink-600 capitalize transition-colors"
                 >
-                  {e}
+                  {cat === 'work' ? 'Work Hard' : cat}
                 </button>
               ))}
             </div>
-          </div>
+          ) : (
+            <div>
+              <button onClick={() => setSelectedDuaCategory(null)} className="text-body-sm text-ink-400 mb-4">← Back</button>
+              <div className="space-y-3">
+                {DUAS[selectedDuaCategory].map((dua, i) => (
+                  <div key={i} className="bg-gold-50 rounded-xl p-4">
+                    <p className="text-body text-ink-600 text-center" dir="auto">{dua}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-          <div className="flex gap-3 pt-4">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
-            <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? 'Adding...' : 'Add'}
+        {/* Love Note */}
+        <div className="bg-white rounded-2xl p-6 shadow-soft">
+          <h2 className="font-serif text-title-sm text-forest mb-4">Send a Love Note</h2>
+          
+          {!showNoteInput ? (
+            <button onClick={() => setShowNoteInput(true)} className="w-full bg-rose-50 text-rose-600 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors">
+              💕 Write a note for {partner?.name}
             </button>
-          </div>
-        </form>
+          ) : (
+            <div className="space-y-3">
+              <textarea
+                value={loveNote}
+                onChange={(e) => setLoveNote(e.target.value)}
+                placeholder="Write something sweet..."
+                className="w-full p-4 bg-cream-50 rounded-xl text-body text-ink-600 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-rose-200"
+              />
+              <div className="flex gap-3">
+                <button onClick={() => { setShowNoteInput(false); setLoveNote('') }} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">
+                  Cancel
+                </button>
+                <button onClick={sendLoveNote} className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-medium">
+                  Send 💕
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
-}
-
-function getGreeting() {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  if (hour < 21) return 'Good evening'
-  return 'Good night'
-}
-
-function getDaysUntil(dateStr) {
-  const target = new Date(dateStr)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diff = target - today
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }

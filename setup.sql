@@ -1,135 +1,151 @@
--- ============================================
--- D(ANE)UA V3-FIX10 - DATABASE SETUP
--- RUN THIS IN SUPABASE SQL EDITOR
--- ============================================
+-- D(ane)ua V3-FIX8 Database Setup
+-- Run this in Supabase SQL Editor
 
--- 1. LOVE NOTES TABLE (for HomePage)
--- ============================================
+-- Daily Answers (for Today's Question)
+CREATE TABLE IF NOT EXISTS daily_answers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, date)
+);
+
+-- Love Notes
 CREATE TABLE IF NOT EXISTS love_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
+  from_user TEXT NOT NULL,
+  to_user TEXT NOT NULL,
   note TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE love_notes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all love notes" ON love_notes FOR ALL USING (true);
+-- Date Ideas
+CREATE TABLE IF NOT EXISTS date_ideas (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  completed BOOLEAN DEFAULT FALSE,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
+-- Calendar Events
+CREATE TABLE IF NOT EXISTS calendar_events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE,
+  time TEXT,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- 2. VOICE NOTES TABLE
--- ============================================
+-- Countdowns
+CREATE TABLE IF NOT EXISTS countdowns (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  target_date DATE NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Goals
+CREATE TABLE IF NOT EXISTS goals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  target INTEGER DEFAULT 100,
+  progress INTEGER DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Moods
+CREATE TABLE IF NOT EXISTS moods (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  mood TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, date)
+);
+
+-- Voice Notes
 CREATE TABLE IF NOT EXISTS voice_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
+  user_id TEXT NOT NULL,
   audio_url TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE voice_notes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all voice notes" ON voice_notes FOR ALL USING (true);
+-- Love Letters
+CREATE TABLE IF NOT EXISTS love_letters (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  from_user TEXT NOT NULL,
+  to_user TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
+-- Daily Photos
+CREATE TABLE IF NOT EXISTS daily_photos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  date DATE NOT NULL UNIQUE,
+  photo_url TEXT NOT NULL,
+  uploaded_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- 3. IDEA FOLDERS TABLE (for Ideas feature)
--- ============================================
+-- Idea Folders
 CREATE TABLE IF NOT EXISTS idea_folders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
-  created_by TEXT NOT NULL CHECK (created_by IN ('shah', 'dane')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE idea_folders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all folders" ON idea_folders FOR ALL USING (true);
-
-
--- 4. IDEA DOCUMENTS TABLE
--- ============================================
+-- Idea Documents
 CREATE TABLE IF NOT EXISTS idea_documents (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   folder_id UUID REFERENCES idea_folders(id) ON DELETE CASCADE,
-  title TEXT DEFAULT 'Untitled',
+  title TEXT NOT NULL,
   content TEXT,
-  created_by TEXT NOT NULL CHECK (created_by IN ('shah', 'dane')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Enable Row Level Security
+ALTER TABLE daily_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE love_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE date_ideas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE countdowns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE moods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE voice_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE love_letters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE idea_folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE idea_documents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all documents" ON idea_documents FOR ALL USING (true);
 
+-- Create policies for all tables (allow all for authenticated/anon)
+DO $$
+DECLARE
+  tbl TEXT;
+BEGIN
+  FOR tbl IN SELECT unnest(ARRAY[
+    'daily_answers', 'love_notes', 'date_ideas', 'calendar_events', 
+    'countdowns', 'goals', 'moods', 'voice_notes', 'love_letters', 
+    'daily_photos', 'idea_folders', 'idea_documents'
+  ])
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Allow all" ON %I', tbl);
+    EXECUTE format('CREATE POLICY "Allow all" ON %I FOR ALL USING (true) WITH CHECK (true)', tbl);
+  END LOOP;
+END $$;
 
--- 5. ADD END_DATE TO CALENDAR_EVENTS (for multi-day events)
--- ============================================
-ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_date DATE;
-
-
--- 6. STORAGE BUCKET SETUP
--- ============================================
--- IMPORTANT: Create these buckets manually in Supabase Storage UI:
--- 
--- 1. Go to Supabase Dashboard > Storage
--- 2. Click "New bucket"
--- 3. Create bucket named "audio" 
---    - Check "Public bucket"
--- 4. Create bucket named "photos"
---    - Check "Public bucket"
---
--- Then run these policies:
-
--- Audio bucket policies
-CREATE POLICY "Public Audio Read" ON storage.objects 
-  FOR SELECT USING (bucket_id = 'audio');
-
-CREATE POLICY "Public Audio Upload" ON storage.objects 
-  FOR INSERT WITH CHECK (bucket_id = 'audio');
-
-CREATE POLICY "Public Audio Update" ON storage.objects 
-  FOR UPDATE USING (bucket_id = 'audio');
-
-CREATE POLICY "Public Audio Delete" ON storage.objects 
-  FOR DELETE USING (bucket_id = 'audio');
-
--- Photos bucket policies  
-CREATE POLICY "Public Photos Read" ON storage.objects 
-  FOR SELECT USING (bucket_id = 'photos');
-
-CREATE POLICY "Public Photos Upload" ON storage.objects 
-  FOR INSERT WITH CHECK (bucket_id = 'photos');
-
-CREATE POLICY "Public Photos Update" ON storage.objects 
-  FOR UPDATE USING (bucket_id = 'photos');
-
-CREATE POLICY "Public Photos Delete" ON storage.objects 
-  FOR DELETE USING (bucket_id = 'photos');
-
-
--- 7. UPDATE USER NAMES
--- ============================================
-UPDATE users SET name = 'Shahjahan' WHERE role = 'shah';
-UPDATE users SET name = 'Dane' WHERE role = 'dane';
-
-
--- ============================================
--- IF YOU GET ERRORS, RUN THESE FIRST:
--- ============================================
--- 
--- DROP POLICY IF EXISTS "Allow all love notes" ON love_notes;
--- DROP TABLE IF EXISTS love_notes;
--- 
--- DROP POLICY IF EXISTS "Allow all voice notes" ON voice_notes;
--- DROP TABLE IF EXISTS voice_notes;
--- 
--- DROP POLICY IF EXISTS "Allow all documents" ON idea_documents;
--- DROP TABLE IF EXISTS idea_documents;
--- 
--- DROP POLICY IF EXISTS "Allow all folders" ON idea_folders;
--- DROP TABLE IF EXISTS idea_folders;
--- 
--- DROP POLICY IF EXISTS "Public Audio Read" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Audio Upload" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Audio Update" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Audio Delete" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Photos Read" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Photos Upload" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Photos Update" ON storage.objects;
--- DROP POLICY IF EXISTS "Public Photos Delete" ON storage.objects;
+-- Grant permissions
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

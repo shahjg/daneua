@@ -1,707 +1,668 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import {
-  getDateIdeas,
-  addDateIdea,
-  updateDateIdea,
-  deleteDateIdea,
-  getCalendarEvents,
-  addCalendarEvent,
-  deleteCalendarEvent
-} from '../lib/supabase'
-
-const vibes = [
-  { id: 'romantic', label: 'Romantic' },
-  { id: 'casual', label: 'Casual' },
-  { id: 'adventure', label: 'Adventure' },
-  { id: 'cozy', label: 'Cozy' },
-  { id: 'fancy', label: 'Fancy' },
-]
-
-const dateTypes = [
-  { id: 'dinner', label: 'Dinner' },
-  { id: 'lunch', label: 'Lunch' },
-  { id: 'cafe', label: 'Cafe' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'day_trip', label: 'Day Trip' },
-  { id: 'at_home', label: 'At Home' },
-]
 
 // 2025-2026 Holidays
-const holidays = [
-  { date: '2025-01-01', title: "New Year's Day", emoji: '🎉' },
-  { date: '2025-01-20', title: 'Martin Luther King Jr. Day', emoji: '✊' },
-  { date: '2025-02-14', title: "Valentine's Day", emoji: '💕' },
-  { date: '2025-02-17', title: "Presidents' Day", emoji: '🇺🇸' },
-  { date: '2025-03-17', title: "St. Patrick's Day", emoji: '☘️' },
-  { date: '2025-03-30', title: 'Ramadan Begins (approx)', emoji: '🌙' },
-  { date: '2025-04-20', title: 'Easter', emoji: '🐣' },
-  { date: '2025-04-29', title: 'Eid al-Fitr (approx)', emoji: '🌙' },
-  { date: '2025-05-11', title: "Mother's Day", emoji: '💐' },
-  { date: '2025-05-26', title: 'Memorial Day', emoji: '🇺🇸' },
-  { date: '2025-06-15', title: "Father's Day", emoji: '👔' },
-  { date: '2025-06-19', title: 'Juneteenth', emoji: '✊' },
-  { date: '2025-07-04', title: 'Independence Day', emoji: '🎆' },
-  { date: '2025-07-06', title: 'Eid al-Adha (approx)', emoji: '🐑' },
-  { date: '2025-09-01', title: 'Labor Day', emoji: '👷' },
-  { date: '2025-10-13', title: 'Columbus Day', emoji: '⛵' },
-  { date: '2025-10-31', title: 'Halloween', emoji: '🎃' },
-  { date: '2025-11-11', title: "Veterans Day", emoji: '🎖️' },
-  { date: '2025-11-27', title: 'Thanksgiving', emoji: '🦃' },
-  { date: '2025-12-25', title: 'Christmas', emoji: '🎄' },
-  { date: '2025-12-31', title: "New Year's Eve", emoji: '🥳' },
-  { date: '2026-01-01', title: "New Year's Day", emoji: '🎉' },
-  { date: '2026-02-14', title: "Valentine's Day", emoji: '💕' },
-  { date: '2026-03-19', title: 'Ramadan Begins (approx)', emoji: '🌙' },
-  { date: '2026-04-05', title: 'Easter', emoji: '🐣' },
-  { date: '2026-04-18', title: 'Eid al-Fitr (approx)', emoji: '🌙' },
-]
+const HOLIDAYS = {
+  '2025-01-01': 'New Year\'s Day',
+  '2025-01-20': 'MLK Day',
+  '2025-02-14': 'Valentine\'s Day',
+  '2025-03-01': 'Ramadan Begins',
+  '2025-03-30': 'Eid al-Fitr',
+  '2025-04-20': 'Easter',
+  '2025-05-11': 'Mother\'s Day',
+  '2025-05-26': 'Memorial Day',
+  '2025-06-06': 'Eid al-Adha',
+  '2025-06-15': 'Father\'s Day',
+  '2025-07-04': 'Independence Day',
+  '2025-09-01': 'Labor Day',
+  '2025-10-31': 'Halloween',
+  '2025-11-27': 'Thanksgiving',
+  '2025-12-25': 'Christmas',
+  '2025-12-31': 'New Year\'s Eve',
+  '2026-01-01': 'New Year\'s Day',
+  '2026-01-19': 'MLK Day',
+  '2026-02-14': 'Valentine\'s Day',
+  '2026-02-17': 'Ramadan Begins',
+  '2026-03-20': 'Eid al-Fitr',
+  '2026-04-05': 'Easter',
+  '2026-05-10': 'Mother\'s Day',
+  '2026-05-25': 'Memorial Day',
+  '2026-05-27': 'Eid al-Adha',
+  '2026-06-21': 'Father\'s Day',
+  '2026-07-04': 'Independence Day',
+  '2026-09-07': 'Labor Day',
+  '2026-10-31': 'Halloween',
+  '2026-11-26': 'Thanksgiving',
+  '2026-12-25': 'Christmas'
+}
 
 export default function PlansPage() {
-  const { user } = useAuth()
-  const [activeSection, setActiveSection] = useState('dates')
+  const { user, supabase, getPartner } = useAuth()
+  const [tab, setTab] = useState('dateIdeas')
+  const [toast, setToast] = useState(null)
+  
+  // Date Ideas State
   const [dateIdeas, setDateIdeas] = useState([])
-  const [events, setEvents] = useState([])
-  const [filter, setFilter] = useState(null)
-  const [showAddDate, setShowAddDate] = useState(false)
-  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [showAddIdea, setShowAddIdea] = useState(false)
+  const [newIdea, setNewIdea] = useState('')
   const [editingIdea, setEditingIdea] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [showDeleteIdea, setShowDeleteIdea] = useState(null)
+  
+  // Calendar State
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [events, setEvents] = useState([])
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [eventTitle, setEventTitle] = useState('')
+  const [eventTime, setEventTime] = useState('')
+  const [eventEndDate, setEventEndDate] = useState('')
+  const [editingEvent, setEditingEvent] = useState(null)
+  const [showDeleteEvent, setShowDeleteEvent] = useState(null)
+  
+  // Countdowns State
+  const [countdowns, setCountdowns] = useState([])
+  const [showAddCountdown, setShowAddCountdown] = useState(false)
+  const [countdownTitle, setCountdownTitle] = useState('')
+  const [countdownDate, setCountdownDate] = useState('')
+  const [editingCountdown, setEditingCountdown] = useState(null)
+  const [showDeleteCountdown, setShowDeleteCountdown] = useState(null)
 
   useEffect(() => {
-    fetchData()
-  }, [filter])
+    loadData()
+  }, [])
 
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const [ideas, eventsData] = await Promise.all([
-        getDateIdeas(filter ? { status: filter } : {}),
-        getCalendarEvents(
-          new Date().toISOString().split('T')[0],
-          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        )
-      ])
-      setDateIdeas(ideas || [])
-      setEvents(eventsData || [])
-    } catch (error) {
-      console.error('Error:', error)
-    }
-    setLoading(false)
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
-  const handleStatusUpdate = async (id, newStatus) => {
-    try {
-      await updateDateIdea(id, { 
-        status: newStatus,
-        completed_on: newStatus === 'done' ? new Date().toISOString().split('T')[0] : null
-      })
-      setDateIdeas(prev => prev.map(idea => 
-        idea.id === id ? { ...idea, status: newStatus } : idea
-      ))
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  const loadData = async () => {
+    if (!supabase) return
+    
+    const [ideasRes, eventsRes, countdownsRes] = await Promise.all([
+      supabase.from('date_ideas').select('*').order('created_at', { ascending: false }),
+      supabase.from('calendar_events').select('*').order('start_date', { ascending: true }),
+      supabase.from('countdowns').select('*').order('target_date', { ascending: true })
+    ])
+    
+    if (ideasRes.data) setDateIdeas(ideasRes.data)
+    if (eventsRes.data) setEvents(eventsRes.data)
+    if (countdownsRes.data) setCountdowns(countdownsRes.data)
   }
 
-  const handleAddIdea = async (idea) => {
-    try {
-      const newIdea = await addDateIdea({ ...idea, added_by: user.role })
-      setDateIdeas(prev => [newIdea, ...prev])
-      setShowAddDate(false)
-    } catch (error) {
-      console.error('Error:', error)
+  // Date Ideas Functions
+  const addDateIdea = async () => {
+    if (!newIdea.trim() || !supabase) return
+    
+    const { error } = await supabase.from('date_ideas').insert({
+      title: newIdea.trim(),
+      completed: false,
+      created_by: user.id
+    })
+    
+    if (!error) {
+      setNewIdea('')
+      setShowAddIdea(false)
+      loadData()
+      showToast('Date idea added!', 'success')
     }
   }
 
-  const handleEditIdea = async (updatedIdea) => {
-    try {
-      await updateDateIdea(editingIdea.id, updatedIdea)
-      setDateIdeas(prev => prev.map(i => 
-        i.id === editingIdea.id ? { ...i, ...updatedIdea } : i
-      ))
-      setEditingIdea(null)
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  const toggleIdeaComplete = async (idea) => {
+    if (!supabase) return
+    await supabase.from('date_ideas').update({ completed: !idea.completed }).eq('id', idea.id)
+    loadData()
   }
 
-  const handleAddEvent = async (event) => {
-    try {
-      const newEvent = await addCalendarEvent({ ...event, added_by: user.role })
-      setEvents(prev => [...prev, newEvent].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)))
-      setShowAddEvent(false)
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  const updateDateIdea = async () => {
+    if (!editingIdea || !supabase) return
+    await supabase.from('date_ideas').update({ title: editingIdea.title }).eq('id', editingIdea.id)
+    setEditingIdea(null)
+    loadData()
+    showToast('Updated!', 'success')
   }
 
-  const handleDeleteIdea = async (id) => {
-    if (!confirm('Delete this date idea?')) return
-    try {
-      await deleteDateIdea(id)
-      setDateIdeas(prev => prev.filter(i => i.id !== id))
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  const deleteIdea = async (id) => {
+    if (!supabase) return
+    await supabase.from('date_ideas').delete().eq('id', id)
+    setShowDeleteIdea(null)
+    loadData()
+    showToast('Deleted', 'success')
   }
 
-  const handleDeleteEvent = async (id) => {
-    if (!confirm('Delete this event?')) return
-    try {
-      await deleteCalendarEvent(id)
-      setEvents(prev => prev.filter(e => e.id !== id))
-    } catch (error) {
-      console.error('Error:', error)
+  // Calendar Functions
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDay = firstDay.getDay()
+    
+    const days = []
+    for (let i = 0; i < startingDay; i++) {
+      days.push(null)
     }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i)
+    }
+    return days
   }
 
-  const getVibeStyle = (vibe) => {
-    const styles = {
-      romantic: 'bg-rose-100 text-rose-600',
-      casual: 'bg-cream-300 text-ink-600',
-      adventure: 'bg-gold-100 text-gold-700',
-      cozy: 'bg-forest-50 text-forest-600',
-      fancy: 'bg-gold-200 text-gold-800',
-    }
-    return styles[vibe] || 'bg-cream-200 text-ink-500'
+  const formatDateKey = (year, month, day) => {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   }
 
-  // Get upcoming holidays
-  const upcomingHolidays = holidays
-    .filter(h => new Date(h.date) >= new Date())
-    .slice(0, 5)
+  const getEventsForDate = (dateKey) => {
+    return events.filter(e => {
+      if (e.end_date) {
+        return dateKey >= e.start_date && dateKey <= e.end_date
+      }
+      return e.start_date === dateKey
+    })
+  }
 
-  // Combine events with holidays for calendar view
-  const allEvents = [
-    ...events.map(e => ({ ...e, isHoliday: false })),
-    ...holidays.map(h => ({ 
-      id: `holiday-${h.date}`, 
-      title: h.title, 
-      start_date: h.date,
-      emoji: h.emoji,
-      isHoliday: true 
-    }))
-  ].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
-    .filter(e => new Date(e.start_date) >= new Date(new Date().setHours(0,0,0,0)))
+  const getHoliday = (dateKey) => HOLIDAYS[dateKey]
+
+  const handleDateClick = (day) => {
+    if (!day) return
+    const dateKey = formatDateKey(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    setSelectedDate(dateKey)
+    setEventTitle('')
+    setEventTime('')
+    setEventEndDate('')
+    setEditingEvent(null)
+    setShowEventModal(true)
+  }
+
+  const saveEvent = async () => {
+    if (!eventTitle.trim() || !supabase) return
+    
+    const eventData = {
+      title: eventTitle.trim(),
+      start_date: selectedDate,
+      end_date: eventEndDate || null,
+      time: eventTime || null,
+      created_by: user.id
+    }
+    
+    if (editingEvent) {
+      await supabase.from('calendar_events').update(eventData).eq('id', editingEvent.id)
+    } else {
+      await supabase.from('calendar_events').insert(eventData)
+    }
+    
+    setShowEventModal(false)
+    loadData()
+    showToast(editingEvent ? 'Updated!' : 'Event added!', 'success')
+  }
+
+  const editEvent = (event) => {
+    setEditingEvent(event)
+    setEventTitle(event.title)
+    setEventTime(event.time || '')
+    setEventEndDate(event.end_date || '')
+    setSelectedDate(event.start_date)
+    setShowEventModal(true)
+  }
+
+  const deleteEvent = async (id) => {
+    if (!supabase) return
+    await supabase.from('calendar_events').delete().eq('id', id)
+    setShowDeleteEvent(null)
+    loadData()
+    showToast('Deleted', 'success')
+  }
+
+  // Countdown Functions
+  const addCountdown = async () => {
+    if (!countdownTitle.trim() || !countdownDate || !supabase) return
+    
+    await supabase.from('countdowns').insert({
+      title: countdownTitle.trim(),
+      target_date: countdownDate,
+      created_by: user.id
+    })
+    
+    setCountdownTitle('')
+    setCountdownDate('')
+    setShowAddCountdown(false)
+    loadData()
+    showToast('Countdown added!', 'success')
+  }
+
+  const updateCountdown = async () => {
+    if (!editingCountdown || !supabase) return
+    await supabase.from('countdowns').update({
+      title: editingCountdown.title,
+      target_date: editingCountdown.target_date
+    }).eq('id', editingCountdown.id)
+    setEditingCountdown(null)
+    loadData()
+    showToast('Updated!', 'success')
+  }
+
+  const deleteCountdown = async (id) => {
+    if (!supabase) return
+    await supabase.from('countdowns').delete().eq('id', id)
+    setShowDeleteCountdown(null)
+    loadData()
+    showToast('Deleted', 'success')
+  }
+
+  const getDaysUntil = (dateStr) => {
+    const target = new Date(dateStr + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24))
+    return diff
+  }
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen bg-cream-100">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-card ${toast.type === 'success' ? 'bg-forest text-cream-100' : 'bg-ink-700 text-white'}`}>
+          {toast.message}
+        </div>
+      )}
+
       {/* Header */}
-      <div className="bg-gold-100 px-6 pt-14 pb-12">
-        <div className="max-w-lg mx-auto text-center">
-          <h1 className="font-serif text-display-sm text-forest mb-2">Plans</h1>
-          <p className="text-body text-forest-600">Our adventures together</p>
+      <div className="p-6 pb-4">
+        <h1 className="font-serif text-display-sm text-forest mb-4">Plans</h1>
+        
+        {/* Tabs */}
+        <div className="flex gap-2 bg-cream-200 p-1 rounded-xl">
+          <button
+            onClick={() => setTab('dateIdeas')}
+            className={`flex-1 py-2 px-3 rounded-lg text-body-sm font-medium transition-colors ${tab === 'dateIdeas' ? 'bg-white text-forest shadow-soft' : 'text-ink-500'}`}
+          >
+            Date Ideas
+          </button>
+          <button
+            onClick={() => setTab('calendar')}
+            className={`flex-1 py-2 px-3 rounded-lg text-body-sm font-medium transition-colors ${tab === 'calendar' ? 'bg-white text-forest shadow-soft' : 'text-ink-500'}`}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={() => setTab('countdowns')}
+            className={`flex-1 py-2 px-3 rounded-lg text-body-sm font-medium transition-colors ${tab === 'countdowns' ? 'bg-white text-forest shadow-soft' : 'text-ink-500'}`}
+          >
+            Countdowns
+          </button>
         </div>
       </div>
 
-      {/* Tabs - Date Ideas First */}
-      <div className="bg-cream px-6 py-4 sticky top-0 z-20 border-b border-cream-300">
-        <div className="max-w-lg mx-auto flex justify-center gap-2">
-          {[
-            { id: 'dates', label: 'Date Ideas' },
-            { id: 'calendar', label: 'Calendar' },
-          ].map((tab) => (
+      <div className="px-6 pb-24">
+        {/* DATE IDEAS TAB */}
+        {tab === 'dateIdeas' && (
+          <div>
             <button
-              key={tab.id}
-              onClick={() => setActiveSection(tab.id)}
-              className={`
-                px-6 py-3 rounded-full text-body-sm font-medium transition-all
-                ${activeSection === tab.id 
-                  ? 'bg-forest text-cream-100' 
-                  : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
-                }
-              `}
+              onClick={() => setShowAddIdea(true)}
+              className="w-full bg-forest text-cream-100 py-4 rounded-xl font-medium mb-4"
             >
-              {tab.label}
+              + Add Date Idea
             </button>
-          ))}
-        </div>
-      </div>
+            
+            <div className="space-y-3">
+              {dateIdeas.map(idea => (
+                <div key={idea.id} className="bg-white rounded-xl p-4 shadow-soft">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => toggleIdeaComplete(idea)}
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${idea.completed ? 'bg-forest border-forest text-white' : 'border-ink-300'}`}
+                    >
+                      {idea.completed && '✓'}
+                    </button>
+                    <p className={`flex-1 text-body ${idea.completed ? 'line-through text-ink-400' : 'text-ink-600'}`}>
+                      {idea.title}
+                    </p>
+                    <button
+                      onClick={() => setEditingIdea(idea)}
+                      className="text-ink-400 px-2"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              {dateIdeas.length === 0 && (
+                <p className="text-center text-ink-400 py-8">No date ideas yet. Add one!</p>
+              )}
+            </div>
+          </div>
+        )}
 
-      {/* Content */}
-      <div className="bg-cream min-h-[60vh]">
-        {/* Date Ideas */}
-        {activeSection === 'dates' && (
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              {/* Filters */}
-              <div className="flex justify-center gap-2 mb-6 flex-wrap">
-                {[
-                  { id: null, label: 'All' },
-                  { id: 'want_to_do', label: 'Want' },
-                  { id: 'planned', label: 'Planned' },
-                  { id: 'done', label: 'Complete' },
-                ].map((f) => (
-                  <button
-                    key={f.id || 'all'}
-                    onClick={() => setFilter(f.id)}
-                    className={`px-4 py-2 rounded-full text-body-sm font-medium transition-all ${
-                      filter === f.id ? 'bg-forest text-cream-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
+        {/* CALENDAR TAB */}
+        {tab === 'calendar' && (
+          <div>
+            {/* Month Navigation */}
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                className="p-2 bg-white rounded-lg shadow-soft"
+              >
+                ←
+              </button>
+              <h2 className="font-serif text-title text-forest">
+                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              </h2>
+              <button
+                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                className="p-2 bg-white rounded-lg shadow-soft"
+              >
+                →
+              </button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="bg-white rounded-2xl p-4 shadow-soft mb-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} className="text-center text-caption text-ink-400 font-medium py-2">{d}</div>
                 ))}
               </div>
-
-              {/* Add Button */}
-              <button 
-                onClick={() => setShowAddDate(true)}
-                className="w-full mb-6 py-5 border-2 border-dashed border-gold-300 rounded-2xl text-gold-600 hover:border-gold-400 hover:bg-gold-50 transition-all font-medium"
-              >
-                + Add date idea
-              </button>
-
-              {/* Ideas */}
-              {loading ? (
-                <p className="text-center py-12 text-ink-400">Loading...</p>
-              ) : dateIdeas.length > 0 ? (
-                <div className="space-y-4">
-                  {dateIdeas.map((idea) => (
-                    <div key={idea.id} className="bg-white rounded-3xl p-6 shadow-card relative group">
-                      {/* Edit & Delete - show on hover */}
-                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setEditingIdea(idea)}
-                          className="w-8 h-8 bg-cream-200 rounded-full flex items-center justify-center text-ink-500 hover:bg-cream-300"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteIdea(idea.id)}
-                          className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-200"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                      
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-serif text-title-sm text-forest">{idea.name}</h3>
-                          <p className="text-caption text-ink-300 mt-1">
-                            Added by {idea.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                          </p>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {getDaysInMonth(currentMonth).map((day, i) => {
+                  if (!day) return <div key={i} />
+                  
+                  const dateKey = formatDateKey(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+                  const dayEvents = getEventsForDate(dateKey)
+                  const holiday = getHoliday(dateKey)
+                  const isToday = dateKey === new Date().toISOString().split('T')[0]
+                  
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handleDateClick(day)}
+                      className={`aspect-square rounded-lg flex flex-col items-center justify-center relative ${
+                        isToday ? 'bg-forest text-cream-100' : 'hover:bg-cream-50'
+                      }`}
+                    >
+                      <span className="text-body-sm">{day}</span>
+                      {(dayEvents.length > 0 || holiday) && (
+                        <div className="flex gap-0.5 mt-0.5">
+                          {holiday && <div className="w-1.5 h-1.5 rounded-full bg-gold" />}
+                          {dayEvents.length > 0 && <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
                         </div>
-                        <span className="text-body font-semibold text-gold-600">
-                          {'$'.repeat(idea.price_level || 1)}
-                        </span>
-                      </div>
-
-                      {idea.description && (
-                        <p className="text-body text-ink-500 mb-4">{idea.description}</p>
                       )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {idea.vibe && <span className={`tag ${getVibeStyle(idea.vibe)}`}>{idea.vibe}</span>}
-                        {idea.date_type && <span className="tag tag-forest">{idea.date_type.replace('_', ' ')}</span>}
-                      </div>
-
-                      {idea.location && (
-                        <p className="text-body-sm text-ink-400 mb-4">📍 {idea.location}</p>
-                      )}
-
-                      {/* Status Buttons */}
-                      <div className="flex gap-2 pt-4 border-t border-cream-200">
-                        {[
-                          { id: 'want_to_do', label: 'Want' },
-                          { id: 'planned', label: 'Planned' },
-                          { id: 'done', label: 'Complete' },
-                        ].map((status) => (
-                          <button
-                            key={status.id}
-                            onClick={() => handleStatusUpdate(idea.id, status.id)}
-                            className={`
-                              flex-1 py-3 rounded-xl text-body-sm font-medium transition-all
-                              ${idea.status === status.id 
-                                ? 'bg-forest text-cream-100' 
-                                : 'bg-cream-100 text-ink-400 hover:bg-cream-200'
-                              }
-                            `}
-                          >
-                            {status.label}
-                          </button>
-                        ))}
-                      </div>
+            {/* Upcoming Events & Holidays */}
+            <h3 className="font-serif text-title-sm text-forest mb-3">Upcoming</h3>
+            <div className="space-y-2">
+              {/* Show holidays for next 30 days */}
+              {Object.entries(HOLIDAYS)
+                .filter(([date]) => {
+                  const d = new Date(date)
+                  const now = new Date()
+                  const diff = (d - now) / (1000 * 60 * 60 * 24)
+                  return diff >= 0 && diff <= 60
+                })
+                .slice(0, 5)
+                .map(([date, name]) => (
+                  <div key={date} className="bg-gold-50 rounded-xl p-3 flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-gold" />
+                    <div className="flex-1">
+                      <p className="text-body-sm font-medium text-ink-600">{name}</p>
+                      <p className="text-caption text-ink-400">{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              
+              {events.slice(0, 5).map(event => (
+                <div key={event.id} className="bg-white rounded-xl p-3 shadow-soft flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-rose-400" />
+                  <div className="flex-1">
+                    <p className="text-body-sm font-medium text-ink-600">{event.title}</p>
+                    <p className="text-caption text-ink-400">
+                      {new Date(event.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {event.time && ` at ${event.time}`}
+                      {event.end_date && ` → ${new Date(event.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    </p>
+                  </div>
+                  <button onClick={() => editEvent(event)} className="text-ink-400 px-2">✏️</button>
                 </div>
-              ) : (
-                <div className="text-center py-16">
-                  <span className="text-5xl mb-4 block">💡</span>
-                  <p className="text-body text-ink-400">No date ideas yet</p>
-                </div>
-              )}
+              ))}
             </div>
           </div>
         )}
 
-        {/* Calendar */}
-        {activeSection === 'calendar' && (
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              <button 
-                onClick={() => setShowAddEvent(true)}
-                className="w-full mb-6 py-5 border-2 border-dashed border-forest-300 rounded-2xl text-forest hover:border-forest-400 hover:bg-forest-50 transition-all font-medium"
-              >
-                + Add event
-              </button>
-
-              {/* Upcoming Holidays */}
-              <div className="mb-8">
-                <p className="section-label mb-4">Upcoming Holidays</p>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {upcomingHolidays.map((h) => (
-                    <div key={h.date} className="flex-shrink-0 bg-rose-50 rounded-2xl p-4 min-w-[140px] text-center">
-                      <span className="text-2xl block mb-2">{h.emoji}</span>
-                      <p className="text-body-sm font-medium text-forest">{h.title}</p>
-                      <p className="text-caption text-ink-400">
-                        {new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </p>
+        {/* COUNTDOWNS TAB */}
+        {tab === 'countdowns' && (
+          <div>
+            <button
+              onClick={() => setShowAddCountdown(true)}
+              className="w-full bg-forest text-cream-100 py-4 rounded-xl font-medium mb-4"
+            >
+              + Add Countdown
+            </button>
+            
+            <div className="space-y-4">
+              {countdowns.map(countdown => {
+                const daysLeft = getDaysUntil(countdown.target_date)
+                return (
+                  <div key={countdown.id} className="bg-white rounded-2xl p-5 shadow-soft">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-serif text-title-sm text-forest">{countdown.title}</h3>
+                      <button onClick={() => setEditingCountdown(countdown)} className="text-ink-400">✏️</button>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Events List */}
-              <p className="section-label mb-4">Upcoming Events</p>
-              {allEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {allEvents.slice(0, 20).map((event) => {
-                    const isMultiDay = event.end_date && event.end_date !== event.start_date
-                    return (
-                      <div 
-                        key={event.id} 
-                        className={`rounded-2xl p-5 relative group ${
-                          event.isHoliday ? 'bg-rose-50' : 'bg-white shadow-card'
-                        }`}
-                      >
-                        {!event.isHoliday && (
-                          <button
-                            onClick={() => handleDeleteEvent(event.id)}
-                            className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                          >
-                            ×
-                          </button>
-                        )}
-
-                        <div className="flex items-start gap-4">
-                          <div className="text-center min-w-[50px]">
-                            <p className="text-caption text-ink-400 uppercase">
-                              {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
-                            </p>
-                            <p className="font-serif text-title text-forest">
-                              {new Date(event.start_date).getDate()}
-                            </p>
-                            {isMultiDay && (
-                              <>
-                                <p className="text-caption text-ink-300">to</p>
-                                <p className="font-serif text-body text-forest">
-                                  {new Date(event.end_date).getDate()}
-                                </p>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              {event.emoji && <span>{event.emoji}</span>}
-                              <h3 className="font-serif text-title-sm text-forest">{event.title}</h3>
-                            </div>
-                            {event.start_time && (
-                              <p className="text-body-sm text-gold-600 mt-1">
-                                🕐 {event.start_time}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap gap-2 mt-2 text-body-sm text-ink-400">
-                              {event.location && <span>📍 {event.location}</span>}
-                            </div>
-                            {!event.isHoliday && event.added_by && (
-                              <p className="text-caption text-ink-300 mt-2">
-                                By {event.added_by === 'shah' ? 'Shahjahan' : 'Dane'}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-16">
-                  <span className="text-5xl mb-4 block">📅</span>
-                  <p className="text-body text-ink-400">No upcoming events</p>
-                </div>
+                    <div className="flex items-end gap-2">
+                      <span className="font-serif text-display text-forest">{daysLeft}</span>
+                      <span className="text-body text-ink-500 mb-2">{daysLeft === 1 ? 'day' : 'days'} left</span>
+                    </div>
+                    <p className="text-caption text-ink-400 mt-2">
+                      {new Date(countdown.target_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                )
+              })}
+              
+              {countdowns.length === 0 && (
+                <p className="text-center text-ink-400 py-8">No countdowns yet. Add one!</p>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Add Date Idea Modal */}
-      {showAddDate && (
-        <AddDateModal onClose={() => setShowAddDate(false)} onAdd={handleAddIdea} />
+      {/* ADD DATE IDEA MODAL */}
+      {showAddIdea && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-4">Add Date Idea</h3>
+            <input
+              value={newIdea}
+              onChange={(e) => setNewIdea(e.target.value)}
+              placeholder="What should we do?"
+              className="w-full p-4 bg-cream-50 rounded-xl text-body mb-4 focus:outline-none focus:ring-2 focus:ring-forest/20"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowAddIdea(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={addDateIdea} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Add</button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Edit Date Idea Modal */}
+      {/* EDIT DATE IDEA MODAL */}
       {editingIdea && (
-        <EditDateModal idea={editingIdea} onClose={() => setEditingIdea(null)} onSave={handleEditIdea} />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-4">Edit Date Idea</h3>
+            <input
+              value={editingIdea.title}
+              onChange={(e) => setEditingIdea({ ...editingIdea, title: e.target.value })}
+              className="w-full p-4 bg-cream-50 rounded-xl text-body mb-4 focus:outline-none focus:ring-2 focus:ring-forest/20"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteIdea(editingIdea.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              <button onClick={() => setEditingIdea(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={updateDateIdea} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Add Event Modal */}
-      {showAddEvent && (
-        <AddEventModal onClose={() => setShowAddEvent(false)} onAdd={handleAddEvent} />
+      {/* DELETE IDEA CONFIRMATION */}
+      {showDeleteIdea && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Date Idea?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteIdea(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => deleteIdea(showDeleteIdea)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
-  )
-}
 
-function AddDateModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    vibe: 'casual',
-    price_level: 2,
-    date_type: 'dinner',
-    location: '',
-  })
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    setLoading(true)
-    await onAdd(form)
-    setLoading(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 bg-gold-100">
-          <h2 className="font-serif text-title text-forest">Add Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-forest hover:text-forest-700 rounded-full hover:bg-gold-200">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="max-h-[50vh] overflow-y-auto p-5">
-          <form id="date-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
-              <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="Sunset picnic..." required />
-            </div>
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" placeholder="What makes this special?" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+      {/* CALENDAR EVENT MODAL */}
+      {showEventModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-4">
+              {editingEvent ? 'Edit Event' : 'Add Event'}
+            </h3>
+            <p className="text-body-sm text-ink-400 mb-4">
+              {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+            
+            <div className="space-y-4 mb-4">
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
-                <select value={form.vibe} onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))} className="input">
-                  {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-                </select>
+                <label className="text-body-sm text-ink-500 mb-1 block">Event Title</label>
+                <input
+                  value={eventTitle}
+                  onChange={(e) => setEventTitle(e.target.value)}
+                  placeholder="What's happening?"
+                  className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+                />
               </div>
+              
               <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
-                <select value={form.price_level} onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))} className="input">
-                  <option value={1}>$ Free</option>
-                  <option value={2}>$$ Moderate</option>
-                  <option value={3}>$$$ Pricey</option>
-                  <option value={4}>$$$$ Splurge</option>
-                </select>
+                <label className="text-body-sm text-ink-500 mb-1 block">Time (optional)</label>
+                <input
+                  type="time"
+                  value={eventTime}
+                  onChange={(e) => setEventTime(e.target.value)}
+                  className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+                />
+              </div>
+              
+              <div>
+                <label className="text-body-sm text-ink-500 mb-1 block">End Date (for multi-day events)</label>
+                <input
+                  type="date"
+                  value={eventEndDate}
+                  onChange={(e) => setEventEndDate(e.target.value)}
+                  min={selectedDate}
+                  className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+                />
               </div>
             </div>
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select value={form.date_type} onChange={(e) => setForm(p => ({ ...p, date_type: e.target.value }))} className="input">
-                {dateTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </select>
+            
+            <div className="flex gap-3">
+              {editingEvent && (
+                <button onClick={() => setShowDeleteEvent(editingEvent.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              )}
+              <button onClick={() => setShowEventModal(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={saveEvent} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
             </div>
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" placeholder="Where?" />
-            </div>
-          </form>
+          </div>
         </div>
+      )}
 
-        <div className="p-5 bg-cream border-t border-cream-300">
-          <button type="submit" form="date-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
-            {loading ? 'Adding...' : '✨ Add Date Idea'}
-          </button>
+      {/* DELETE EVENT CONFIRMATION */}
+      {showDeleteEvent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Event?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteEvent(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => { deleteEvent(showDeleteEvent); setShowEventModal(false) }} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  )
-}
+      )}
 
-function EditDateModal({ idea, onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: idea.name || '',
-    description: idea.description || '',
-    vibe: idea.vibe || 'casual',
-    price_level: idea.price_level || 2,
-    date_type: idea.date_type || 'dinner',
-    location: idea.location || '',
-  })
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    setLoading(true)
-    await onSave(form)
-    setLoading(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 bg-gold-100">
-          <h2 className="font-serif text-title text-forest">Edit Date Idea</h2>
-          <button onClick={onClose} className="p-2 text-forest rounded-full hover:bg-gold-200">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      {/* ADD COUNTDOWN MODAL */}
+      {showAddCountdown && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-4">Add Countdown</h3>
+            <div className="space-y-4 mb-4">
+              <input
+                value={countdownTitle}
+                onChange={(e) => setCountdownTitle(e.target.value)}
+                placeholder="What are you counting down to?"
+                className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+              />
+              <input
+                type="date"
+                value={countdownDate}
+                onChange={(e) => setCountdownDate(e.target.value)}
+                className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowAddCountdown(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={addCountdown} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Add</button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="max-h-[50vh] overflow-y-auto p-5">
-          <form id="edit-date-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Name *</label>
-              <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" required />
+      {/* EDIT COUNTDOWN MODAL */}
+      {editingCountdown && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-4">Edit Countdown</h3>
+            <div className="space-y-4 mb-4">
+              <input
+                value={editingCountdown.title}
+                onChange={(e) => setEditingCountdown({ ...editingCountdown, title: e.target.value })}
+                className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+              />
+              <input
+                type="date"
+                value={editingCountdown.target_date}
+                onChange={(e) => setEditingCountdown({ ...editingCountdown, target_date: e.target.value })}
+                className="w-full p-4 bg-cream-50 rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-forest/20"
+              />
             </div>
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteCountdown(editingCountdown.id)} className="py-3 px-4 bg-rose-100 text-rose-600 rounded-xl">Delete</button>
+              <button onClick={() => setEditingCountdown(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={updateCountdown} className="flex-1 py-3 bg-forest text-cream-100 rounded-xl">Save</button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Vibe</label>
-                <select value={form.vibe} onChange={(e) => setForm(p => ({ ...p, vibe: e.target.value }))} className="input">
-                  {vibes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Price</label>
-                <select value={form.price_level} onChange={(e) => setForm(p => ({ ...p, price_level: parseInt(e.target.value) }))} className="input">
-                  <option value={1}>$ Free</option>
-                  <option value={2}>$$ Moderate</option>
-                  <option value={3}>$$$ Pricey</option>
-                  <option value={4}>$$$$ Splurge</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" />
-            </div>
-          </form>
+          </div>
         </div>
+      )}
 
-        <div className="p-5 bg-cream border-t border-cream-300">
-          <button type="submit" form="edit-date-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
+      {/* DELETE COUNTDOWN CONFIRMATION */}
+      {showDeleteCountdown && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Countdown?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteCountdown(null)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={() => deleteCountdown(showDeleteCountdown)} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function AddEventModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    event_type: 'date',
-    start_date: '',
-    end_date: '',
-    start_time: '',
-    location: '',
-  })
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.title.trim() || !form.start_date) return
-    setLoading(true)
-    await onAdd({
-      ...form,
-      end_date: form.end_date || form.start_date
-    })
-    setLoading(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-forest-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-cream w-full max-w-md rounded-3xl shadow-elevated overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 bg-forest">
-          <h2 className="font-serif text-title text-cream-100">Add Event</h2>
-          <button onClick={onClose} className="p-2 text-cream-200 hover:text-cream-100 rounded-full hover:bg-forest-600">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="max-h-[50vh] overflow-y-auto p-5">
-          <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Title *</label>
-              <input type="text" value={form.title} onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} className="input" placeholder="Dinner at..." required />
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Type</label>
-              <select value={form.event_type} onChange={(e) => setForm(p => ({ ...p, event_type: e.target.value }))} className="input">
-                <option value="date">Date</option>
-                <option value="trip">Trip</option>
-                <option value="anniversary">Anniversary</option>
-                <option value="reminder">Reminder</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">Start Date *</label>
-                <input type="date" value={form.start_date} onChange={(e) => setForm(p => ({ ...p, start_date: e.target.value }))} className="input" required />
-              </div>
-              <div>
-                <label className="text-body-sm font-medium text-ink-600 block mb-1">End Date</label>
-                <input type="date" value={form.end_date} onChange={(e) => setForm(p => ({ ...p, end_date: e.target.value }))} className="input" placeholder="Multi-day?" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">⏰ Time (optional)</label>
-              <input type="time" value={form.start_time} onChange={(e) => setForm(p => ({ ...p, start_time: e.target.value }))} className="input" />
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Location</label>
-              <input type="text" value={form.location} onChange={(e) => setForm(p => ({ ...p, location: e.target.value }))} className="input" placeholder="Where?" />
-            </div>
-
-            <div>
-              <label className="text-body-sm font-medium text-ink-600 block mb-1">Description</label>
-              <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} className="input min-h-[60px] resize-none" placeholder="Details..." />
-            </div>
-          </form>
-        </div>
-
-        <div className="p-5 bg-cream border-t border-cream-300">
-          <button type="submit" form="event-form" className="w-full py-4 bg-forest text-cream-100 rounded-2xl font-semibold text-lg" disabled={loading}>
-            {loading ? 'Adding...' : '📅 Add Event'}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
