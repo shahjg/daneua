@@ -17,7 +17,19 @@ const moods = [
 ]
 
 async function getVoiceNotes() {
-  const { data, error } = await supabase.from('voice_notes').select('*').order('created_at', { ascending: false }).limit(20)
+  // Get notes from last 24 hours only
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  
+  // Delete old voice notes (older than 24 hours)
+  await supabase.from('voice_notes').delete().lt('created_at', twentyFourHoursAgo)
+  
+  // Fetch recent notes
+  const { data, error } = await supabase
+    .from('voice_notes')
+    .select('*')
+    .gte('created_at', twentyFourHoursAgo)
+    .order('created_at', { ascending: false })
+    .limit(20)
   if (error) return []
   return data || []
 }
@@ -142,17 +154,22 @@ export default function UsPage() {
               <VoiceNoteRecorder user={user} theirName={theirName} onSent={handleVoiceNoteSent} showToast={showToast} />
               {voiceNotes.length > 0 && (
                 <div className="mt-8">
-                  <p className="text-body-sm text-ink-400 mb-4">Previous Notes</p>
+                  <p className="text-body-sm text-ink-400 mb-4">Voice Notes <span className="text-rose-400">(disappear after 24h)</span></p>
                   <div className="space-y-3">
-                    {voiceNotes.map((note) => (
-                      <div key={note.id} className="bg-white rounded-2xl p-4 shadow-soft">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-body-sm font-medium text-forest">{note.from_user === user?.role ? 'You' : theirName}</p>
-                          <p className="text-caption text-ink-300">{new Date(note.created_at).toLocaleDateString()}</p>
+                    {voiceNotes.map((note) => {
+                      const createdAt = new Date(note.created_at)
+                      const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000)
+                      const hoursLeft = Math.max(0, Math.round((expiresAt - Date.now()) / (1000 * 60 * 60)))
+                      return (
+                        <div key={note.id} className="bg-white rounded-2xl p-4 shadow-soft">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-body-sm font-medium text-forest">{note.from_user === user?.role ? 'You' : theirName}</p>
+                            <p className="text-caption text-rose-400">{hoursLeft}h left</p>
+                          </div>
+                          <audio src={note.audio_url} controls className="w-full h-10" />
                         </div>
-                        <audio src={note.audio_url} controls className="w-full h-10" />
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}

@@ -29,6 +29,7 @@ export default function HomePage({ onOpenSettings }) {
   const [showAddNote, setShowAddNote] = useState(false)
   const [todaysMoments, setTodaysMoments] = useState([])
   const [photoStatus, setPhotoStatus] = useState('')
+  const [fullscreenPhoto, setFullscreenPhoto] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const greeting = getGreeting()
@@ -362,13 +363,15 @@ export default function HomePage({ onOpenSettings }) {
               label="Shahjahan" 
               photo={todaysMoments.find(m => m.user_role === 'shah')} 
               canUpload={user?.role === 'shah'} 
-              onUpload={handlePhotoUpload} 
+              onUpload={handlePhotoUpload}
+              onViewPhoto={setFullscreenPhoto}
             />
             <PhotoSlot 
               label="Dane" 
               photo={todaysMoments.find(m => m.user_role === 'dane')} 
               canUpload={user?.role === 'dane'} 
-              onUpload={handlePhotoUpload} 
+              onUpload={handlePhotoUpload}
+              onViewPhoto={setFullscreenPhoto}
             />
           </div>
           
@@ -384,6 +387,26 @@ export default function HomePage({ onOpenSettings }) {
           <DuaSelector theirName={theirName} />
         </div>
       </div>
+
+      {/* Fullscreen Photo Modal */}
+      {fullscreenPhoto && (
+        <div 
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+          onClick={() => setFullscreenPhoto(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white text-3xl z-10 w-12 h-12 flex items-center justify-center"
+            onClick={() => setFullscreenPhoto(null)}
+          >
+            ✕
+          </button>
+          <img 
+            src={fullscreenPhoto} 
+            alt="" 
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      )}
 
       {/* Add Countdown Modal */}
       {showAddCountdown && (
@@ -541,7 +564,7 @@ function getDaysUntil(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
 
-function PhotoSlot({ label, photo, canUpload, onUpload }) {
+function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
   const inputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
 
@@ -550,50 +573,8 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
     if (!file) return
     
     setUploading(true)
-    try {
-      // Create image and process
-      const img = new Image()
-      const objectUrl = URL.createObjectURL(file)
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        img.src = objectUrl
-      })
-      
-      // Resize if needed
-      const maxSize = 1200
-      let width = img.width
-      let height = img.height
-      
-      if (width > maxSize || height > maxSize) {
-        if (width > height) {
-          height = (height / width) * maxSize
-          width = maxSize
-        } else {
-          width = (width / height) * maxSize
-          height = maxSize
-        }
-      }
-      
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(0, 0, width, height)
-      ctx.drawImage(img, 0, 0, width, height)
-      
-      URL.revokeObjectURL(objectUrl)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-      const processedFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      
-      await onUpload(processedFile)
-    } catch (err) {
-      console.error('Image processing error:', err)
-      await onUpload(file)
-    }
+    // Upload directly without canvas processing to preserve orientation
+    await onUpload(file)
     setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
   }
@@ -602,7 +583,12 @@ function PhotoSlot({ label, photo, canUpload, onUpload }) {
     <div className="relative">
       <div className="aspect-square rounded-2xl overflow-hidden bg-white shadow-soft">
         {photo ? (
-          <img src={photo.photo_url} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
+          <img 
+            src={photo.photo_url} 
+            alt="" 
+            className="w-full h-full object-cover cursor-pointer" 
+            onClick={() => onViewPhoto && onViewPhoto(photo.photo_url)}
+          />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
             <span className="text-4xl mb-2">📷</span>

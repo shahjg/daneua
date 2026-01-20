@@ -594,9 +594,29 @@ function VoicePractice({ word, user, theirName }) {
       
       const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
       
-      // Upsert - update if exists, insert if not
-      const { error: dbError } = await supabase.from('word_recordings')
-        .upsert({ word_key: wordKey, user_role: user.role, audio_url: publicUrl }, { onConflict: 'word_key,user_role' })
+      // Check if recording already exists for this word/user
+      const { data: existing } = await supabase
+        .from('word_recordings')
+        .select('id')
+        .eq('word_key', wordKey)
+        .eq('user_role', user.role)
+        .maybeSingle()
+      
+      let dbError
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('word_recordings')
+          .update({ audio_url: publicUrl, created_at: new Date().toISOString() })
+          .eq('id', existing.id)
+        dbError = error
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('word_recordings')
+          .insert({ word_key: wordKey, user_role: user.role, audio_url: publicUrl })
+        dbError = error
+      }
       
       if (dbError) {
         console.error('DB error:', dbError)
