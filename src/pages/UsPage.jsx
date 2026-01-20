@@ -4,9 +4,6 @@ import {
   getLoveMessage,
   getLoveLetters,
   addLoveLetter,
-  getTodaysMoments,
-  getMomentsHistory,
-  addMoment,
   supabase
 } from '../lib/supabase'
 
@@ -39,8 +36,6 @@ export default function UsPage() {
   const [letters, setLetters] = useState([])
   const [voiceNotes, setVoiceNotes] = useState([])
   const [showWriteLetter, setShowWriteLetter] = useState(false)
-  const [todaysMoments, setTodaysMoments] = useState([])
-  const [momentsHistory, setMomentsHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
 
@@ -55,15 +50,11 @@ export default function UsPage() {
 
   const fetchData = async () => {
     try {
-      const [lettersData, todayData, historyData, notesData] = await Promise.all([
+      const [lettersData, notesData] = await Promise.all([
         getLoveLetters(),
-        getTodaysMoments(),
-        getMomentsHistory(14),
         getVoiceNotes()
       ])
       setLetters(lettersData || [])
-      setTodaysMoments(todayData || [])
-      setMomentsHistory(historyData || [])
       setVoiceNotes(notesData || [])
     } catch (error) {
       console.error('Error:', error)
@@ -97,39 +88,10 @@ export default function UsPage() {
     showToast('Voice note sent!', 'success')
   }
 
-  const handlePhotoUpload = async (file) => {
-    try {
-      // Simple filename - no subfolders
-      const fileName = `${user.role}_${Date.now()}.jpg`
-      
-      const { error } = await supabase.storage.from('photos').upload(fileName, file, { 
-        contentType: 'image/jpeg', 
-        upsert: true 
-      })
-      
-      if (error) {
-        console.error('Storage error:', error)
-        showToast(`Upload failed: ${error.message}`, 'error')
-        return
-      }
-
-      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
-      const newMoment = await addMoment(user.role, urlData.publicUrl)
-      setTodaysMoments(prev => [...prev, newMoment])
-      setMomentsHistory(prev => [newMoment, ...prev])
-      
-      showToast('Photo uploaded!', 'success')
-    } catch (error) {
-      console.error('Upload error:', error)
-      showToast(`Error: ${error.message}`, 'error')
-    }
-  }
-
   const tabs = [
     { id: 'feel', label: 'How I Feel' },
     { id: 'voice', label: 'Voice Notes' },
     { id: 'letters', label: 'Letters' },
-    { id: 'photo', label: 'Pic of Day' },
   ]
 
   return (
@@ -210,30 +172,6 @@ export default function UsPage() {
                 </div>
               ) : (
                 <p className="text-center text-ink-400 py-12">No letters yet</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'photo' && (
-          <div className="px-6 py-8">
-            <div className="max-w-lg mx-auto">
-              <p className="text-center text-body text-ink-500 mb-6">Share a photo from your day</p>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <PhotoSlot label="Shahjahan" photo={todaysMoments.find(m => m.user_role === 'shah')} canUpload={user?.role === 'shah'} onUpload={handlePhotoUpload} />
-                <PhotoSlot label="Dane" photo={todaysMoments.find(m => m.user_role === 'dane')} canUpload={user?.role === 'dane'} onUpload={handlePhotoUpload} />
-              </div>
-              {momentsHistory.length > 0 && (
-                <div>
-                  <p className="text-body-sm text-ink-400 mb-4">Recent Memories</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {momentsHistory.map((moment) => (
-                      <div key={moment.id} className="aspect-square rounded-xl overflow-hidden bg-cream-200">
-                        <img src={moment.photo_url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
           </div>
@@ -442,94 +380,6 @@ function LetterCard({ letter, currentUser }) {
       </div>
       <p className={`text-body text-ink-600 whitespace-pre-wrap ${!expanded && 'line-clamp-3'}`}>{letter.content}</p>
       {letter.content.length > 150 && <p className="text-body-sm text-forest mt-2 font-medium">{expanded ? 'Tap to collapse' : 'Tap to read more...'}</p>}
-    </div>
-  )
-}
-
-function PhotoSlot({ label, photo, canUpload, onUpload }) {
-  const cameraInputRef = useRef(null)
-  const [uploading, setUploading] = useState(false)
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    setUploading(true)
-    try {
-      // Create image and wait for load
-      const img = new Image()
-      const objectUrl = URL.createObjectURL(file)
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        img.src = objectUrl
-      })
-      
-      // Use a reasonable max size to avoid memory issues
-      const maxSize = 1200
-      let width = img.width
-      let height = img.height
-      
-      if (width > maxSize || height > maxSize) {
-        if (width > height) {
-          height = (height / width) * maxSize
-          width = maxSize
-        } else {
-          width = (width / height) * maxSize
-          height = maxSize
-        }
-      }
-      
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      
-      // Fill white background (in case of transparency)
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(0, 0, width, height)
-      
-      // Draw image - browser should auto-correct EXIF in modern versions
-      ctx.drawImage(img, 0, 0, width, height)
-      
-      URL.revokeObjectURL(objectUrl)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-      const processedFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      
-      await onUpload(processedFile)
-    } catch (err) {
-      console.error('Image processing error:', err)
-      // Fallback: upload original file
-      await onUpload(file)
-    }
-    setUploading(false)
-    if (cameraInputRef.current) cameraInputRef.current.value = ''
-  }
-
-  return (
-    <div className="relative">
-      <div className="aspect-square rounded-2xl overflow-hidden bg-cream-200 shadow-soft">
-        {photo ? (
-          <img src={photo.photo_url} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
-            <span className="text-4xl mb-2">+</span>
-            <p className="text-body-sm">{label}</p>
-          </div>
-        )}
-        {uploading && (
-          <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-      </div>
-      {canUpload && !photo && (
-        <button onClick={() => cameraInputRef.current?.click()} className="absolute inset-0 w-full h-full" />
-      )}
-      <input ref={cameraInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-      <p className="text-center text-caption text-ink-400 mt-2">{label}</p>
     </div>
   )
 }

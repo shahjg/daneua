@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { 
   getCountdowns,
@@ -8,7 +8,10 @@ import {
   answerQuestion,
   sendDuaRequest,
   getLoveNotes,
-  addLoveNote
+  addLoveNote,
+  getTodaysMoments,
+  addMoment,
+  supabase
 } from '../lib/supabase'
 
 export default function HomePage({ onOpenSettings }) {
@@ -24,6 +27,8 @@ export default function HomePage({ onOpenSettings }) {
   const [loveNotes, setLoveNotes] = useState([])
   const [newNote, setNewNote] = useState('')
   const [showAddNote, setShowAddNote] = useState(false)
+  const [todaysMoments, setTodaysMoments] = useState([])
+  const [photoStatus, setPhotoStatus] = useState('')
   const [loading, setLoading] = useState(true)
 
   const greeting = getGreeting()
@@ -55,18 +60,50 @@ export default function HomePage({ onOpenSettings }) {
 
   const fetchData = async () => {
     try {
-      const [countdownData, questionData, notesData] = await Promise.all([
+      const [countdownData, questionData, notesData, momentsData] = await Promise.all([
         getCountdowns(),
         getDailyQuestion(),
-        getLoveNotes ? getLoveNotes() : []
+        getLoveNotes ? getLoveNotes() : [],
+        getTodaysMoments()
       ])
       setCountdowns(countdownData || [])
       setQuestion(questionData)
       setLoveNotes(notesData || [])
+      setTodaysMoments(momentsData || [])
     } catch (error) {
       console.error('Error fetching data:', error)
     }
     setLoading(false)
+  }
+
+  const handlePhotoUpload = async (file) => {
+    setPhotoStatus('Uploading...')
+    try {
+      const fileName = `${user.role}_${Date.now()}.jpg`
+      
+      const { error } = await supabase.storage.from('photos').upload(fileName, file, { 
+        contentType: 'image/jpeg', 
+        upsert: true 
+      })
+      
+      if (error) {
+        console.error('Storage error:', error)
+        setPhotoStatus(`Failed: ${error.message}`)
+        setTimeout(() => setPhotoStatus(''), 4000)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
+      const newMoment = await addMoment(user.role, urlData.publicUrl)
+      setTodaysMoments(prev => [...prev, newMoment])
+      
+      setPhotoStatus('Uploaded!')
+      setTimeout(() => setPhotoStatus(''), 2000)
+    } catch (error) {
+      console.error('Upload error:', error)
+      setPhotoStatus(`Error: ${error.message}`)
+      setTimeout(() => setPhotoStatus(''), 4000)
+    }
   }
 
   const handleSendDua = async () => {
@@ -315,6 +352,32 @@ export default function HomePage({ onOpenSettings }) {
         </div>
       </div>
 
+      {/* Pic of the Day */}
+      <div className="px-6 py-10 bg-gradient-to-br from-rose-50 to-gold-50">
+        <div className="max-w-lg mx-auto">
+          <p className="section-label text-center mb-6">📸 Pic of the Day</p>
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <PhotoSlot 
+              label="Shahjahan" 
+              photo={todaysMoments.find(m => m.user_role === 'shah')} 
+              canUpload={user?.role === 'shah'} 
+              onUpload={handlePhotoUpload} 
+            />
+            <PhotoSlot 
+              label="Dane" 
+              photo={todaysMoments.find(m => m.user_role === 'dane')} 
+              canUpload={user?.role === 'dane'} 
+              onUpload={handlePhotoUpload} 
+            />
+          </div>
+          
+          {photoStatus && (
+            <p className="text-center text-body-sm text-ink-500">{photoStatus}</p>
+          )}
+        </div>
+      </div>
+
       {/* Send a Dua */}
       <div className="px-6 py-10 bg-cream-200">
         <div className="max-w-lg mx-auto">
@@ -476,4 +539,94 @@ function getDaysUntil(dateStr) {
   today.setHours(0, 0, 0, 0)
   const diff = target - today
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
+
+function PhotoSlot({ label, photo, canUpload, onUpload }) {
+  const inputRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setUploading(true)
+    try {
+      // Create image and process
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = objectUrl
+      })
+      
+      // Resize if needed
+      const maxSize = 1200
+      let width = img.width
+      let height = img.height
+      
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = (height / width) * maxSize
+          width = maxSize
+        } else {
+          width = (width / height) * maxSize
+          height = maxSize
+        }
+      }
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, height)
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      URL.revokeObjectURL(objectUrl)
+      
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+      const processedFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      
+      await onUpload(processedFile)
+    } catch (err) {
+      console.error('Image processing error:', err)
+      await onUpload(file)
+    }
+    setUploading(false)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <div className="relative">
+      <div className="aspect-square rounded-2xl overflow-hidden bg-white shadow-soft">
+        {photo ? (
+          <img src={photo.photo_url} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
+            <span className="text-4xl mb-2">📷</span>
+            <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
+            <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+      {canUpload && !photo && (
+        <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
+      )}
+      <input 
+        ref={inputRef} 
+        type="file" 
+        accept="image/*" 
+        capture="environment"
+        className="hidden" 
+        onChange={handleFileChange} 
+      />
+      <p className="text-center text-caption text-ink-500 mt-2 font-medium">{label}</p>
+    </div>
+  )
 }
