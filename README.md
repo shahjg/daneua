@@ -1,60 +1,81 @@
-# D(ane)ua V3 - Fixed
+# D(ane)ua V3 - Fix 7
 
-## What's Fixed
-- ✅ Pic of Day → Opens camera first, then gallery option
-- ✅ Delete goals and date ideas (hover to see delete button)
-- ✅ Word of the day stays same per language all day
-- ✅ "Explore" section redesigned with vibe-based categories
-- ✅ Voice notes work and are shared between both users
-- ✅ Letters have clear submit button
-- ✅ Add Date/Goal buttons clearly visible
-- ✅ **NEW: Ideas tab** - Collaborative notes like Google Docs but cute!
+Private PWA for couples. PIN auth, real-time sync, editorial design.
 
-## New Features
+## What's Fixed (V3-FIX7)
 
-### Ideas Tab 💭
-- Post-it style notes with colors
-- Categories: General, Travel, Home, Date Ideas, Bucket List, Food, Gift Ideas
-- Pin important ideas
-- Mark ideas as complete
-- Voice ideas (record & save)
-- Add photos to ideas
-- Live typing indicator (see when partner is adding)
+- **In-app notifications** - No more browser alerts or Vercel prompts. All errors/success shown as toast notifications
+- **Photo orientation** - Canvas processing fixes iOS photo flip/mirror issues
+- **Delete modals** - All delete actions use in-app confirmation modals
+- **Edit functionality** - Goals, Plans, Calendar events all have edit with delete inside
+- **Live Calendar** - Visual calendar grid with date picker
+- **Today's Question** - Both answers visible once submitted
+- **Dua categories** - Choose from Love, Prayer, Work Hard, Health, Peace, Gratitude
+- **Ideas redesign** - Google Docs style with user-created folders, documents, sketches
 
-## CRITICAL: Do This First
+## What's New
 
-### Step 1: Create Storage Buckets
+### Learn Page
+- Urdu: 100+ words, grammar, alphabet (swipeable), numbers, voice recording
+- Tagalog: Full library, alphabet, numbers, voice recording  
+- Islam: Word of day, 4-level lessons, Arabic alphabet, Arabic numbers
+- Voice Practice: Record yourself saying words, see partner's recordings
 
-1. Go to Supabase → **Storage**
-2. Click **New bucket**
-3. Name: `audio` → Toggle **Public bucket** = ON → Create
-4. Repeat for bucket named `photos`
+### Ideas Page  
+- Create your own folders
+- Document editor with real-time sync
+- Sketch/drawing on documents
+- Quick notes section
 
-### Step 2: Run the SQL
+### Plans Page
+- Visual calendar grid (tap any date to add event)
+- Edit events with delete option
+- Date ideas with checkboxes
+- Countdowns with edit/delete
 
-Go to Supabase → **SQL Editor** → New Query
+### Goals Page
+- Full edit/delete modal
+- Milestones with progress bar
 
-Copy and paste the contents of `setup.sql` and run it.
+## First Time Setup
 
-This will:
-- Create `voice_notes` table
-- Create `shared_ideas` table (for Ideas feature)
-- Set up storage policies
-- Update your name to "Shahjahan"
+### 1. Create Storage Buckets (CRITICAL)
+In Supabase Dashboard:
+1. Go to **Storage**
+2. Click **New Bucket**
+3. Create bucket named `audio` - Toggle **Public** ON
+4. Create bucket named `photos` - Toggle **Public** ON
 
-## To Deploy
+### 2. Run Database SQL
+1. Go to **SQL Editor** in Supabase
+2. Paste contents of `setup.sql`
+3. Click **Run**
 
-1. GitHub Desktop → delete everything in your local repo
-2. Extract zip → copy `daneua-v3-fix3` contents into repo  
-3. Commit → Push
-4. Wait for Vercel
+### 3. Deploy
+```bash
+# Extract zip to your local repo
+# Then:
+git add .
+git commit -m "V3-FIX7"
+git push
+```
+Vercel auto-deploys on push.
 
 ## Default PINs
-- **Shahjahan:** `1111`
-- **Dane:** `2222`
+- Shahjahan: 1111
+- Dane: 2222
 
-## Upcoming Features (Not in this release)
-- Push notifications for Duas and updates
-- Lesson levels and progress tracking
-- More comprehensive language lessons (Gemini's suggestions)
-- Video support in Ideas
+## Features
+
+- **Home**: Status updates, daily question (both answers visible), dua categories, love notes
+- **Plans**: Live calendar, date ideas, countdowns
+- **Goals**: Milestones with progress tracking
+- **Us**: Moods, voice notes, love letters, pic of the day
+- **Learn**: Urdu/Tagalog/Islam with voice practice
+- **Ideas**: Folders, documents, sketches, quick notes
+
+## Tech Stack
+- React + Vite
+- Supabase (DB + Auth + Storage + Realtime)
+- Tailwind CSS
+- PWA with service worker

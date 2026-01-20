@@ -1,183 +1,97 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import {
-  getFolders,
-  createFolder,
-  deleteFolder,
-  getDocuments,
-  createDocument,
-  updateDocument,
-  deleteDocument
-} from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 export default function IdeasPage() {
   const { user } = useAuth()
+  const [view, setView] = useState('home')
   const [folders, setFolders] = useState([])
-  const [selectedFolder, setSelectedFolder] = useState(null)
   const [documents, setDocuments] = useState([])
+  const [quickNotes, setQuickNotes] = useState([])
+  const [selectedFolder, setSelectedFolder] = useState(null)
   const [selectedDoc, setSelectedDoc] = useState(null)
-  const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [showAddFolder, setShowAddFolder] = useState(false)
 
   useEffect(() => {
     fetchFolders()
+    fetchQuickNotes()
   }, [])
 
-  useEffect(() => {
-    if (selectedFolder) {
-      fetchDocuments(selectedFolder.id)
-    }
-  }, [selectedFolder])
-
   const fetchFolders = async () => {
-    try {
-      const data = await getFolders()
-      setFolders(data || [])
-    } catch (error) {
-      console.error('Error:', error)
-    }
-    setLoading(false)
+    const { data } = await supabase.from('idea_folders').select('*').order('created_at')
+    setFolders(data || [])
+  }
+
+  const fetchQuickNotes = async () => {
+    const { data } = await supabase.from('quick_notes').select('*').order('created_at', { ascending: false })
+    setQuickNotes(data || [])
   }
 
   const fetchDocuments = async (folderId) => {
-    try {
-      const data = await getDocuments(folderId)
-      setDocuments(data || [])
-    } catch (error) {
-      console.error('Error:', error)
-    }
+    const { data } = await supabase.from('idea_documents').select('*').eq('folder_id', folderId).order('updated_at', { ascending: false })
+    setDocuments(data || [])
   }
 
-  const handleCreateFolder = async () => {
+  const addFolder = async () => {
     if (!newFolderName.trim()) return
-    try {
-      const folder = await createFolder(newFolderName, user.role)
-      setFolders(prev => [...prev, folder])
-      setNewFolderName('')
-      setShowNewFolder(false)
-    } catch (error) {
-      console.error('Error:', error)
+    await supabase.from('idea_folders').insert({ name: newFolderName.trim(), created_by: user.role })
+    setNewFolderName('')
+    setShowAddFolder(false)
+    fetchFolders()
+  }
+
+  const openFolder = (folder) => {
+    setSelectedFolder(folder)
+    fetchDocuments(folder.id)
+    setView('folder')
+  }
+
+  const createDocument = async () => {
+    const { data } = await supabase.from('idea_documents').insert({
+      folder_id: selectedFolder.id,
+      title: 'Untitled',
+      content: '',
+      created_by: user.role,
+      last_edited_by: user.role
+    }).select().single()
+    if (data) {
+      setSelectedDoc(data)
+      setView('editor')
     }
   }
 
-  const handleDeleteFolder = async (id) => {
-    if (!confirm('Delete this folder and all documents?')) return
-    try {
-      await deleteFolder(id)
-      setFolders(prev => prev.filter(f => f.id !== id))
-      if (selectedFolder?.id === id) {
-        setSelectedFolder(null)
-        setDocuments([])
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  const openDocument = (doc) => {
+    setSelectedDoc(doc)
+    setView('editor')
   }
 
-  const handleCreateDocument = async () => {
-    try {
-      const doc = await createDocument(selectedFolder.id, 'Untitled', '', user.role)
-      setDocuments(prev => [doc, ...prev])
-      setSelectedDoc(doc)
-    } catch (error) {
-      console.error('Error:', error)
-    }
+  if (view === 'editor' && selectedDoc) {
+    return <DocumentEditor doc={selectedDoc} user={user} onBack={() => { setView('folder'); fetchDocuments(selectedFolder.id) }} />
   }
 
-  const handleSaveDocument = async (title, content) => {
-    try {
-      await updateDocument(selectedDoc.id, title, content)
-      setDocuments(prev => prev.map(d => 
-        d.id === selectedDoc.id ? { ...d, title, content } : d
-      ))
-      setSelectedDoc(prev => ({ ...prev, title, content }))
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  const handleDeleteDocument = async (id) => {
-    if (!confirm('Delete this document?')) return
-    try {
-      await deleteDocument(id)
-      setDocuments(prev => prev.filter(d => d.id !== id))
-      if (selectedDoc?.id === id) setSelectedDoc(null)
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
-  // Document Editor View
-  if (selectedDoc) {
-    return (
-      <DocumentEditor
-        doc={selectedDoc}
-        onSave={handleSaveDocument}
-        onBack={() => setSelectedDoc(null)}
-        onDelete={() => handleDeleteDocument(selectedDoc.id)}
-      />
-    )
-  }
-
-  // Documents List View
-  if (selectedFolder) {
+  if (view === 'folder' && selectedFolder) {
     return (
       <div className="min-h-screen pb-28">
-        <div className="bg-rose-100 px-6 pt-14 pb-10">
+        <div className="bg-forest px-6 pt-14 pb-12">
           <div className="max-w-lg mx-auto">
-            <button 
-              onClick={() => { setSelectedFolder(null); setDocuments([]) }}
-              className="flex items-center gap-3 text-forest mb-4"
-            >
-              <div className="w-10 h-10 rounded-full bg-forest flex items-center justify-center">
-                <svg className="w-5 h-5 text-cream-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </div>
-              <span className="text-body font-medium">Back</span>
-            </button>
-            <h1 className="font-serif text-display-sm text-forest">{selectedFolder.name}</h1>
+            <button onClick={() => setView('home')} className="text-cream-300 text-body-sm mb-4">← Back</button>
+            <h1 className="font-serif text-display-sm text-cream-50">{selectedFolder.name}</h1>
           </div>
         </div>
-
-        <div className="bg-cream min-h-[60vh] px-6 py-8">
+        <div className="bg-cream px-6 py-8 min-h-[60vh]">
           <div className="max-w-lg mx-auto">
-            <button
-              onClick={handleCreateDocument}
-              className="w-full mb-6 py-5 border-2 border-dashed border-rose-300 rounded-2xl text-rose-500 hover:border-rose-400 hover:bg-rose-50 transition-all font-medium"
-            >
-              + New Document
-            </button>
-
-            {documents.length > 0 ? (
-              <div className="space-y-3">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="bg-white rounded-2xl p-5 shadow-soft group relative cursor-pointer hover:shadow-card transition-shadow"
-                    onClick={() => setSelectedDoc(doc)}
-                  >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id) }}
-                      className="absolute top-4 right-4 w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                    >
-                      ×
-                    </button>
-                    <h3 className="font-serif text-title-sm text-forest">{doc.title || 'Untitled'}</h3>
-                    <p className="text-body-sm text-ink-400 mt-1">
-                      {doc.content ? doc.content.replace(/<[^>]*>/g, '').substring(0, 100) + '...' : 'Empty document'}
-                    </p>
-                    <p className="text-caption text-ink-300 mt-2">
-                      {new Date(doc.updated_at || doc.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
+            <button onClick={createDocument} className="w-full bg-forest text-cream-100 rounded-xl p-4 mb-6 font-medium">New Document</button>
+            {documents.length === 0 ? (
+              <p className="text-center text-ink-400 py-12">No documents yet</p>
             ) : (
-              <div className="text-center py-16">
-                <span className="text-5xl block mb-4">📝</span>
-                <p className="text-body text-ink-400">No documents yet</p>
+              <div className="space-y-3">
+                {documents.map(doc => (
+                  <button key={doc.id} onClick={() => openDocument(doc)} className="w-full bg-white rounded-xl p-4 shadow-soft text-left">
+                    <p className="font-medium text-forest">{doc.title || 'Untitled'}</p>
+                    <p className="text-body-sm text-ink-400">{new Date(doc.updated_at).toLocaleDateString()}</p>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -186,388 +100,332 @@ export default function IdeasPage() {
     )
   }
 
-  // Folders View
   return (
     <div className="min-h-screen pb-28">
-      <div className="bg-rose-100 px-6 pt-14 pb-12">
+      <div className="bg-forest px-6 pt-14 pb-12">
         <div className="max-w-lg mx-auto text-center">
-          <h1 className="font-serif text-display-sm text-forest mb-2">Ideas</h1>
-          <p className="text-body text-forest-600">Your shared thoughts & plans</p>
+          <h1 className="font-serif text-display-sm text-cream-50 mb-2">Ideas</h1>
+          <p className="text-body text-cream-300">Our shared space</p>
         </div>
       </div>
 
-      <div className="bg-cream min-h-[60vh] px-6 py-8">
+      <div className="bg-cream px-6 py-8 min-h-[60vh]">
         <div className="max-w-lg mx-auto">
-          {/* New Folder */}
-          {showNewFolder ? (
-            <div className="bg-white rounded-2xl p-5 shadow-card mb-6">
-              <input
-                type="text"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Folder name..."
-                className="input mb-3"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button onClick={handleCreateFolder} className="btn-primary flex-1 py-2">Create</button>
-                <button onClick={() => { setShowNewFolder(false); setNewFolderName('') }} className="btn-ghost py-2">Cancel</button>
-              </div>
+          {/* Folders */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-serif text-title text-forest">Folders</h2>
+              <button onClick={() => setShowAddFolder(true)} className="text-body-sm text-forest font-medium">+ Add Folder</button>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowNewFolder(true)}
-              className="w-full mb-6 py-5 border-2 border-dashed border-rose-300 rounded-2xl text-rose-500 hover:border-rose-400 hover:bg-rose-50 transition-all font-medium"
-            >
-              + New Folder
-            </button>
-          )}
 
-          {/* Folders Grid */}
-          {loading ? (
-            <p className="text-center py-12 text-ink-400">Loading...</p>
-          ) : folders.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              {folders.map((folder) => (
-                <div
-                  key={folder.id}
-                  className="bg-white rounded-2xl p-6 shadow-soft group relative cursor-pointer hover:shadow-card transition-shadow"
-                  onClick={() => setSelectedFolder(folder)}
-                >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id) }}
-                    className="absolute top-3 right-3 w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:bg-rose-200"
-                  >
-                    ×
-                  </button>
-                  <span className="text-4xl block mb-3">📁</span>
-                  <h3 className="font-serif text-title-sm text-forest">{folder.name}</h3>
-                  <p className="text-caption text-ink-400 mt-1">
-                    {folder.document_count || 0} docs
-                  </p>
+            {showAddFolder && (
+              <div className="bg-white rounded-xl p-4 shadow-soft mb-4">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  placeholder="Folder name..."
+                  className="w-full px-3 py-2 border border-cream-300 rounded-lg mb-3"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={addFolder} className="flex-1 bg-forest text-cream-100 rounded-lg py-2 text-body-sm">Create</button>
+                  <button onClick={() => { setShowAddFolder(false); setNewFolderName('') }} className="flex-1 bg-cream-200 text-ink-500 rounded-lg py-2 text-body-sm">Cancel</button>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <span className="text-5xl block mb-4">📁</span>
-              <p className="text-body text-ink-400">No folders yet</p>
-              <p className="text-body-sm text-ink-300 mt-2">Create a folder to organize your ideas</p>
-            </div>
-          )}
+              </div>
+            )}
+
+            {folders.length === 0 ? (
+              <p className="text-ink-400 text-center py-8">No folders yet. Create one to get started.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {folders.map(folder => (
+                  <button key={folder.id} onClick={() => openFolder(folder)} className="bg-white rounded-xl p-4 shadow-soft text-left">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 mb-2">F</div>
+                    <p className="font-medium text-forest">{folder.name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Notes */}
+          <div>
+            <h2 className="font-serif text-title text-forest mb-4">Quick Notes</h2>
+            <QuickNotesSection notes={quickNotes} user={user} onRefresh={fetchQuickNotes} />
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// Rich Text Document Editor with Google Docs-like features
-function DocumentEditor({ doc, onSave, onBack, onDelete }) {
-  const [title, setTitle] = useState(doc.title || 'Untitled')
-  const [hasChanges, setHasChanges] = useState(false)
+function QuickNotesSection({ notes, user, onRefresh }) {
+  const [newNote, setNewNote] = useState('')
+
+  const addNote = async () => {
+    if (!newNote.trim()) return
+    await supabase.from('quick_notes').insert({ content: newNote.trim(), added_by: user.role })
+    setNewNote('')
+    onRefresh()
+  }
+
+  const deleteNote = async (id) => {
+    await supabase.from('quick_notes').delete().eq('id', id)
+    onRefresh()
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newNote}
+          onChange={e => setNewNote(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addNote()}
+          placeholder="Add a quick note..."
+          className="flex-1 px-4 py-3 bg-white border border-cream-300 rounded-xl"
+        />
+        <button onClick={addNote} className="px-4 bg-forest text-cream-100 rounded-xl">Add</button>
+      </div>
+      <div className="space-y-2">
+        {notes.map(note => (
+          <div key={note.id} className="bg-white rounded-xl p-4 shadow-soft flex justify-between items-start">
+            <div>
+              <p className="text-body text-ink-600">{note.content}</p>
+              <p className="text-caption text-ink-300 mt-1">by {note.added_by === 'shah' ? 'Shahjahan' : 'Dane'}</p>
+            </div>
+            <button onClick={() => deleteNote(note.id)} className="text-ink-300 hover:text-rose-500 p-1">x</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DocumentEditor({ doc, user, onBack }) {
+  const [title, setTitle] = useState(doc.title || '')
+  const [content, setContent] = useState(doc.content || '')
   const [saving, setSaving] = useState(false)
-  const [showColorPicker, setShowColorPicker] = useState(null)
-  const editorRef = useRef(null)
+  const [showDelete, setShowDelete] = useState(false)
+  const [showSketch, setShowSketch] = useState(false)
+  const [sketches, setSketches] = useState(doc.sketches || [])
+  const saveTimeoutRef = useRef(null)
+
+  const theirName = user?.role === 'shah' ? 'Dane' : 'Shahjahan'
 
   useEffect(() => {
-    if (editorRef.current && doc.content) {
-      editorRef.current.innerHTML = doc.content
-    }
-  }, [])
+    const channel = supabase.channel(`doc-${doc.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'idea_documents', filter: `id=eq.${doc.id}` }, (payload) => {
+        if (payload.new.last_edited_by !== user.role) {
+          setTitle(payload.new.title || '')
+          setContent(payload.new.content || '')
+          setSketches(payload.new.sketches || [])
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [doc.id, user.role])
 
-  const handleSave = async () => {
+  const saveDocument = async (newTitle, newContent, newSketches) => {
     setSaving(true)
-    await onSave(title, editorRef.current?.innerHTML || '')
-    setHasChanges(false)
+    await supabase.from('idea_documents').update({
+      title: newTitle,
+      content: newContent,
+      sketches: newSketches,
+      last_edited_by: user.role,
+      updated_at: new Date().toISOString()
+    }).eq('id', doc.id)
     setSaving(false)
   }
 
-  const execCommand = (command, value = null) => {
-    document.execCommand(command, false, value)
-    editorRef.current?.focus()
-    setHasChanges(true)
+  const handleTitleChange = (val) => {
+    setTitle(val)
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => saveDocument(val, content, sketches), 500)
   }
 
-  const insertImage = () => {
-    const url = prompt('Enter image URL:')
-    if (url) {
-      execCommand('insertImage', url)
-    }
+  const handleContentChange = (val) => {
+    setContent(val)
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => saveDocument(title, val, sketches), 500)
   }
 
-  const setFontSize = (size) => {
-    execCommand('fontSize', size)
+  const deleteDocument = async () => {
+    await supabase.from('idea_documents').delete().eq('id', doc.id)
+    onBack()
   }
 
-  const setFontName = (font) => {
-    execCommand('fontName', font)
+  const saveSketch = (dataUrl) => {
+    const newSketches = [...sketches, { id: Date.now(), dataUrl, createdBy: user.role }]
+    setSketches(newSketches)
+    setShowSketch(false)
+    saveDocument(title, content, newSketches)
   }
 
-  const colors = ['#000000', '#374151', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']
-  const highlightColors = ['#fef3c7', '#fecaca', '#d1fae5', '#dbeafe', '#f3e8ff', '#fce7f3', '#ffffff']
+  const deleteSketch = (id) => {
+    const newSketches = sketches.filter(s => s.id !== id)
+    setSketches(newSketches)
+    saveDocument(title, content, newSketches)
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <div className="bg-forest px-4 pt-12 pb-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={onBack} className="flex items-center gap-2 text-cream-200 hover:text-cream-100">
-              <div className="w-10 h-10 rounded-full bg-forest-600 flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </div>
-              <span className="font-medium">Back</span>
-            </button>
-            <div className="flex items-center gap-2">
-              {hasChanges && <span className="text-gold text-sm">Unsaved changes</span>}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2 bg-gold text-forest rounded-full font-semibold hover:bg-gold-400 transition-colors"
-              >
-                {saving ? 'Saving...' : '💾 Save'}
-              </button>
-            </div>
+    <div className="min-h-screen pb-28">
+      <div className="bg-forest px-6 pt-14 pb-6">
+        <div className="max-w-lg mx-auto flex justify-between items-center">
+          <button onClick={onBack} className="text-cream-300 text-body-sm">← Back</button>
+          <div className="flex items-center gap-3">
+            {saving && <span className="text-cream-400 text-body-sm">Saving...</span>}
+            <button onClick={() => setShowSketch(true)} className="text-cream-300 text-body-sm">Sketch</button>
+            <button onClick={() => setShowDelete(true)} className="text-cream-300 text-body-sm">Delete</button>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-cream px-6 py-6 min-h-[70vh]">
+        <div className="max-w-lg mx-auto">
           <input
             type="text"
             value={title}
-            onChange={(e) => { setTitle(e.target.value); setHasChanges(true) }}
-            className="w-full bg-transparent text-cream-50 font-serif text-2xl border-none outline-none placeholder-cream-400"
-            placeholder="Document title..."
+            onChange={e => handleTitleChange(e.target.value)}
+            placeholder="Untitled"
+            className="w-full bg-transparent font-serif text-display-sm text-forest border-none outline-none mb-4"
           />
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="bg-cream-200 border-b border-cream-300 px-4 py-2 sticky top-0 z-20 overflow-x-auto">
-        <div className="max-w-4xl mx-auto flex items-center gap-1 flex-wrap">
-          {/* Font */}
-          <select 
-            onChange={(e) => setFontName(e.target.value)}
-            className="px-2 py-1 rounded bg-white border border-cream-300 text-sm"
-          >
-            <option value="Arial">Arial</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Times New Roman">Times</option>
-            <option value="Courier New">Courier</option>
-            <option value="Verdana">Verdana</option>
-          </select>
-
-          {/* Font Size */}
-          <select 
-            onChange={(e) => setFontSize(e.target.value)}
-            className="px-2 py-1 rounded bg-white border border-cream-300 text-sm"
-          >
-            <option value="2">Small</option>
-            <option value="3">Normal</option>
-            <option value="4">Large</option>
-            <option value="5">X-Large</option>
-            <option value="6">Huge</option>
-          </select>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Basic Formatting */}
-          <button onClick={() => execCommand('bold')} className="toolbar-btn font-bold">B</button>
-          <button onClick={() => execCommand('italic')} className="toolbar-btn italic">I</button>
-          <button onClick={() => execCommand('underline')} className="toolbar-btn underline">U</button>
-          <button onClick={() => execCommand('strikeThrough')} className="toolbar-btn line-through">S</button>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Text Color */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowColorPicker(showColorPicker === 'text' ? null : 'text')}
-              className="toolbar-btn flex items-center gap-1"
-            >
-              <span className="text-red-500">A</span>
-              <span className="text-xs">▼</span>
-            </button>
-            {showColorPicker === 'text' && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-white rounded-lg shadow-lg z-30 flex gap-1 flex-wrap w-32">
-                {colors.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => { execCommand('foreColor', c); setShowColorPicker(null) }}
-                    className="w-6 h-6 rounded border border-cream-300"
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Highlight Color */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowColorPicker(showColorPicker === 'highlight' ? null : 'highlight')}
-              className="toolbar-btn flex items-center gap-1"
-            >
-              <span className="bg-yellow-200 px-1">H</span>
-              <span className="text-xs">▼</span>
-            </button>
-            {showColorPicker === 'highlight' && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-white rounded-lg shadow-lg z-30 flex gap-1 flex-wrap w-32">
-                {highlightColors.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => { execCommand('hiliteColor', c); setShowColorPicker(null) }}
-                    className="w-6 h-6 rounded border border-cream-300"
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Headers */}
-          <button onClick={() => execCommand('formatBlock', '<h1>')} className="toolbar-btn text-lg font-bold">H1</button>
-          <button onClick={() => execCommand('formatBlock', '<h2>')} className="toolbar-btn text-base font-bold">H2</button>
-          <button onClick={() => execCommand('formatBlock', '<h3>')} className="toolbar-btn text-sm font-bold">H3</button>
-          <button onClick={() => execCommand('formatBlock', '<p>')} className="toolbar-btn text-sm">¶</button>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Lists */}
-          <button onClick={() => execCommand('insertUnorderedList')} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <button onClick={() => execCommand('insertOrderedList')} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-          </button>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Alignment */}
-          <button onClick={() => execCommand('justifyLeft')} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h10M3 18h14" />
-            </svg>
-          </button>
-          <button onClick={() => execCommand('justifyCenter')} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M7 12h10M5 18h14" />
-            </svg>
-          </button>
-          <button onClick={() => execCommand('justifyRight')} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M11 12h10M7 18h14" />
-            </svg>
-          </button>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Image */}
-          <button onClick={insertImage} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </button>
-
-          {/* Link */}
-          <button onClick={() => {
-            const url = prompt('Enter URL:')
-            if (url) execCommand('createLink', url)
-          }} className="toolbar-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-          </button>
-
-          <div className="w-px h-6 bg-cream-400 mx-1" />
-
-          {/* Undo/Redo */}
-          <button onClick={() => execCommand('undo')} className="toolbar-btn">↶</button>
-          <button onClick={() => execCommand('redo')} className="toolbar-btn">↷</button>
-        </div>
-      </div>
-
-      {/* Editor */}
-      <div className="flex-1 bg-white">
-        <div className="max-w-4xl mx-auto p-6">
-          <div
-            ref={editorRef}
-            contentEditable
-            onInput={() => setHasChanges(true)}
-            className="min-h-[60vh] outline-none prose prose-lg max-w-none"
-            style={{ 
-              lineHeight: 1.8,
-              fontSize: '16px'
-            }}
+          <textarea
+            value={content}
+            onChange={e => handleContentChange(e.target.value)}
             placeholder="Start writing..."
+            className="w-full h-64 bg-transparent text-body text-ink-600 border-none outline-none resize-none"
           />
+
+          {/* Sketches */}
+          {sketches.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-cream-300">
+              <h3 className="font-medium text-forest mb-3">Sketches</h3>
+              <div className="space-y-3">
+                {sketches.map(sketch => (
+                  <div key={sketch.id} className="relative">
+                    <img src={sketch.dataUrl} alt="Sketch" className="w-full rounded-xl border border-cream-300" />
+                    <button onClick={() => deleteSketch(sketch.id)} className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow text-ink-400">x</button>
+                    <p className="text-caption text-ink-300 mt-1">by {sketch.createdBy === 'shah' ? 'Shahjahan' : 'Dane'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <style>{`
-        .toolbar-btn {
-          padding: 6px 10px;
-          border-radius: 6px;
-          background: white;
-          border: 1px solid #e5e0d8;
-          cursor: pointer;
-          transition: all 0.15s;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-width: 32px;
-          height: 32px;
-        }
-        .toolbar-btn:hover {
-          background: #f5f2ed;
-          border-color: #d4cfc5;
-        }
-        .toolbar-btn:active {
-          background: #ebe7e0;
-        }
-        [contenteditable]:empty:before {
-          content: attr(placeholder);
-          color: #9ca3af;
-          pointer-events: none;
-        }
-        [contenteditable] img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 8px;
-          margin: 16px 0;
-        }
-        [contenteditable] h1 {
-          font-size: 2em;
-          font-weight: bold;
-          margin: 1em 0 0.5em;
-          font-family: serif;
-        }
-        [contenteditable] h2 {
-          font-size: 1.5em;
-          font-weight: bold;
-          margin: 1em 0 0.5em;
-          font-family: serif;
-        }
-        [contenteditable] h3 {
-          font-size: 1.25em;
-          font-weight: bold;
-          margin: 1em 0 0.5em;
-        }
-        [contenteditable] ul, [contenteditable] ol {
-          margin: 1em 0;
-          padding-left: 2em;
-        }
-        [contenteditable] a {
-          color: #2563eb;
-          text-decoration: underline;
-        }
-      `}</style>
+      {/* Delete Modal */}
+      {showDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="font-serif text-title text-forest mb-2">Delete Document?</h3>
+            <p className="text-body text-ink-500 mb-6">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDelete(false)} className="flex-1 py-3 bg-cream-200 rounded-xl text-ink-600">Cancel</button>
+              <button onClick={deleteDocument} className="flex-1 py-3 bg-rose-500 text-white rounded-xl">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sketch Modal */}
+      {showSketch && <SketchCanvas onSave={saveSketch} onClose={() => setShowSketch(false)} />}
+    </div>
+  )
+}
+
+function SketchCanvas({ onSave, onClose }) {
+  const canvasRef = useRef(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [color, setColor] = useState('#1a3a2f')
+  const [brushSize, setBrushSize] = useState(4)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }, [])
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    }
+  }
+
+  const startDrawing = (e) => {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const { x, y } = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.strokeStyle = color
+    ctx.lineWidth = brushSize
+    ctx.lineCap = 'round'
+    setIsDrawing(true)
+  }
+
+  const draw = (e) => {
+    if (!isDrawing) return
+    e.preventDefault()
+    const ctx = canvasRef.current.getContext('2d')
+    const { x, y } = getPos(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => setIsDrawing(false)
+
+  const clear = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }
+
+  const save = () => {
+    const dataUrl = canvasRef.current.toDataURL('image/png')
+    onSave(dataUrl)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+      <div className="bg-white px-4 py-3 flex justify-between items-center">
+        <button onClick={onClose} className="text-ink-500">Cancel</button>
+        <div className="flex gap-2">
+          {['#1a3a2f', '#000', '#3b82f6', '#ef4444', '#f59e0b'].map(c => (
+            <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-forest' : ''}`} style={{ backgroundColor: c }} />
+          ))}
+        </div>
+        <button onClick={save} className="text-forest font-medium">Save</button>
+      </div>
+      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={600}
+          className="bg-white rounded-xl shadow-lg max-w-full max-h-full touch-none"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+        />
+      </div>
+      <div className="bg-white px-4 py-3 flex justify-center gap-4">
+        <button onClick={clear} className="px-4 py-2 bg-cream-200 rounded-lg text-ink-600">Clear</button>
+        <input type="range" min="2" max="20" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-32" />
+      </div>
     </div>
   )
 }
