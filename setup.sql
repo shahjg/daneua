@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS love_notes (
   from_user TEXT NOT NULL CHECK (from_user IN ('shah', 'dane')),
   to_user TEXT NOT NULL CHECK (to_user IN ('shah', 'dane')),
   note TEXT NOT NULL,
+  reaction TEXT DEFAULT NULL,
+  read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

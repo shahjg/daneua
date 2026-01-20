@@ -172,6 +172,23 @@ export default function HomePage({ onOpenSettings }) {
     }
   }
 
+  const handleReactToNote = async (noteId, reaction) => {
+    try {
+      await supabase
+        .from('love_notes')
+        .update({ read: true, reaction })
+        .eq('id', noteId)
+      
+      setLoveNotes(prev => prev.map(n => 
+        n.id === noteId ? { ...n, read: true, reaction } : n
+      ))
+      showToast(`Reacted with ${reaction}`, 'success')
+    } catch (error) {
+      console.error('Error reacting:', error)
+      showToast(`Error: ${error.message}`, 'error')
+    }
+  }
+
   const myAnswer = user?.role === 'shah' ? question?.shah_answer : question?.dane_answer
   const theirAnswer = user?.role === 'shah' ? question?.dane_answer : question?.shah_answer
 
@@ -345,18 +362,46 @@ export default function HomePage({ onOpenSettings }) {
             </div>
           )}
 
-          {loveNotes.length > 0 ? (
+          {/* Unread notes from partner - show prominently */}
+          {loveNotes.filter(n => n.to_user === user?.role && !n.read).map((note) => (
+            <div key={note.id} className="bg-gradient-to-br from-rose-100 to-gold-50 rounded-2xl p-5 mb-4 shadow-soft">
+              <p className="text-caption text-rose-600 mb-2">{theirName} sent you a note 💌</p>
+              <p className="text-body text-ink-700 mb-4">{note.note}</p>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleReactToNote(note.id, '❤️')}
+                  className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 transition-colors"
+                >
+                  ❤️ Love it
+                </button>
+                <button 
+                  onClick={() => handleReactToNote(note.id, '🥰')}
+                  className="flex-1 py-3 bg-gold-500 text-white rounded-xl font-medium hover:bg-gold-600 transition-colors"
+                >
+                  🥰 So sweet
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Already read notes or notes you sent */}
+          {loveNotes.filter(n => n.from_user === user?.role || n.read).length > 0 ? (
             <div className="space-y-3">
-              {loveNotes.slice(0, 3).map((note) => (
+              {loveNotes.filter(n => n.from_user === user?.role || n.read).slice(0, 5).map((note) => (
                 <div key={note.id} className={`rounded-2xl p-4 ${note.from_user === user?.role ? 'bg-forest text-cream-100' : 'bg-rose-100 text-rose-800'}`}>
-                  <p className="text-caption opacity-70 mb-1">
-                    {note.from_user === user?.role ? 'You' : theirName}
-                  </p>
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="text-caption opacity-70">
+                      {note.from_user === user?.role ? 'You' : theirName}
+                    </p>
+                    {note.reaction && (
+                      <span className="text-lg">{note.reaction}</span>
+                    )}
+                  </div>
                   <p className="text-body">{note.note}</p>
                 </div>
               ))}
             </div>
-          ) : !showAddNote && (
+          ) : !showAddNote && loveNotes.filter(n => n.to_user === user?.role && !n.read).length === 0 && (
             <button 
               onClick={() => setShowAddNote(true)}
               className="w-full py-6 border-2 border-dashed border-rose-200 rounded-2xl text-rose-400 hover:border-rose-300 hover:bg-rose-50 transition-all"
