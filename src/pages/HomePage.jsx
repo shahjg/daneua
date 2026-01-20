@@ -174,14 +174,14 @@ export default function HomePage({ onOpenSettings }) {
 
   const handleReactToNote = async (noteId, reaction) => {
     try {
+      // Delete the note after reacting
       await supabase
         .from('love_notes')
-        .update({ read: true, reaction })
+        .delete()
         .eq('id', noteId)
       
-      setLoveNotes(prev => prev.map(n => 
-        n.id === noteId ? { ...n, read: true, reaction } : n
-      ))
+      // Remove from local state
+      setLoveNotes(prev => prev.filter(n => n.id !== noteId))
       showToast(`Reacted with ${reaction}`, 'success')
     } catch (error) {
       console.error('Error reacting:', error)
@@ -384,24 +384,21 @@ export default function HomePage({ onOpenSettings }) {
             </div>
           ))}
 
-          {/* Already read notes or notes you sent */}
-          {loveNotes.filter(n => n.from_user === user?.role || n.read).length > 0 ? (
+          {/* Notes you sent - pending reaction */}
+          {loveNotes.filter(n => n.from_user === user?.role).length > 0 && (
             <div className="space-y-3">
-              {loveNotes.filter(n => n.from_user === user?.role || n.read).slice(0, 5).map((note) => (
-                <div key={note.id} className={`rounded-2xl p-4 ${note.from_user === user?.role ? 'bg-forest text-cream-100' : 'bg-rose-100 text-rose-800'}`}>
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="text-caption opacity-70">
-                      {note.from_user === user?.role ? 'You' : theirName}
-                    </p>
-                    {note.reaction && (
-                      <span className="text-lg">{note.reaction}</span>
-                    )}
-                  </div>
+              {loveNotes.filter(n => n.from_user === user?.role).slice(0, 3).map((note) => (
+                <div key={note.id} className="rounded-2xl p-4 bg-forest text-cream-100">
+                  <p className="text-caption opacity-70 mb-1">You sent</p>
                   <p className="text-body">{note.note}</p>
+                  <p className="text-caption opacity-50 mt-2">Waiting for {theirName} to react...</p>
                 </div>
               ))}
             </div>
-          ) : !showAddNote && loveNotes.filter(n => n.to_user === user?.role && !n.read).length === 0 && (
+          )}
+
+          {/* Empty state */}
+          {loveNotes.length === 0 && !showAddNote && (
             <button 
               onClick={() => setShowAddNote(true)}
               className="w-full py-6 border-2 border-dashed border-rose-200 rounded-2xl text-rose-400 hover:border-rose-300 hover:bg-rose-50 transition-all"
