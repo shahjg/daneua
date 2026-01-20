@@ -328,9 +328,14 @@ function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
     setSending(true)
     try {
       const fileName = `${user.role}_${Date.now()}.webm`
-      const { error: uploadError } = await supabase.storage.from('audio').upload(fileName, audioBlob, { contentType: audioBlob.type })
+      const { error: uploadError } = await supabase.storage.from('audio').upload(fileName, audioBlob, { contentType: audioBlob.type || 'audio/webm' })
       
-      if (uploadError) throw new Error(uploadError.message)
+      if (uploadError) {
+        console.error('Audio upload error:', uploadError)
+        showToast(`Upload failed: ${uploadError.message}`, 'error')
+        setSending(false)
+        return
+      }
 
       const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
       const newNote = await saveVoiceNote(user.role, urlData.publicUrl)
@@ -338,7 +343,8 @@ function VoiceNoteRecorder({ user, theirName, onSent, showToast }) {
       onSent(newNote)
       cancelRecording()
     } catch (err) {
-      showToast('Could not send. Make sure audio bucket exists in Supabase and is public.', 'error')
+      console.error('Voice note error:', err)
+      showToast(`Error: ${err.message}`, 'error')
     }
     setSending(false)
   }

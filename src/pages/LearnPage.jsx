@@ -512,7 +512,9 @@ export default function LearnPage() {
 function VoicePractice({ word, user, theirName }) {
   const [recordings, setRecordings] = useState([])
   const [isRecording, setIsRecording] = useState(false)
+  const [status, setStatus] = useState('')
   const mediaRef = useRef(null)
+  const streamRef = useRef(null)
   const chunksRef = useRef([])
   const wordKey = word?.roman?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
 
@@ -527,31 +529,90 @@ function VoicePractice({ word, user, theirName }) {
 
   const startRecording = async () => {
     try {
+      setStatus('Starting...')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRef.current = new MediaRecorder(stream)
-      chunksRef.current = []
-      mediaRef.current.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data)
-      mediaRef.current.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        stream.getTracks().forEach(t => t.stop())
-        await uploadRecording(blob)
+      streamRef.current = stream
+      
+      // Find supported mime type
+      let options = {}
+      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', '']
+      for (const type of types) {
+        if (type === '' || MediaRecorder.isTypeSupported(type)) {
+          if (type) options = { mimeType: type }
+          break
+        }
       }
-      mediaRef.current.start()
+      
+      mediaRef.current = new MediaRecorder(stream, options)
+      chunksRef.current = []
+      
+      mediaRef.current.ondataavailable = e => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      
+      mediaRef.current.onstop = async () => {
+        setStatus('Uploading...')
+        const blob = new Blob(chunksRef.current, { type: mediaRef.current.mimeType || 'audio/webm' })
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        
+        if (blob.size > 0) {
+          await uploadRecording(blob)
+        } else {
+          setStatus('No audio recorded')
+          setTimeout(() => setStatus(''), 2000)
+        }
+      }
+      
+      mediaRef.current.start(100) // Collect data every 100ms
       setIsRecording(true)
-    } catch { alert('Microphone access needed') }
+      setStatus('Recording...')
+    } catch (err) {
+      console.error('Mic error:', err)
+      setStatus('Microphone access needed')
+      setTimeout(() => setStatus(''), 3000)
+    }
   }
 
-  const stopRecording = () => { mediaRef.current?.stop(); setIsRecording(false) }
+  const stopRecording = () => {
+    if (mediaRef.current?.state === 'recording') {
+      mediaRef.current.stop()
+    }
+    setIsRecording(false)
+  }
 
   const uploadRecording = async (blob) => {
     try {
       const filename = `${wordKey}_${user.role}_${Date.now()}.webm`
-      const { error: uploadError } = await supabase.storage.from('audio').upload(filename, blob)
-      if (uploadError) throw uploadError
+      const { error: uploadError } = await supabase.storage.from('audio').upload(filename, blob, { contentType: 'audio/webm' })
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        setStatus(`Failed: ${uploadError.message}`)
+        setTimeout(() => setStatus(''), 3000)
+        return
+      }
+      
       const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
-      await supabase.from('word_recordings').insert({ word_key: wordKey, user_role: user.role, audio_url: publicUrl })
+      
+      // Upsert - update if exists, insert if not
+      const { error: dbError } = await supabase.from('word_recordings')
+        .upsert({ word_key: wordKey, user_role: user.role, audio_url: publicUrl }, { onConflict: 'word_key,user_role' })
+      
+      if (dbError) {
+        console.error('DB error:', dbError)
+        setStatus(`DB Error: ${dbError.message}`)
+        setTimeout(() => setStatus(''), 3000)
+        return
+      }
+      
+      setStatus('Saved!')
+      setTimeout(() => setStatus(''), 2000)
       fetchRecordings()
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error('Upload error:', err)
+      setStatus(`Error: ${err.message}`)
+      setTimeout(() => setStatus(''), 3000)
+    }
   }
 
   const shahRec = recordings.find(r => r.user_role === 'shah')
@@ -570,10 +631,11 @@ function VoicePractice({ word, user, theirName }) {
           {daneRec ? <audio controls src={daneRec.audio_url} className="w-full h-10" /> : <p className="text-caption text-ink-300">Not recorded</p>}
         </div>
       </div>
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-2">
         <button onClick={isRecording ? stopRecording : startRecording} className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${isRecording ? 'bg-rose-500 animate-pulse' : 'bg-forest'}`}>
           <span className="text-white text-sm font-medium">{isRecording ? 'Stop' : 'Record'}</span>
         </button>
+        {status && <p className="text-caption text-ink-500">{status}</p>}
       </div>
     </div>
   )
