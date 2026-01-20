@@ -31,6 +31,12 @@ export default function HomePage({ onOpenSettings }) {
   const [photoStatus, setPhotoStatus] = useState('')
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }
 
   const greeting = getGreeting()
   const userName = user?.name || 'Love'
@@ -159,8 +165,10 @@ export default function HomePage({ onOpenSettings }) {
       setLoveNotes(prev => [note, ...prev])
       setNewNote('')
       setShowAddNote(false)
+      showToast('Love note sent! 💕', 'success')
     } catch (error) {
       console.error('Error adding note:', error)
+      showToast(`Error: ${error.message}`, 'error')
     }
   }
 
@@ -169,6 +177,13 @@ export default function HomePage({ onOpenSettings }) {
 
   return (
     <div className="min-h-screen pb-28">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-50 p-4 rounded-xl shadow-lg ${toast.type === 'error' ? 'bg-rose-500 text-white' : toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-forest text-cream-100'}`}>
+          <p className="text-body-sm text-center">{toast.message}</p>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="bg-forest text-cream-100 px-6 pt-14 pb-12">
         <div className="max-w-lg mx-auto">
@@ -384,7 +399,7 @@ export default function HomePage({ onOpenSettings }) {
       {/* Send a Dua */}
       <div className="px-6 py-10 bg-cream-200">
         <div className="max-w-lg mx-auto">
-          <DuaSelector theirName={theirName} user={user} />
+          <DuaSelector theirName={theirName} user={user} showToast={showToast} />
         </div>
       </div>
 
@@ -505,10 +520,11 @@ function getGreeting() {
   return 'Good night'
 }
 
-function DuaSelector({ theirName, user }) {
+function DuaSelector({ theirName, user, showToast }) {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [sent, setSent] = useState(false)
   const [receivedDuas, setReceivedDuas] = useState([])
+  const [sending, setSending] = useState(false)
 
   const categories = [
     { id: 'prayer', label: 'Prayer', emoji: '🤲', message: `May Allah bless you and keep you safe, ${theirName}. You are always in my prayers.` },
@@ -520,56 +536,64 @@ function DuaSelector({ theirName, user }) {
   ]
 
   useEffect(() => {
-    fetchReceivedDuas()
-    // Check for new duas every 30 seconds
-    const interval = setInterval(fetchReceivedDuas, 30000)
-    return () => clearInterval(interval)
+    if (user?.role) {
+      fetchReceivedDuas()
+      const interval = setInterval(fetchReceivedDuas, 30000)
+      return () => clearInterval(interval)
+    }
   }, [user?.role])
 
   const fetchReceivedDuas = async () => {
     if (!user?.role) return
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('dua_messages')
         .select('*')
         .eq('to_user', user.role)
         .eq('read', false)
         .order('created_at', { ascending: false })
-      setReceivedDuas(data || [])
+      if (!error) setReceivedDuas(data || [])
     } catch (err) {
       console.error('Error fetching duas:', err)
     }
   }
 
   const handleSend = async (cat) => {
-    if (!user?.role) return
+    if (sending) return
+    setSending(true)
     setSelectedCategory(cat)
     
     try {
-      const toUser = user.role === 'shah' ? 'dane' : 'shah'
-      await supabase.from('dua_messages').insert({
-        from_user: user.role,
+      const toUser = user?.role === 'shah' ? 'dane' : 'shah'
+      const fromUser = user?.role || 'shah'
+      
+      const { error } = await supabase.from('dua_messages').insert({
+        from_user: fromUser,
         to_user: toUser,
         category: cat.id,
         emoji: cat.emoji,
         message: cat.message
       })
       
-      // Try to send push notification
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`${user.role === 'shah' ? 'Shahjahan' : 'Dane'} sent you a ${cat.label}`, {
-          body: cat.message,
-          icon: cat.emoji
-        })
+      if (error) {
+        console.error('Dua error:', error)
+        showToast?.(`Error: ${error.message}`, 'error')
+        setSending(false)
+        setSelectedCategory(null)
+        return
       }
       
       setSent(true)
       setTimeout(() => {
         setSent(false)
         setSelectedCategory(null)
+        setSending(false)
       }, 4000)
     } catch (err) {
       console.error('Error sending dua:', err)
+      showToast?.(`Error: ${err.message}`, 'error')
+      setSending(false)
+      setSelectedCategory(null)
     }
   }
 
@@ -618,7 +642,8 @@ function DuaSelector({ theirName, user }) {
           <button
             key={cat.id}
             onClick={() => handleSend(cat)}
-            className="bg-gradient-to-b from-white to-cream-100 rounded-2xl p-4 shadow-soft hover:shadow-card transition-all text-center"
+            disabled={sending}
+            className={`bg-gradient-to-b from-white to-cream-100 rounded-2xl p-4 shadow-soft hover:shadow-card transition-all text-center ${sending ? 'opacity-50' : ''}`}
           >
             <span className="text-2xl block mb-2">{cat.emoji}</span>
             <span className="text-body-sm font-medium text-forest">{cat.label}</span>
