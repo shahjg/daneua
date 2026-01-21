@@ -713,8 +713,38 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     if (!file) return
     
     setUploading(true)
-    // Upload directly - no processing
-    await onUpload(file)
+    try {
+      // Load the image
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = objectUrl
+      })
+      
+      // Create canvas and mirror horizontally for selfies
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      
+      // Mirror horizontally - makes selfie look like the preview
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(img, 0, 0)
+      
+      URL.revokeObjectURL(objectUrl)
+      
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+      const processedFile = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      
+      await onUpload(processedFile)
+    } catch (err) {
+      console.error('Image processing error:', err)
+      await onUpload(file)
+    }
     setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
   }
