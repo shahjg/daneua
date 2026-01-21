@@ -765,9 +765,8 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName })
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: facing,
-          width: { ideal: 1920 },
-          height: { ideal: 1920 },
-          aspectRatio: { ideal: 1 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         },
         audio: false
       })
@@ -817,11 +816,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName })
     const offsetX = (video.videoWidth - size) / 2
     const offsetY = (video.videoHeight - size) / 2
     
-    // Only mirror for front camera
-    if (facingMode === 'user') {
-      ctx.translate(size, 0)
-      ctx.scale(-1, 1)
-    }
+    // No mirroring - save exactly as previewed
     ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size)
     
     canvas.toBlob((blob) => {
@@ -903,7 +898,6 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName })
             playsInline 
             muted
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
           />
           
           {/* Viewfinder overlay */}
