@@ -795,38 +795,40 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
   }
 
   return (
-    <div className="relative">
-      <div className="aspect-square rounded-2xl overflow-hidden bg-white shadow-soft">
-        {photo ? (
-          <img 
-            src={photo.photo_url} 
-            alt="" 
-            className="w-full h-full object-cover cursor-pointer" 
-            onClick={() => onViewPhoto && onViewPhoto(photo.photo_url)}
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
-            <span className="text-4xl mb-2">📷</span>
-            <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
-          </div>
-        )}
-        {(uploading || flipping) && (
-          <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
-          </div>
+    <div>
+      <div className="relative">
+        <div className="aspect-square rounded-2xl overflow-hidden bg-white shadow-soft">
+          {photo ? (
+            <img 
+              src={photo.photo_url} 
+              alt="" 
+              className="w-full h-full object-cover cursor-pointer" 
+              onClick={() => onViewPhoto && onViewPhoto(photo.photo_url)}
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
+              <span className="text-4xl mb-2">📷</span>
+              <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
+            </div>
+          )}
+          {(uploading || flipping) && (
+            <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+        {canUpload && !photo && (
+          <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
         )}
       </div>
-      {canUpload && !photo && (
-        <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
-      )}
+      <p className="text-center text-caption text-ink-500 mt-2 font-medium">{label}</p>
       {canUpload && photo && (
         <button 
           onClick={handleFlip}
           disabled={flipping}
-          className="absolute top-2 right-2 z-10 bg-black text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg text-lg font-bold"
-          title="Flip photo"
+          className="w-full mt-2 py-2 bg-ink-200 text-ink-700 rounded-lg text-sm font-medium"
         >
-          ⟷
+          ⟷ Flip Photo
         </button>
       )}
       <input 
@@ -837,7 +839,6 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
         className="hidden" 
         onChange={handleFileChange} 
       />
-      <p className="text-center text-caption text-ink-500 mt-2 font-medium">{label}</p>
     </div>
   )
 }
