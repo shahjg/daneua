@@ -459,7 +459,6 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'shah'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
-              onFlip={handleFlipPhoto}
             />
             <PhotoSlot 
               label="Dane" 
@@ -467,7 +466,6 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'dane'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
-              onFlip={handleFlipPhoto}
             />
           </div>
           
@@ -743,55 +741,100 @@ function getDaysUntil(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
 
-function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
+function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
   const inputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
-  const [flipping, setFlipping] = useState(false)
+  const [preview, setPreview] = useState(null) // { url, file, flipped }
+  const canvasRef = useRef(null)
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     
-    setUploading(true)
-    // Upload raw file - no processing
-    await onUpload(file)
-    setUploading(false)
+    // Show preview instead of uploading immediately
+    const url = URL.createObjectURL(file)
+    setPreview({ url, file, flipped: false })
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  const handleFlip = async () => {
-    if (!photo?.photo_url || flipping) return
-    setFlipping(true)
+  const handleFlipPreview = async () => {
+    if (!preview) return
     
-    try {
-      // Load current image
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        img.src = photo.photo_url
-      })
-      
-      // Flip horizontally
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      ctx.translate(canvas.width, 0)
-      ctx.scale(-1, 1)
-      ctx.drawImage(img, 0, 0)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-      const flippedFile = new File([blob], `flipped_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      
-      // Re-upload the flipped version
-      await onFlip(flippedFile)
-    } catch (err) {
-      console.error('Flip error:', err)
+    // Load image and flip it
+    const img = new Image()
+    img.src = preview.url
+    
+    await new Promise((resolve) => {
+      img.onload = resolve
+    })
+    
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    
+    // Flip horizontally
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(img, 0, 0)
+    
+    // Create new blob/url
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    const newFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    const newUrl = URL.createObjectURL(blob)
+    
+    // Revoke old URL
+    URL.revokeObjectURL(preview.url)
+    
+    setPreview({ url: newUrl, file: newFile, flipped: !preview.flipped })
+  }
+
+  const handleConfirm = async () => {
+    if (!preview) return
+    setUploading(true)
+    await onUpload(preview.file)
+    URL.revokeObjectURL(preview.url)
+    setPreview(null)
+    setUploading(false)
+  }
+
+  const handleCancel = () => {
+    if (preview) {
+      URL.revokeObjectURL(preview.url)
+      setPreview(null)
     }
-    setFlipping(false)
+  }
+
+  // Show preview mode
+  if (preview) {
+    return (
+      <div>
+        <div className="aspect-square rounded-2xl overflow-hidden bg-white shadow-soft">
+          <img src={preview.url} alt="Preview" className="w-full h-full object-cover" />
+        </div>
+        <div className="flex gap-2 mt-3">
+          <button 
+            onClick={handleFlipPreview}
+            className="flex-1 py-2 bg-ink-200 text-ink-700 rounded-lg text-sm font-medium"
+          >
+            ⟷ Flip
+          </button>
+          <button 
+            onClick={handleConfirm}
+            disabled={uploading}
+            className="flex-1 py-2 bg-forest text-white rounded-lg text-sm font-medium"
+          >
+            {uploading ? '...' : '✓ Upload'}
+          </button>
+        </div>
+        <button 
+          onClick={handleCancel}
+          className="w-full mt-2 py-2 text-ink-400 text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -811,26 +854,12 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
               <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
             </div>
           )}
-          {(uploading || flipping) && (
-            <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
         </div>
         {canUpload && !photo && (
           <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
         )}
       </div>
       <p className="text-center text-caption text-ink-500 mt-2 font-medium">{label}</p>
-      {canUpload && photo && (
-        <button 
-          onClick={handleFlip}
-          disabled={flipping}
-          className="w-full mt-2 py-2 bg-ink-200 text-ink-700 rounded-lg text-sm font-medium"
-        >
-          ⟷ Flip Photo
-        </button>
-      )}
       <input 
         ref={inputRef} 
         type="file" 
