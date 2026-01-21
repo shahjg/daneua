@@ -459,6 +459,7 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'shah'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
+              userName="Shahjahan"
             />
             <PhotoSlot 
               label="Dane" 
@@ -466,6 +467,7 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'dane'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
+              userName="Dane"
             />
           </div>
           
@@ -741,30 +743,37 @@ function getDaysUntil(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
 
-function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
+function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName }) {
   const [showCamera, setShowCamera] = useState(false)
   const [preview, setPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+  const [facingMode, setFacingMode] = useState('user')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
-  const startCamera = async () => {
+  const startCamera = async (facing = facingMode) => {
     setError(null)
     setShowCamera(true)
+    
+    // Stop any existing stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+    }
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: 'user', 
-          width: { ideal: 1280 }, 
-          height: { ideal: 1280 } 
+          facingMode: facing,
+          width: { ideal: 1920 },
+          height: { ideal: 1920 },
+          aspectRatio: { ideal: 1 }
         },
         audio: false
       })
       streamRef.current = stream
+      setFacingMode(facing)
       
-      // Wait for ref to be available
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream
@@ -787,26 +796,32 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     setShowCamera(false)
   }
 
+  const flipCamera = () => {
+    const newFacing = facingMode === 'user' ? 'environment' : 'user'
+    startCamera(newFacing)
+  }
+
   const capturePhoto = () => {
     if (!videoRef.current) return
     
     const video = videoRef.current
     const canvas = document.createElement('canvas')
     
-    // Make it square using smaller dimension
+    // Use full resolution
     const size = Math.min(video.videoWidth, video.videoHeight)
     canvas.width = size
     canvas.height = size
     
     const ctx = canvas.getContext('2d')
     
-    // Calculate center crop
     const offsetX = (video.videoWidth - size) / 2
     const offsetY = (video.videoHeight - size) / 2
     
-    // Mirror the capture to match the mirrored preview
-    ctx.translate(size, 0)
-    ctx.scale(-1, 1)
+    // Only mirror for front camera
+    if (facingMode === 'user') {
+      ctx.translate(size, 0)
+      ctx.scale(-1, 1)
+    }
     ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size)
     
     canvas.toBlob((blob) => {
@@ -814,7 +829,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
       const file = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
       setPreview({ url, file })
       stopCamera()
-    }, 'image/jpeg', 0.9)
+    }, 'image/jpeg', 0.95)
   }
 
   const handleFlipPreview = async () => {
@@ -832,7 +847,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     ctx.scale(-1, 1)
     ctx.drawImage(img, 0, 0)
     
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95))
     const newFile = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
     const newUrl = URL.createObjectURL(blob)
     URL.revokeObjectURL(preview.url)
@@ -856,10 +871,30 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     stopCamera()
   }
 
-  // Camera view - FULLSCREEN
+  // Camera view - FULLSCREEN FANCY
   if (showCamera) {
     return (
       <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        {/* Top bar */}
+        <div className="bg-gradient-to-b from-black/80 to-transparent px-6 py-4 flex items-center justify-between absolute top-0 left-0 right-0 z-10">
+          <button 
+            onClick={handleCancel}
+            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
+          >
+            <span className="text-white text-xl">✕</span>
+          </button>
+          <div className="text-center">
+            <p className="text-white/60 text-xs uppercase tracking-widest">D(ane)ua</p>
+            <p className="text-white font-serif text-lg">{userName}'s Camera</p>
+          </div>
+          <button 
+            onClick={flipCamera}
+            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
+          >
+            <span className="text-white text-xl">🔄</span>
+          </button>
+        </div>
+        
         {/* Camera preview */}
         <div className="flex-1 relative overflow-hidden">
           <video 
@@ -868,34 +903,46 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
             playsInline 
             muted
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
+            style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
           />
+          
+          {/* Viewfinder overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            {/* Corner brackets */}
+            <div className="absolute top-1/4 left-1/4 w-12 h-12 border-l-2 border-t-2 border-white/40 rounded-tl-lg" />
+            <div className="absolute top-1/4 right-1/4 w-12 h-12 border-r-2 border-t-2 border-white/40 rounded-tr-lg" />
+            <div className="absolute bottom-1/4 left-1/4 w-12 h-12 border-l-2 border-b-2 border-white/40 rounded-bl-lg" />
+            <div className="absolute bottom-1/4 right-1/4 w-12 h-12 border-r-2 border-b-2 border-white/40 rounded-br-lg" />
+          </div>
         </div>
         
         {/* Bottom controls */}
-        <div className="bg-black/80 px-6 py-8 flex items-center justify-center gap-12">
-          <button 
-            onClick={handleCancel}
-            className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center"
-          >
-            <span className="text-white text-2xl">✕</span>
-          </button>
+        <div className="bg-gradient-to-t from-black via-black/90 to-transparent px-6 py-8">
+          <div className="flex items-center justify-center gap-8">
+            <div className="w-16" /> {/* Spacer */}
+            
+            {/* Capture button */}
+            <button 
+              onClick={capturePhoto}
+              className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-400 to-gold-400 p-1 shadow-lg active:scale-95 transition-transform"
+            >
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-rose-100 to-gold-100" />
+              </div>
+            </button>
+            
+            <div className="w-16" /> {/* Spacer */}
+          </div>
           
-          <button 
-            onClick={capturePhoto}
-            className="w-20 h-20 rounded-full bg-white border-4 border-white/30 flex items-center justify-center active:scale-95 transition-transform"
-          >
-            <div className="w-16 h-16 rounded-full bg-white" />
-          </button>
-          
-          <div className="w-14 h-14" /> {/* Spacer */}
+          <p className="text-white/40 text-center text-xs mt-4">Tap to capture your moment</p>
         </div>
         
         {error && (
-          <div className="absolute inset-0 bg-black flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/95 flex items-center justify-center p-6 z-20">
             <div className="text-center">
+              <span className="text-5xl block mb-4">📷</span>
               <p className="text-white mb-4">{error}</p>
-              <button onClick={handleCancel} className="bg-white text-black px-6 py-3 rounded-xl">Go Back</button>
+              <button onClick={handleCancel} className="bg-white text-black px-6 py-3 rounded-xl font-medium">Go Back</button>
             </div>
           </div>
         )}
