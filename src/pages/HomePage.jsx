@@ -713,7 +713,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     if (!file) return
     
     setUploading(true)
-    // Upload directly without canvas processing to preserve orientation
+    // Upload directly - no processing
     await onUpload(file)
     setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
@@ -748,7 +748,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
         ref={inputRef} 
         type="file" 
         accept="image/*" 
-        capture="environment"
+        capture="user"
         className="hidden" 
         onChange={handleFileChange} 
       />
