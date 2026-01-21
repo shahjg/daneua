@@ -714,28 +714,18 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
     
     setUploading(true)
     try {
-      // Load the image
-      const img = new Image()
-      const objectUrl = URL.createObjectURL(file)
+      // Use createImageBitmap which properly handles EXIF orientation
+      const bitmap = await createImageBitmap(file)
       
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        img.src = objectUrl
-      })
-      
-      // Create canvas and mirror horizontally for selfies
       const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
       const ctx = canvas.getContext('2d')
       
-      // Mirror horizontally - makes selfie look like the preview
+      // Flip horizontally to match selfie preview (mirror effect)
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
-      ctx.drawImage(img, 0, 0)
-      
-      URL.revokeObjectURL(objectUrl)
+      ctx.drawImage(bitmap, 0, 0)
       
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
       const processedFile = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
