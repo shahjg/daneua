@@ -742,51 +742,101 @@ function getDaysUntil(dateStr) {
 }
 
 function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
-  const inputRef = useRef(null)
+  const [showCamera, setShowCamera] = useState(false)
+  const [preview, setPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
-  const [preview, setPreview] = useState(null) // { url, file, flipped }
-  const canvasRef = useRef(null)
+  const [error, setError] = useState(null)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const startCamera = async () => {
+    setError(null)
+    setShowCamera(true)
     
-    // Show preview instead of uploading immediately
-    const url = URL.createObjectURL(file)
-    setPreview({ url, file, flipped: false })
-    if (inputRef.current) inputRef.current.value = ''
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'user', 
+          width: { ideal: 1280 }, 
+          height: { ideal: 1280 } 
+        },
+        audio: false
+      })
+      streamRef.current = stream
+      
+      // Wait for ref to be available
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.setAttribute('playsinline', 'true')
+          videoRef.current.setAttribute('webkit-playsinline', 'true')
+          videoRef.current.play().catch(console.error)
+        }
+      }, 100)
+    } catch (err) {
+      console.error('Camera error:', err)
+      setError('Could not access camera. Please allow camera permission and reload.')
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    setShowCamera(false)
+  }
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return
+    
+    const video = videoRef.current
+    const canvas = document.createElement('canvas')
+    
+    // Make it square using smaller dimension
+    const size = Math.min(video.videoWidth, video.videoHeight)
+    canvas.width = size
+    canvas.height = size
+    
+    const ctx = canvas.getContext('2d')
+    
+    // Calculate center crop
+    const offsetX = (video.videoWidth - size) / 2
+    const offsetY = (video.videoHeight - size) / 2
+    
+    // Mirror the capture to match the mirrored preview
+    ctx.translate(size, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size)
+    
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob)
+      const file = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      setPreview({ url, file })
+      stopCamera()
+    }, 'image/jpeg', 0.9)
   }
 
   const handleFlipPreview = async () => {
     if (!preview) return
     
-    // Load image and flip it
     const img = new Image()
     img.src = preview.url
-    
-    await new Promise((resolve) => {
-      img.onload = resolve
-    })
+    await new Promise(resolve => { img.onload = resolve })
     
     const canvas = document.createElement('canvas')
     canvas.width = img.width
     canvas.height = img.height
     const ctx = canvas.getContext('2d')
-    
-    // Flip horizontally
     ctx.translate(canvas.width, 0)
     ctx.scale(-1, 1)
     ctx.drawImage(img, 0, 0)
     
-    // Create new blob/url
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-    const newFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    const newFile = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
     const newUrl = URL.createObjectURL(blob)
-    
-    // Revoke old URL
     URL.revokeObjectURL(preview.url)
-    
-    setPreview({ url: newUrl, file: newFile, flipped: !preview.flipped })
+    setPreview({ url: newUrl, file: newFile })
   }
 
   const handleConfirm = async () => {
@@ -803,9 +853,57 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
       URL.revokeObjectURL(preview.url)
       setPreview(null)
     }
+    stopCamera()
   }
 
-  // Show preview mode
+  // Camera view - FULLSCREEN
+  if (showCamera) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        {/* Camera preview */}
+        <div className="flex-1 relative overflow-hidden">
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+        </div>
+        
+        {/* Bottom controls */}
+        <div className="bg-black/80 px-6 py-8 flex items-center justify-center gap-12">
+          <button 
+            onClick={handleCancel}
+            className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center"
+          >
+            <span className="text-white text-2xl">✕</span>
+          </button>
+          
+          <button 
+            onClick={capturePhoto}
+            className="w-20 h-20 rounded-full bg-white border-4 border-white/30 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <div className="w-16 h-16 rounded-full bg-white" />
+          </button>
+          
+          <div className="w-14 h-14" /> {/* Spacer */}
+        </div>
+        
+        {error && (
+          <div className="absolute inset-0 bg-black flex items-center justify-center p-6">
+            <div className="text-center">
+              <p className="text-white mb-4">{error}</p>
+              <button onClick={handleCancel} className="bg-white text-black px-6 py-3 rounded-xl">Go Back</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Preview mode
   if (preview) {
     return (
       <div>
@@ -814,10 +912,10 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
         </div>
         <div className="flex gap-2 mt-3">
           <button 
-            onClick={handleFlipPreview}
+            onClick={() => { handleCancel(); setTimeout(startCamera, 100); }}
             className="flex-1 py-2 bg-ink-200 text-ink-700 rounded-lg text-sm font-medium"
           >
-            ⟷ Flip
+            🔄 Retake
           </button>
           <button 
             onClick={handleConfirm}
@@ -828,15 +926,16 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
           </button>
         </div>
         <button 
-          onClick={handleCancel}
-          className="w-full mt-2 py-2 text-ink-400 text-sm"
+          onClick={handleFlipPreview}
+          className="w-full mt-2 py-2 text-ink-500 text-sm"
         >
-          Cancel
+          ⟷ Flip if needed
         </button>
       </div>
     )
   }
 
+  // Default view
   return (
     <div>
       <div className="relative">
@@ -849,25 +948,18 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
               onClick={() => onViewPhoto && onViewPhoto(photo.photo_url)}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-ink-300">
+            <div 
+              className="w-full h-full flex flex-col items-center justify-center text-ink-300 cursor-pointer"
+              onClick={canUpload ? startCamera : undefined}
+            >
               <span className="text-4xl mb-2">📷</span>
-              <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
+              <p className="text-body-sm">{canUpload ? 'Take selfie' : 'Waiting...'}</p>
             </div>
           )}
         </div>
-        {canUpload && !photo && (
-          <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
-        )}
       </div>
       <p className="text-center text-caption text-ink-500 mt-2 font-medium">{label}</p>
-      <input 
-        ref={inputRef} 
-        type="file" 
-        accept="image/*" 
-        capture="user"
-        className="hidden" 
-        onChange={handleFileChange} 
-      />
+      {error && <p className="text-center text-caption text-rose-500 mt-1">{error}</p>}
     </div>
   )
 }
