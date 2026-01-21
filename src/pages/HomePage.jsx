@@ -113,6 +113,43 @@ export default function HomePage({ onOpenSettings }) {
     }
   }
 
+  const handleFlipPhoto = async (flippedFile) => {
+    setPhotoStatus('Flipping...')
+    try {
+      const fileName = `${user.role}_flipped_${Date.now()}.jpg`
+      
+      const { error } = await supabase.storage.from('photos').upload(fileName, flippedFile, { 
+        contentType: 'image/jpeg', 
+        upsert: true 
+      })
+      
+      if (error) {
+        console.error('Storage error:', error)
+        setPhotoStatus(`Failed: ${error.message}`)
+        setTimeout(() => setPhotoStatus(''), 4000)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(fileName)
+      
+      // Find the current moment and update it
+      const currentMoment = todaysMoments.find(m => m.user_role === user.role)
+      if (currentMoment) {
+        await supabase.from('moments').update({ photo_url: urlData.publicUrl }).eq('id', currentMoment.id)
+        setTodaysMoments(prev => prev.map(m => 
+          m.id === currentMoment.id ? { ...m, photo_url: urlData.publicUrl } : m
+        ))
+      }
+      
+      setPhotoStatus('Flipped!')
+      setTimeout(() => setPhotoStatus(''), 2000)
+    } catch (error) {
+      console.error('Flip error:', error)
+      setPhotoStatus(`Error: ${error.message}`)
+      setTimeout(() => setPhotoStatus(''), 4000)
+    }
+  }
+
   const handleSendDua = async () => {
     if (duaSent) return
     try {
@@ -422,6 +459,7 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'shah'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
+              onFlip={handleFlipPhoto}
             />
             <PhotoSlot 
               label="Dane" 
@@ -429,6 +467,7 @@ export default function HomePage({ onOpenSettings }) {
               canUpload={user?.role === 'dane'} 
               onUpload={handlePhotoUpload}
               onViewPhoto={setFullscreenPhoto}
+              onFlip={handleFlipPhoto}
             />
           </div>
           
@@ -704,39 +743,55 @@ function getDaysUntil(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
 
-function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
+function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
   const inputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
+  const [flipping, setFlipping] = useState(false)
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     
     setUploading(true)
-    try {
-      // Use createImageBitmap which properly handles EXIF orientation
-      const bitmap = await createImageBitmap(file)
-      
-      const canvas = document.createElement('canvas')
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
-      const ctx = canvas.getContext('2d')
-      
-      // Flip horizontally to match selfie preview (mirror effect)
-      ctx.translate(canvas.width, 0)
-      ctx.scale(-1, 1)
-      ctx.drawImage(bitmap, 0, 0)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-      const processedFile = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      
-      await onUpload(processedFile)
-    } catch (err) {
-      console.error('Image processing error:', err)
-      await onUpload(file)
-    }
+    // Upload raw file - no processing
+    await onUpload(file)
     setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
+  }
+
+  const handleFlip = async () => {
+    if (!photo?.photo_url || flipping) return
+    setFlipping(true)
+    
+    try {
+      // Load current image
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = photo.photo_url
+      })
+      
+      // Flip horizontally
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(img, 0, 0)
+      
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+      const flippedFile = new File([blob], `flipped_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      
+      // Re-upload the flipped version
+      await onFlip(flippedFile)
+    } catch (err) {
+      console.error('Flip error:', err)
+    }
+    setFlipping(false)
   }
 
   return (
@@ -755,7 +810,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
             <p className="text-body-sm">{canUpload ? 'Add photo' : 'Waiting...'}</p>
           </div>
         )}
-        {uploading && (
+        {(uploading || flipping) && (
           <div className="absolute inset-0 bg-forest/50 flex items-center justify-center">
             <div className="w-8 h-8 border-4 border-cream-100 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -763,6 +818,16 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto }) {
       </div>
       {canUpload && !photo && (
         <button onClick={() => inputRef.current?.click()} className="absolute inset-0 w-full h-full" />
+      )}
+      {canUpload && photo && (
+        <button 
+          onClick={handleFlip}
+          disabled={flipping}
+          className="absolute top-2 right-2 bg-white/90 rounded-full p-2 shadow-md hover:bg-white transition-colors"
+          title="Flip photo"
+        >
+          ↔️
+        </button>
       )}
       <input 
         ref={inputRef} 
