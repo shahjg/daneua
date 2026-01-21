@@ -816,7 +816,9 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName })
     const offsetX = (video.videoWidth - size) / 2
     const offsetY = (video.videoHeight - size) / 2
     
-    // No mirroring - save exactly as previewed
+    // Mirror to match the flipped preview
+    ctx.translate(size, 0)
+    ctx.scale(-1, 1)
     ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size)
     
     canvas.toBlob((blob) => {
@@ -898,6 +900,7 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, userName })
             playsInline 
             muted
             className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }}
           />
           
           {/* Viewfinder overlay */}
