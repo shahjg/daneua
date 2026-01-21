@@ -823,10 +823,10 @@ function PhotoSlot({ label, photo, canUpload, onUpload, onViewPhoto, onFlip }) {
         <button 
           onClick={handleFlip}
           disabled={flipping}
-          className="absolute top-2 right-2 bg-white/90 rounded-full p-2 shadow-md hover:bg-white transition-colors"
+          className="absolute top-2 right-2 z-10 bg-black text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg text-lg font-bold"
           title="Flip photo"
         >
-          ↔️
+          ⟷
         </button>
       )}
       <input 
