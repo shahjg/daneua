@@ -834,7 +834,7 @@ function Shell({children,dark}){return(<div className="dc-shell" style={{width:"
 function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Browse",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
 
 function Home({go}){
-  const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';const partner=user==='shah'?'Dane':'Shah';
+  const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';
   const xp=local.get(user+'_xp',0);const completed=local.get(user+'_completed',[]);const streak=local.get(user+'_streak',0);
   // Ramadan data
   const R=[
@@ -945,52 +945,11 @@ function Home({go}){
           <p style={{color:S.sub,fontSize:12,margin:0,lineHeight:1.3}}>{cat.s}</p>
         </div>))}
       </div>
-
-      {/* Location peek */}
-      <h2 style={{color:S.white,fontSize:19,fontWeight:700,margin:"0 0 12px"}}>Location</h2>
-      <LocationPeek user={user} partner={partner}/>
     </div>
   </div>);
 }
 
 // Location component — shows on Home and Us tab
-function LocationPeek({user,partner}){
-  const [myLoc,setMyLoc]=useState(()=>local.get(user+'_loc',null));
-  const [partnerLoc]=useState(()=>local.get((user==='shah'?'dane':'shah')+'_loc',null));
-  const [loading,setLoading]=useState(false);
-  const [error,setError]=useState(null);
-
-  const share=()=>{
-    if(!navigator.geolocation){setError("Location not available");return;}
-    setLoading(true);setError(null);
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const loc={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy),time:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),date:new Date().toLocaleDateString()};
-      setMyLoc(loc);local.set(user+'_loc',loc);setLoading(false);
-    },err=>{
-      setError(err.code===1?"Allow location access in your browser settings":err.code===2?"Location unavailable":"Timed out — try again");
-      setLoading(false);
-    },{enableHighAccuracy:true,timeout:10000});
-  };
-
-  return(<div style={{background:S.card,borderRadius:14,padding:16,marginBottom:20}}>
-    {/* My location */}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:partnerLoc||myLoc?12:0}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:10,height:10,borderRadius:"50%",background:myLoc?"#1DB954":"#6A6A6A",boxShadow:myLoc?"0 0 8px #1DB95460":"none"}}/>
-        <span style={{color:S.white,fontSize:14,fontWeight:500}}>{myLoc?"You shared at "+myLoc.time:"Share your location"}</span>
-      </div>
-      <button onClick={share} disabled={loading} style={{padding:"7px 16px",borderRadius:20,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:S.green,fontSize:12,fontWeight:600,cursor:"pointer"}}>{loading?"Locating...":myLoc?"Update":"Share"}</button>
-    </div>
-    {/* Partner location */}
-    {partnerLoc&&<div style={{display:"flex",alignItems:"center",gap:10}}>
-      <div style={{width:10,height:10,borderRadius:"50%",background:S.rose,boxShadow:"0 0 8px "+S.rose+"60"}}/>
-      <span style={{color:S.white,fontSize:14,fontWeight:500}}>{partner} shared at {partnerLoc.time}</span>
-      <span style={{color:S.sub,fontSize:11}}>{partnerLoc.date}</span>
-    </div>}
-    {error&&<p style={{color:"#E74C3C",fontSize:12,margin:"8px 0 0"}}>{error}</p>}
-    {!myLoc&&!partnerLoc&&!error&&<p style={{color:S.muted,fontSize:12,margin:"4px 0 0"}}>Tap Share to let {partner} know where you are</p>}
-  </div>);
-}
 
 function Browse({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
@@ -1328,6 +1287,7 @@ function Browse({go}){
     <p style={{color:"rgba(255,255,255,0.4)",fontSize:10,margin:"4px 0 0",position:"relative",zIndex:1}}>{c.sub}</p>
   </div>))}</div></div></div>);
 }
+
 function Learn(){
   const W=useW();const dark=useDark();
   const {user}=useUser()||{user:'shah'};
@@ -1490,53 +1450,324 @@ function Learn(){
 }
 
 // Logout button for Settings
+
+// Logout button for Settings
 function LogoutBtn(){
   const {logout}=useUser()||{};const W=useW();
   return(<button onClick={logout} style={{width:"100%",marginTop:24,padding:"15px",borderRadius:14,border:"1px solid #E74C3C30",background:"#E74C3C08",color:"#E74C3C",fontSize:15,fontWeight:600,cursor:"pointer"}}>Log Out</button>);
 }
 
 function Us({onDark,isDark}){
-  const W=useW();const dark=useDark();
+  const W=useW();const dark=useDark();const {user,logout}=useUser()||{user:'shah'};
   const [events,setEvents]=useState(()=>local.get('us_events',[]));
   useEffect(()=>{local.set('us_events',events);},[events]);
-  const [addEvt,setAddEvt]=useState(false);const [ne,setNe]=useState({t:"",d:"",tm:""});const [tab,setTab]=useState("cal");const [tapped,setTapped]=useState(null);const [calMonth,setCalMonth]=useState(1);const [calYear]=useState(2026);const [settings,setSettings]=useState({notif:true,alarms:true,sounds:false});
-  const [playingNote,setPlayingNote]=useState(null);const [wavePhase,setWavePhase]=useState(0);const waveRef=useRef(null);
+  const [addEvt,setAddEvt]=useState(false);const [ne,setNe]=useState({t:"",d:"",tm:""});
+  const [tab,setTab]=useState("cal");const [calMonth,setCalMonth]=useState(new Date().getMonth());const [calYear,setCalYear]=useState(new Date().getFullYear());
+  const [settings,setSettings]=useState({notif:true,alarms:true,sounds:false});
+  const [notes,setNotes]=useState(()=>local.get('us_notes',[]));const [addNote,setAddNote]=useState(false);const [noteText,setNoteText]=useState("");
+  useEffect(()=>{local.set('us_notes',notes);},[notes]);
 
-  useEffect(()=>{if(playingNote!==null){waveRef.current=setInterval(()=>setWavePhase(p=>p+1),80);const t=setTimeout(()=>{clearInterval(waveRef.current);setPlayingNote(null);},3000);return()=>{clearInterval(waveRef.current);clearTimeout(t);};}return()=>{if(waveRef.current)clearInterval(waveRef.current);};},[playingNote]);
+  // Gym tracker
+  const [gym,setGym]=useState(()=>local.get(user+'_gym',[])); // array of {date,exercises:[{name,sets:[{reps,weight}]}],cardio:{type,duration,distance}}
+  useEffect(()=>{local.set(user+'_gym',gym);},[gym]);
+  const [gymView,setGymView]=useState("log"); // log | add | history
+  const [gymDate,setGymDate]=useState(new Date().toISOString().split('T')[0]);
+  const [gymExercises,setGymExercises]=useState([]);
+  const [gymCardio,setGymCardio]=useState({type:"",duration:"",distance:""});
+  const [selExercise,setSelExercise]=useState("");const [quickMode,setQuickMode]=useState(true);const [quickReps,setQuickReps]=useState("8");const [quickSets,setQuickSets]=useState("3");
+  const [manualSets,setManualSets]=useState([{reps:"",weight:""}]);
+  const EXERCISES={
+    "Push":[
+      "Bench Press","Incline Bench Press","Dumbbell Press","Dumbbell Flyes","Overhead Press","Lateral Raises","Tricep Pushdown","Tricep Dips","Cable Crossover","Push Ups"
+    ],
+    "Pull":[
+      "Deadlift","Barbell Row","Dumbbell Row","Lat Pulldown","Pull Ups","Chin Ups","Face Pulls","Bicep Curls","Hammer Curls","Cable Row"
+    ],
+    "Legs":[
+      "Squat","Leg Press","Romanian Deadlift","Lunges","Leg Extension","Leg Curl","Calf Raises","Hip Thrust","Bulgarian Split Squat","Goblet Squat"
+    ],
+    "Core":[
+      "Plank","Crunches","Leg Raises","Russian Twists","Ab Rollout","Cable Woodchops","Dead Bug","Mountain Climbers"
+    ],
+    "Cardio":[
+      "Treadmill","Stairmaster","Elliptical","Bike","Rowing","Jump Rope","Walking","Running"
+    ]
+  };
+  const todayStr=new Date().toISOString().split('T')[0];
+  const todayWorkout=gym.find(g=>g.date===todayStr);
+  const hasGymDay=(day)=>{if(!day)return false;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");return gym.some(g=>g.date===ds);};
+
+  const addExerciseToWorkout=()=>{
+    if(!selExercise)return;
+    let sets=[];
+    if(quickMode){
+      const r=parseInt(quickReps)||8;const s=parseInt(quickSets)||3;
+      for(let i=0;i<s;i++)sets.push({reps:r,weight:""});
+    }else{
+      sets=manualSets.filter(s=>s.reps).map(s=>({reps:parseInt(s.reps)||0,weight:s.weight}));
+    }
+    if(sets.length===0)return;
+    setGymExercises([...gymExercises,{name:selExercise,sets}]);
+    setSelExercise("");setManualSets([{reps:"",weight:""}]);
+  };
+
+  const saveWorkout=()=>{
+    if(gymExercises.length===0&&!gymCardio.type)return;
+    const existing=gym.findIndex(g=>g.date===gymDate);
+    const entry={date:gymDate,exercises:gymExercises,cardio:gymCardio.type?gymCardio:null,user};
+    if(existing>=0){const n=[...gym];n[existing]=entry;setGym(n);}
+    else setGym([...gym,entry]);
+    setGymExercises([]);setGymCardio({type:"",duration:"",distance:""});setGymView("log");
+  };
 
   const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
   const dim=new Date(calYear,calMonth+1,0).getDate();const fd=new Date(calYear,calMonth,1).getDay();const calDays=[];for(let i=0;i<fd;i++)calDays.push(null);for(let i=1;i<=dim;i++)calDays.push(i);
+  const today=new Date();const isToday=(day)=>day&&calMonth===today.getMonth()&&calYear===today.getFullYear()&&day===today.getDate();
   const hasEvent=(day)=>{if(!day)return null;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");return events.find(e=>e.d===ds);};
+  const upcomingEvents=events.filter(e=>e.d>=today.toISOString().split('T')[0]).sort((a,b)=>a.d.localeCompare(b.d));
 
-  if(addEvt)return(<div className="dc-slide-up" style={{height:"100%",background:W.bg,padding:"14px 16px"}}><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><button onClick={()=>setAddEvt(false)} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.forest} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:W.forest,fontSize:21,fontWeight:700,margin:0}}>New event</h1></div>{[{l:"Title",k:"t",ph:"Date night...",ty:"text"},{l:"Date",k:"d",ph:"",ty:"date"},{l:"Time",k:"tm",ph:"",ty:"time"}].map(f=>(<div key={f.k} style={{marginBottom:16}}><p style={{color:W.textMuted,fontSize:12,fontWeight:600,margin:"0 0 6px"}}>{f.l}</p><input type={f.ty} value={ne[f.k]} onChange={e=>setNe({...ne,[f.k]:e.target.value})} placeholder={f.ph} style={{width:"100%",padding:"14px",borderRadius:12,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/></div>))}<button onClick={()=>{if(ne.t){setEvents([...events,{id:Date.now(),t:ne.t,d:ne.d||"",tm:ne.tm||"TBD",c:W.forest}]);setNe({t:"",d:"",tm:""});setAddEvt(false);}}} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ne.t?W.forest:W.border,color:ne.t?(dark?"#000":WL.cream):W.textMuted,fontSize:16,fontWeight:700,cursor:ne.t?"pointer":"not-allowed"}}>Save</button></div>);
+  // Add event form
+  if(addEvt)return(<div className="dc-slide-up" style={{height:"100%",background:W.bg,padding:"14px 16px"}}><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><button onClick={()=>setAddEvt(false)} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.forest} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:W.forest,fontSize:21,fontWeight:700,margin:0}}>New event</h1></div>{[{l:"Title",k:"t",ph:"Iftar at mom's...",ty:"text"},{l:"Date",k:"d",ph:"",ty:"date"},{l:"Time",k:"tm",ph:"",ty:"time"}].map(f=>(<div key={f.k} style={{marginBottom:16}}><p style={{color:W.textMuted,fontSize:12,fontWeight:600,margin:"0 0 6px"}}>{f.l}</p><input type={f.ty} value={ne[f.k]} onChange={e=>setNe({...ne,[f.k]:e.target.value})} placeholder={f.ph} style={{width:"100%",padding:"14px",borderRadius:12,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/></div>))}<div style={{display:"flex",gap:8,marginBottom:16}}>{["#D4A84B","#E8115B","#1DB954","#8D67AB","#4B9CD3"].map(c=>(<button key={c} onClick={()=>setNe({...ne,c})} style={{width:32,height:32,borderRadius:"50%",background:c,border:ne.c===c?"3px solid "+W.text:"3px solid transparent",cursor:"pointer"}}/>))}</div><button onClick={()=>{if(ne.t){setEvents([...events,{id:Date.now(),t:ne.t,d:ne.d||"",tm:ne.tm||"",c:ne.c||"#D4A84B"}]);setNe({t:"",d:"",tm:""});setAddEvt(false);}}} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ne.t?W.forest:W.border,color:ne.t?(dark?"#000":WL.cream):W.textMuted,fontSize:16,fontWeight:700,cursor:ne.t?"pointer":"not-allowed"}}>Save</button></div>);
 
+  // Settings
   if(tab==="settings")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:W.bg}}><div style={{background:dark?WD.cardAlt:WL.forest,padding:"12px 16px 20px",borderRadius:"0 0 24px 24px"}}><div style={{display:"flex",alignItems:"center",gap:12}}><button onClick={()=>setTab("cal")} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dark?"#E8E8E8":WL.cream} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:dark?"#E8E8E8":WL.cream,fontSize:21,fontWeight:700,margin:0}}>Settings</h1></div></div><div style={{padding:"16px"}}>{[{k:"notif",l:"Push Notifications",desc:"Get notified for events"},{k:"alarms",l:"Event Alarms",desc:"Reminders before events"},{k:"sounds",l:"Sounds",desc:"Notification sounds"},{k:"dark",l:"Dark Mode",desc:"Switch theme"}].map(s=>{const on=s.k==="dark"?isDark:settings[s.k];return(<div key={s.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0",borderBottom:"1px solid "+W.border}}><div style={{flex:1}}><p style={{color:W.forest,fontSize:15,fontWeight:600,margin:0}}>{s.l}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{s.desc}</p></div><button onClick={()=>s.k==="dark"?onDark(!isDark):setSettings({...settings,[s.k]:!on})} style={{width:48,height:28,borderRadius:14,background:on?W.forest:W.border,border:"none",padding:2,cursor:"pointer",transition:"background 0.2s",display:"flex",alignItems:on?"flex-end":"flex-start",justifyContent:on?"flex-end":"flex-start"}}><div style={{width:24,height:24,borderRadius:12,background:S.white,boxShadow:"0 1px 3px rgba(0,0,0,0.15)",transition:"all 0.2s"}}/></button></div>);})}<LogoutBtn/></div></div>);
 
   return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg}}>
-    <div style={{height:220,position:"relative",background:"linear-gradient(145deg,#e8edf5,#d0d9e8)",flexShrink:0}} onClick={()=>setTapped(null)}>
-      <div style={{position:"absolute",left:"18%",top:0,bottom:0,width:20,background:"rgba(255,255,255,0.6)"}}/>
-      <div style={{position:"absolute",top:"48%",left:0,right:0,height:20,background:"rgba(255,255,255,0.6)"}}/>
-      <div style={{position:"absolute",left:"55%",top:"15%",width:16,height:"70%",background:"rgba(255,255,255,0.5)",transform:"rotate(6deg)"}}/>
-      <div style={{position:"absolute",top:"72%",left:"8%",width:"55%",height:14,background:"rgba(255,255,255,0.4)",transform:"rotate(-4deg)"}}/>
-      {[[10,15,18,20],[40,8,25,18],[65,55,22,16],[8,60,20,14]].map(([l,t,w,h],i)=>(<div key={"b"+i} style={{position:"absolute",left:l+"%",top:t+"%",width:w+"%",height:h+"%",background:"rgba(200,208,218,0.5)",borderRadius:3}}/>))}
-      <div onClick={e=>{e.stopPropagation();setTapped(tapped==="shah"?null:"shah");}} style={{position:"absolute",left:"28%",top:"38%",zIndex:3,cursor:"pointer"}}><div style={{width:42,height:42,borderRadius:"50%",background:WL.forest,border:"3px solid white",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 10px rgba(0,0,0,0.2)"}}><span style={{color:WL.cream,fontSize:15,fontWeight:800}}>S</span></div>{tapped==="shah"&&<div style={{position:"absolute",top:-40,left:"50%",transform:"translateX(-50%)",background:S.white,borderRadius:10,padding:"6px 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)",whiteSpace:"nowrap",zIndex:10}}><p style={{color:WL.forest,fontSize:12,fontWeight:700,margin:0}}>Shah</p><p style={{color:WL.textMuted,fontSize:10,margin:0}}>At work</p></div>}</div>
-      <div onClick={e=>{e.stopPropagation();setTapped(tapped==="dane"?null:"dane");}} style={{position:"absolute",left:"52%",top:"33%",transform:"translateX(-50%)",zIndex:4,cursor:"pointer"}}><div style={{width:58,height:58,borderRadius:"50%",border:"4px solid rgba(140,120,230,0.35)",padding:2}}><div style={{width:"100%",height:"100%",borderRadius:"50%",background:"linear-gradient(135deg,#7C6DC7,#9B8ED8)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 14px rgba(140,120,230,0.3)"}}><span style={{color:S.white,fontSize:20,fontWeight:800}}>D</span></div></div>{tapped==="dane"&&<div style={{position:"absolute",top:-40,left:"50%",transform:"translateX(-50%)",background:S.white,borderRadius:10,padding:"6px 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)",whiteSpace:"nowrap",zIndex:10}}><p style={{color:WL.forest,fontSize:12,fontWeight:700,margin:0}}>Dane</p><p style={{color:WL.textMuted,fontSize:10,margin:0}}>Since 1:49 PM · 65%</p></div>}</div>
-      <button onClick={(e)=>{e.stopPropagation();setTab("settings");}} style={{position:"absolute",top:10,right:10,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.85)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.1)",zIndex:5}}><svg width="18" height="18" viewBox="0 0 24 24" fill="#7A8B84"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg></button>
+    {/* Header */}
+    <div style={{background:dark?WD.cardAlt:WL.forest,padding:"max(12px,env(safe-area-inset-top)) 16px 16px",borderRadius:"0 0 24px 24px",flexShrink:0}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <h1 style={{color:dark?"#E8E8E8":WL.cream,fontSize:22,fontWeight:700,margin:0}}>Us</h1>
+        <button onClick={()=>setTab("settings")} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.12)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><svg width="16" height="16" viewBox="0 0 24 24" fill={dark?"#E8E8E8":WL.cream}><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg></button>
+      </div>
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,marginTop:14}}>{[{k:"cal",l:"Calendar"},{k:"upcoming",l:"Upcoming"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E8E8E8":WL.cream,fontSize:13,fontWeight:tab===t.k?700:500,cursor:"pointer"}}>{t.l}</button>))}</div>
     </div>
+
     <div style={{flex:1,overflowY:"auto",paddingBottom:92,WebkitOverflowScrolling:"touch"}}>
-      <div style={{display:"flex",gap:6,padding:"14px 16px 10px"}}>{[{k:"cal",l:"Calendar"},{k:"loc",l:"Location"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{flex:1,padding:"10px 16px",borderRadius:12,border:"1.5px solid "+(tab===t.k?W.forest:W.border),background:tab===t.k?W.forest:"transparent",color:tab===t.k?(dark?"#000":WL.cream):W.text,fontSize:14,fontWeight:600,cursor:"pointer",minHeight:44}}>{t.l}</button>))}</div>
-      {tab==="loc"&&<div style={{padding:"0 16px"}}><LocationPeek user={(useUser()||{user:'shah'}).user} partner={(useUser()||{user:'shah'}).user==='shah'?'Dane':'Shah'}/></div>}
-      {tab==="cal"&&<div style={{padding:"0 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}><button onClick={()=>setCalMonth(m=>m>0?m-1:11)} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:44,minHeight:44}}><svg width="20" height="20" viewBox="0 0 24 24" fill={W.textMuted}><path d="M15 18l-6-6 6-6"/></svg></button><h2 style={{color:W.forest,fontSize:17,fontWeight:700,margin:0}}>{months[calMonth]} {calYear}</h2><button onClick={()=>setCalMonth(m=>m<11?m+1:0)} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:44,minHeight:44}}><svg width="20" height="20" viewBox="0 0 24 24" fill={W.textMuted}><path d="M9 18l6-6-6-6"/></svg></button></div><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>{["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(<div key={d} style={{textAlign:"center",padding:"4px 0",color:W.textMuted,fontSize:11,fontWeight:600}}>{d}</div>))}</div><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:16}}>{calDays.map((day,i)=>{const ev=hasEvent(day);return(<div key={"d"+i} style={{textAlign:"center",padding:"8px 0",borderRadius:10,background:ev?ev.c+"20":"transparent",cursor:day?"pointer":"default"}}><span style={{color:day?(ev?ev.c:W.text):"transparent",fontSize:14,fontWeight:ev?700:500}}>{day||""}</span>{ev&&<div style={{width:4,height:4,borderRadius:2,background:ev.c,margin:"2px auto 0"}}/>}</div>);})}</div><button onClick={()=>setAddEvt(true)} style={{width:"100%",padding:"12px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14,minHeight:44}}>+ Add Event</button><p style={{color:W.forest,fontSize:15,fontWeight:700,margin:"0 0 8px"}}>Upcoming</p>{events.map(ev=>(<div key={ev.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1px solid "+W.border}}><div style={{width:4,height:36,borderRadius:2,background:ev.c,flexShrink:0}}/><div style={{flex:1}}><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:0}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{ev.d} · {ev.tm}</p></div><button onClick={()=>setEvents(events.filter(e=>e.id!==ev.id))} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></div>))}</div>}
-      {tab==="notes"&&<div style={{padding:"0 16px"}}><p style={{color:W.forest,fontSize:15,fontWeight:700,margin:"0 0 12px"}}>From Shah</p>{[{t:"Good morning baby",d:"0:34",tm:"Today"},{t:"Listen to this ayah",d:"1:12",tm:"Yesterday"},{t:"Miss you",d:"0:18",tm:"2 days ago"},{t:"Thinking about us",d:"0:45",tm:"3 days ago"}].map((v,i)=>(<div key={i} onClick={()=>setPlayingNote(playingNote===i?null:i)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px",marginBottom:8,background:W.card,borderRadius:14,border:"1px solid "+(playingNote===i?W.forest:W.border),boxShadow:"0 1px 4px rgba(0,0,0,0.03)",cursor:"pointer",transition:"border 0.2s"}}><div style={{width:40,height:40,borderRadius:"50%",background:playingNote===i?W.forest+"20":W.cardAlt,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{playingNote===i?<div style={{width:12,height:12,display:"flex",gap:2,alignItems:"flex-end"}}>{[0,1,2].map(j=>(<div key={j} style={{width:3,flex:1,background:W.forest,borderRadius:1,transition:"height 0.1s",height:Math.abs(Math.sin((wavePhase+j*2)*0.5))*12+4}}/>))}</div>:<svg width="16" height="16" viewBox="0 0 24 24" fill={W.forest}><path d="M8 5v14l11-7z"/></svg>}</div><div style={{flex:1,minWidth:0}}><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:0}}>{v.t}</p>{playingNote===i?<div style={{display:"flex",gap:1,alignItems:"center",height:16,marginTop:4}}>{Array.from({length:20}).map((_,k)=>(<div key={k} style={{width:3,borderRadius:1,background:k/20<(wavePhase%30)/30?W.forest:W.border,height:Math.abs(Math.sin((k+wavePhase)*0.4))*12+3,transition:"height 0.1s"}}/>))}</div>:<p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{v.d} · {v.tm}</p>}</div></div>))}</div>}
+      {/* CALENDAR TAB */}
+      {tab==="cal"&&<div style={{padding:"16px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <button onClick={()=>{if(calMonth===0){setCalMonth(11);setCalYear(calYear-1);}else setCalMonth(calMonth-1);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:44,minHeight:44}}><svg width="20" height="20" viewBox="0 0 24 24" fill={W.textMuted}><path d="M15 18l-6-6 6-6"/></svg></button>
+          <h2 style={{color:W.forest,fontSize:17,fontWeight:700,margin:0}}>{months[calMonth]} {calYear}</h2>
+          <button onClick={()=>{if(calMonth===11){setCalMonth(0);setCalYear(calYear+1);}else setCalMonth(calMonth+1);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:44,minHeight:44}}><svg width="20" height="20" viewBox="0 0 24 24" fill={W.textMuted}><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>{["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(<div key={d} style={{textAlign:"center",padding:"4px 0",color:W.textMuted,fontSize:11,fontWeight:600}}>{d}</div>))}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:16}}>{calDays.map((day,i)=>{const ev=hasEvent(day);const tod=isToday(day);return(<div key={"d"+i} style={{textAlign:"center",padding:"8px 0",borderRadius:10,background:tod?W.forest+"20":ev?ev.c+"15":"transparent",cursor:day?"pointer":"default"}}><span style={{color:day?(tod?W.forest:ev?ev.c:W.text):"transparent",fontSize:14,fontWeight:tod||ev?700:500}}>{day||""}</span>{ev&&<div style={{width:4,height:4,borderRadius:2,background:ev.c,margin:"2px auto 0"}}/>}{tod&&!ev&&<div style={{width:4,height:4,borderRadius:2,background:W.forest,margin:"2px auto 0"}}/>}</div>);})}</div>
+        <button onClick={()=>setAddEvt(true)} style={{width:"100%",padding:"13px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44}}>+ Add Event</button>
+        {upcomingEvents.length>0&&<div style={{marginTop:16}}>
+          <p style={{color:W.forest,fontSize:14,fontWeight:700,margin:"0 0 8px"}}>Coming up</p>
+          {upcomingEvents.slice(0,5).map(ev=>(<div key={ev.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1px solid "+W.border}}>
+            <div style={{width:4,height:36,borderRadius:2,background:ev.c||W.forest,flexShrink:0}}/>
+            <div style={{flex:1}}><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:0}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{ev.d}{ev.tm?" · "+ev.tm:""}</p></div>
+            <button onClick={()=>setEvents(events.filter(e=>e.id!==ev.id))} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:36,minHeight:36}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+          </div>))}
+        </div>}
+      </div>}
+
+      {/* UPCOMING TAB */}
+      {tab==="upcoming"&&<div style={{padding:"16px"}}>
+        {upcomingEvents.length===0?<div style={{textAlign:"center",padding:"40px 0"}}><p style={{color:W.textMuted,fontSize:14}}>No upcoming events</p><button onClick={()=>{setTab("cal");setTimeout(()=>setAddEvt(true),100);}} style={{padding:"10px 24px",borderRadius:20,border:"1px solid "+W.border,background:"transparent",color:W.forest,fontSize:13,fontWeight:600,cursor:"pointer",marginTop:8}}>Add one</button></div>
+        :upcomingEvents.map((ev,i)=>{
+          const d=new Date(ev.d+"T12:00:00");const diff=Math.ceil((d-today)/(1000*60*60*24));
+          return(<div key={ev.id} style={{background:W.card,borderRadius:14,padding:16,marginBottom:10,borderLeft:"4px solid "+(ev.c||W.forest)}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div><p style={{color:W.forest,fontSize:16,fontWeight:600,margin:"0 0 2px"}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>{ev.d}{ev.tm?" at "+ev.tm:""}</p></div>
+              <div style={{background:(ev.c||W.forest)+"15",borderRadius:10,padding:"6px 12px"}}><p style={{color:ev.c||W.forest,fontSize:13,fontWeight:700,margin:0}}>{diff===0?"Today":diff===1?"Tomorrow":diff+" days"}</p></div>
+            </div>
+          </div>);
+        })}
+      </div>}
+
+      {/* NOTES TAB */}
+      {tab==="notes"&&<div style={{padding:"16px"}}>
+        {addNote?<div style={{background:W.card,borderRadius:14,padding:16,border:"1px solid "+W.border,marginBottom:12}}>
+          <textarea value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Write something..." autoFocus style={{width:"100%",minHeight:100,padding:0,background:"transparent",border:"none",color:W.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <button onClick={()=>{if(noteText.trim()){setNotes([{text:noteText.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString(),id:Date.now()},...notes]);setNoteText("");setAddNote(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Save</button>
+            <button onClick={()=>{setAddNote(false);setNoteText("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
+          </div>
+        </div>
+        :<button onClick={()=>setAddNote(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid "+W.border,background:W.card,color:W.textMuted,fontSize:14,cursor:"pointer",marginBottom:12,textAlign:"left"}}>+ Write a note...</button>}
+        {notes.length===0&&!addNote&&<div style={{textAlign:"center",padding:"30px 0"}}><p style={{color:W.textMuted,fontSize:13}}>No notes yet — leave each other little messages</p></div>}
+        {notes.map((n,i)=>(<div key={n.id} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border}}>
+          <p style={{color:W.text,fontSize:14,margin:"0 0 8px",lineHeight:1.5}}>{n.text}</p>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:18,height:18,borderRadius:"50%",background:n.from==="Shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:7,fontWeight:700}}>{n.from[0]}</span></div>
+              <span style={{color:W.textMuted,fontSize:11}}>{n.from} · {n.dt}</span>
+            </div>
+            <button onClick={()=>setNotes(notes.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+          </div>
+        </div>))}
+      </div>}
+
+      {/* GYM TAB */}
+      {tab==="gym"&&<div style={{padding:"16px"}}>
+        {/* Quick stats */}
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          {[{v:gym.length,l:"Workouts",c:S.green},{v:gym.filter(g=>{const d=new Date(g.date);const n=new Date();return d>=new Date(n.getFullYear(),n.getMonth(),n.getDate()-7);}).length,l:"This week",c:S.gold},{v:todayWorkout?"✓":"—",l:"Today",c:todayWorkout?S.green:S.muted}].map((s,i)=>(<div key={i} style={{flex:1,background:W.card,borderRadius:12,padding:"12px 10px",textAlign:"center",border:"1px solid "+W.border}}>
+            <p style={{color:s.c,fontSize:20,fontWeight:700,margin:"0 0 2px"}}>{s.v}</p>
+            <p style={{color:W.textMuted,fontSize:10,margin:0}}>{s.l}</p>
+          </div>))}
+        </div>
+
+        {/* Gym month view — dots for workout days */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:16}}>
+          {Array.from({length:new Date(calYear,calMonth+1,0).getDate()}).map((_,i)=>{
+            const day=i+1;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+            const worked=gym.some(g=>g.date===ds);const isT=isToday(day);
+            return(<div key={day} style={{textAlign:"center",padding:"4px 0"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:worked?S.green+"20":isT?W.forest+"15":"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto"}}>
+                <span style={{color:worked?S.green:isT?W.forest:W.textMuted,fontSize:11,fontWeight:worked||isT?700:400}}>{day}</span>
+              </div>
+              {worked&&<div style={{width:4,height:4,borderRadius:2,background:S.green,margin:"2px auto 0"}}/>}
+            </div>);
+          })}
+        </div>
+
+        {gymView==="log"&&<div>
+          {/* Today's workout summary */}
+          {todayWorkout&&<div style={{background:W.card,borderRadius:14,padding:14,marginBottom:12,border:"1px solid "+W.border}}>
+            <p style={{color:W.forest,fontSize:14,fontWeight:700,margin:"0 0 8px"}}>Today's Workout</p>
+            {todayWorkout.exercises.map((ex,i)=>(<div key={i} style={{marginBottom:6}}>
+              <p style={{color:W.text,fontSize:13,fontWeight:600,margin:"0 0 2px"}}>{ex.name}</p>
+              <p style={{color:W.textMuted,fontSize:11,margin:0}}>{ex.sets.map((s,j)=>(s.weight?s.reps+"×"+s.weight+"lb":s.reps+" reps")).join(" · ")}</p>
+            </div>))}
+            {todayWorkout.cardio&&<div style={{marginTop:6,padding:"8px 10px",background:S.rose+"10",borderRadius:8}}>
+              <p style={{color:S.rose,fontSize:12,fontWeight:600,margin:0}}>{todayWorkout.cardio.type} — {todayWorkout.cardio.duration} min{todayWorkout.cardio.distance?" · "+todayWorkout.cardio.distance+" km":""}</p>
+            </div>}
+          </div>}
+          <button onClick={()=>setGymView("add")} style={{width:"100%",padding:"14px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44,marginBottom:12}}>+ Log Workout</button>
+
+          {/* History */}
+          {gym.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map((g,i)=>(<div key={i} style={{background:W.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+W.border}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <p style={{color:W.forest,fontSize:13,fontWeight:700,margin:0}}>{new Date(g.date+"T12:00:00").toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</p>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{color:W.textMuted,fontSize:11}}>{g.exercises.length} exercises</span>
+                <button onClick={()=>setGym(gym.filter((_,j)=>j!==gym.indexOf(g)))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+              </div>
+            </div>
+            {g.exercises.map((ex,j)=>(<p key={j} style={{color:W.textMuted,fontSize:12,margin:"2px 0"}}>{ex.name} — {ex.sets.length} sets</p>))}
+            {g.cardio&&<p style={{color:S.rose,fontSize:11,margin:"4px 0 0"}}>{g.cardio.type} {g.cardio.duration}min</p>}
+          </div>))}
+        </div>}
+
+        {gymView==="add"&&<div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <h3 style={{color:W.forest,fontSize:17,fontWeight:700,margin:0}}>Log Workout</h3>
+            <button onClick={()=>setGymView("log")} style={{padding:"6px 14px",borderRadius:12,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:12,cursor:"pointer"}}>Cancel</button>
+          </div>
+
+          <input type="date" value={gymDate} onChange={e=>setGymDate(e.target.value)} style={{width:"100%",padding:"10px 14px",borderRadius:10,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:14,marginBottom:14,boxSizing:"border-box",fontFamily:"inherit"}}/>
+
+          {/* Added exercises */}
+          {gymExercises.map((ex,i)=>(<div key={i} style={{background:W.card,borderRadius:10,padding:"10px 12px",marginBottom:6,border:"1px solid "+W.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><p style={{color:W.text,fontSize:13,fontWeight:600,margin:0}}>{ex.name}</p><p style={{color:W.textMuted,fontSize:11,margin:0}}>{ex.sets.map(s=>(s.weight?s.reps+"×"+s.weight:s.reps)).join(", ")}</p></div>
+            <button onClick={()=>setGymExercises(gymExercises.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+          </div>))}
+
+          {/* Exercise selector */}
+          <div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:12}}>
+            <p style={{color:W.forest,fontSize:13,fontWeight:700,margin:"0 0 8px"}}>Add Exercise</p>
+            {/* Category buttons */}
+            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
+              {Object.keys(EXERCISES).map(cat=>(<button key={cat} onClick={()=>setSelExercise("")} style={{padding:"5px 12px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.text,fontSize:11,fontWeight:600,cursor:"pointer"}}>{cat}</button>))}
+            </div>
+            {/* Exercise dropdown */}
+            <select value={selExercise} onChange={e=>setSelExercise(e.target.value)} style={{width:"100%",padding:"10px",borderRadius:10,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:14,marginBottom:10,fontFamily:"inherit"}}>
+              <option value="">Select exercise...</option>
+              {Object.entries(EXERCISES).map(([cat,exs])=>(<optgroup key={cat} label={cat}>{exs.map(ex=>(<option key={ex} value={ex}>{ex}</option>))}</optgroup>))}
+            </select>
+
+            {selExercise&&<div>
+              {/* Quick vs Manual toggle */}
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                <button onClick={()=>setQuickMode(true)} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:quickMode?W.forest:"transparent",color:quickMode?(dark?"#000":WL.cream):W.textMuted,fontSize:12,fontWeight:600,cursor:"pointer"}}>{selExercise.includes("Treadmill")||selExercise.includes("Stairmaster")||selExercise.includes("Elliptical")||selExercise.includes("Bike")||selExercise.includes("Rowing")||selExercise.includes("Jump Rope")||selExercise.includes("Walking")||selExercise.includes("Running")?"Cardio":"Same reps"}</button>
+                <button onClick={()=>setQuickMode(false)} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:!quickMode?W.forest:"transparent",color:!quickMode?(dark?"#000":WL.cream):W.textMuted,fontSize:12,fontWeight:600,cursor:"pointer"}}>Per set</button>
+              </div>
+
+              {EXERCISES["Cardio"].includes(selExercise)?
+                /* Cardio entry */
+                <div style={{display:"flex",gap:8}}>
+                  <input value={gymCardio.duration} onChange={e=>setGymCardio({...gymCardio,type:selExercise,duration:e.target.value})} placeholder="Minutes" type="number" style={{flex:1,padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontFamily:"inherit"}}/>
+                  <input value={gymCardio.distance} onChange={e=>setGymCardio({...gymCardio,distance:e.target.value})} placeholder="km (optional)" type="number" step="0.1" style={{flex:1,padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontFamily:"inherit"}}/>
+                </div>
+              :quickMode?
+                /* Quick mode: same reps × sets */
+                <div style={{display:"flex",gap:8}}>
+                  <div style={{flex:1}}><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>REPS</p><input value={quickReps} onChange={e=>setQuickReps(e.target.value)} type="number" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                  <div style={{display:"flex",alignItems:"flex-end",paddingBottom:10,color:W.textMuted,fontSize:14,fontWeight:700}}>×</div>
+                  <div style={{flex:1}}><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>SETS</p><input value={quickSets} onChange={e=>setQuickSets(e.target.value)} type="number" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                </div>
+              :
+                /* Manual mode: per-set entry */
+                <div>
+                  {manualSets.map((s,i)=>(<div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+                    <span style={{color:W.textMuted,fontSize:11,width:20}}>S{i+1}</span>
+                    <input value={s.reps} onChange={e=>{const n=[...manualSets];n[i]={...n[i],reps:e.target.value};setManualSets(n);}} placeholder="Reps" type="number" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontFamily:"inherit"}}/>
+                    <input value={s.weight} onChange={e=>{const n=[...manualSets];n[i]={...n[i],weight:e.target.value};setManualSets(n);}} placeholder="lbs" type="number" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontFamily:"inherit"}}/>
+                    {manualSets.length>1&&<button onClick={()=>setManualSets(manualSets.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>}
+                  </div>))}
+                  <button onClick={()=>setManualSets([...manualSets,{reps:"",weight:""}])} style={{width:"100%",padding:"6px",borderRadius:6,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:11,cursor:"pointer"}}>+ Add set</button>
+                </div>
+              }
+              <button onClick={()=>{if(EXERCISES["Cardio"].includes(selExercise)){if(gymCardio.duration)setGymView("log");}else addExerciseToWorkout();}} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Add {selExercise}</button>
+            </div>}
+          </div>
+
+          {(gymExercises.length>0||gymCardio.type)&&<button onClick={saveWorkout} style={{width:"100%",padding:"14px",background:S.green,border:"none",borderRadius:50,color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44}}>Save Workout</button>}
+        </div>}
+      </div>}
     </div>
   </div>);
-}
+}{const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/804)*100);if(n>=804){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v="ep1" sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>So... What Is Ramadan?</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode 1</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>13:24</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(804,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
 
 function NP({go}){const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/804)*100);if(n>=804){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v="ep1" sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>So... What Is Ramadan?</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode 1</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>13:24</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(804,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
 
 function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const ok=a[1]&&a[1].length>5;if(d)return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:S.black}}><div style={{width:72,height:72,borderRadius:"50%",background:S.green,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}><svg width="36" height="36" viewBox="0 0 24 24" fill={S.black}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><h2 style={{color:S.white,fontSize:24,fontWeight:700,margin:"0 0 6px"}}>Saved</h2><p style={{color:S.sub,fontSize:15,margin:"0 0 28px"}}>Episode 2 unlocked</p><button onClick={()=>go("home")} style={{padding:"14px 48px",borderRadius:50,border:"none",background:S.white,color:S.black,fontSize:16,fontWeight:700,cursor:"pointer",minHeight:44}}>Done</button></div>);return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",WebkitOverflowScrolling:"touch"}}><div style={{padding:"12px 20px"}}><button onClick={()=>go("np")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button></div><div style={{padding:"0 24px 120px"}}><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"0 0 4px"}}>Time to reflect</h1><p style={{color:S.sub,fontSize:14,margin:"0 0 20px"}}>Episode 1</p>{[{id:1,p:"What surprised you most about Ramadan?",req:true},{id:2,p:"Any questions? I got you.",req:false}].map(h=>(<div key={h.id} style={{marginBottom:18}}>{h.req&&<p style={{color:S.green,fontSize:11,fontWeight:700,margin:"0 0 6px"}}>REQUIRED</p>}<p style={{color:S.white,fontSize:15,lineHeight:1.5,margin:"0 0 8px"}}>{h.p}</p><textarea value={a[h.id]||""} onChange={e=>setA({...a,[h.id]:e.target.value})} placeholder="Type here..." style={{width:"100%",minHeight:75,padding:14,borderRadius:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,lineHeight:1.6,resize:"vertical",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/></div>))}<button onClick={ok?()=>setD(true):undefined} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ok?S.green:S.faint,color:ok?S.black:S.muted,fontSize:16,fontWeight:700,cursor:ok?"pointer":"not-allowed",minHeight:44}}>{ok?"Submit":"Write a reflection to continue"}</button></div></div>);}
 
-function Series({go}){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 35%)",WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(8px, env(safe-area-inset-top)) 16px 0"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:"8px 0",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button></div><div style={{display:"flex",gap:16,padding:"4px 20px 18px"}}><Cv size={125} r={6} v="ep1" sh/><div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:0}}>SERIES</p><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"4px 0 0",lineHeight:1.1}}>Tea Sessions</h1><p style={{color:S.sub,fontSize:13,margin:"6px 0 0"}}>8 episodes</p></div></div><div style={{padding:"0 20px 8px"}}><div onClick={()=>go("np")} style={{width:46,height:46,borderRadius:"50%",background:S.green,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 4px 14px rgba(0,0,0,0.4)"}}><svg width="18" height="18" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg></div></div><div style={{padding:"0 20px"}}>{[{id:1,t:"So... What Is Ramadan?",s:"current",v:"ep1"},{id:2,t:"Why You Already Feel It",s:"locked",v:"ep2"},{id:3,t:"Who Is Allah?",s:"locked",v:"ep3"},{id:4,t:"The Quran Explained",s:"locked",v:"main"}].map((ep,i)=>(<div key={ep.id} onClick={ep.s==="current"?()=>go("np"):undefined} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<3?"1px solid rgba(255,255,255,0.04)":"none",cursor:ep.s==="current"?"pointer":"default",opacity:ep.s==="locked"?0.3:1}}><Cv size={42} r={4} v={ep.v}/><div style={{flex:1,minWidth:0}}><p style={{color:ep.s==="current"?S.green:S.white,fontSize:15,fontWeight:500,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ep.t}</p><p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>Episode {ep.id}</p></div>{ep.s==="locked"&&<svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted}><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>}</div>))}</div></div>);}
+function Series({go}){
+  const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
+  const [eps,setEps]=useState(()=>local.get('tea_eps',[
+    {id:1,t:"So... What Is Ramadan?",s:"available",v:"ep1"},
+    {id:2,t:"Why You Already Feel It",s:"locked",v:"ep2"},
+    {id:3,t:"Who Is Allah?",s:"locked",v:"ep3"},
+    {id:4,t:"The Quran Explained",s:"locked",v:"main"},
+  ]));
+  const [addEp,setAddEp]=useState(false);const [newEp,setNewEp]=useState("");
+  const [comments,setComments]=useState(()=>local.get('tea_comments',{}));
+  useEffect(()=>{local.set('tea_eps',eps);},[eps]);
+  useEffect(()=>{local.set('tea_comments',comments);},[comments]);
+
+  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"linear-gradient(180deg,#1E3264 0%,#121212 35%)",WebkitOverflowScrolling:"touch"}}>
+    <div style={{padding:"max(8px, env(safe-area-inset-top)) 16px 0"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:"8px 0",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+    <div style={{display:"flex",gap:16,padding:"4px 20px 18px"}}><Cv size={125} r={6} v="ep1" sh/><div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:0}}>SERIES</p><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"4px 0 0",lineHeight:1.1}}>Tea Sessions</h1><p style={{color:S.sub,fontSize:13,margin:"6px 0 0"}}>{eps.length} episodes</p></div></div>
+    <div style={{padding:"0 20px"}}>{eps.map((ep,i)=>(<div key={ep.id} style={{marginBottom:2}}>
+      <div onClick={ep.s!=="locked"?()=>go("np"):undefined} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",cursor:ep.s!=="locked"?"pointer":"default",opacity:ep.s==="locked"?0.3:1}}>
+        <Cv size={42} r={4} v={ep.v||"main"}/>
+        <div style={{flex:1,minWidth:0}}><p style={{color:ep.s==="available"?S.green:S.white,fontSize:15,fontWeight:500,margin:0}}>{ep.t}</p><p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>Episode {i+1}</p></div>
+        {ep.s==="locked"&&<svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted}><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>}
+        {isShah&&<button onClick={e=>{e.stopPropagation();setEps(eps.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>}
+      </div>
+      {/* Dane's comment/reflection */}
+      {comments[ep.id]&&<div style={{marginLeft:54,padding:"8px 12px",background:"rgba(232,17,91,0.06)",borderRadius:10,marginBottom:6}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {comments[ep.id]}</p></div>}
+      {!isShah&&ep.s!=="locked"&&<button onClick={()=>{const c=prompt("Your thoughts on this episode:");if(c)setComments({...comments,[ep.id]:c});}} style={{marginLeft:54,padding:"4px 12px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>Reflect</button>}
+    </div>))}
+    {/* Shah: add episode */}
+    {isShah&&<div style={{marginTop:12}}>
+      {addEp?<div style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.06)"}}>
+        <input value={newEp} onChange={e=>setNewEp(e.target.value)} placeholder="Episode title" style={{width:"100%",padding:"10px 0",background:"transparent",border:"none",borderBottom:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:12}}/>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{if(newEp.trim()){setEps([...eps,{id:Date.now(),t:newEp.trim(),s:"locked",v:"main"}]);setNewEp("");setAddEp(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:"#E13300",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add Episode</button>
+          <button onClick={()=>{setAddEp(false);setNewEp("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Cancel</button>
+        </div>
+      </div>
+      :<button onClick={()=>setAddEp(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.25)",fontSize:13,cursor:"pointer"}}>+ add episode</button>}
+    </div>}
+    </div>
+  </div>);
+}
 
 export default function App(){
   const[user,setUser]=useState(()=>local.get('user',null));
