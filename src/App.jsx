@@ -19,6 +19,20 @@ const sync={
   async saveRec(dayIdx,langKey,userName,audioData){if(!supabase)return;try{await supabase.from('dc_wotd_recs').upsert({day_idx:dayIdx,lang_key:langKey,user_name:userName,audio_data:audioData},{onConflict:'day_idx,lang_key,user_name'});}catch{}},
   async deleteRec(dayIdx,langKey,userName){if(!supabase)return;try{await supabase.from('dc_wotd_recs').delete().eq('day_idx',dayIdx).eq('lang_key',langKey).eq('user_name',userName);}catch{}},
   async loadGym(user){if(!supabase)return null;try{const{data}=await supabase.from('dc_gym').select('*').eq('user_name',user).order('date',{ascending:false});return data;}catch{return null;}},
+  async uploadAudio(file,epId){
+    if(!supabase)return null;
+    try{
+      const ext=file.name.split('.').pop()||'webm';
+      const path='tea/'+epId+'_'+Date.now()+'.'+ext;
+      const{error}=await supabase.storage.from('media').upload(path,file,{contentType:file.type,upsert:true});
+      if(error)return null;
+      const{data:{publicUrl}}=supabase.storage.from('media').getPublicUrl(path);
+      return publicUrl;
+    }catch{return null;}
+  },
+  async loadEps(){if(!supabase)return null;try{const{data}=await supabase.from('dc_tea_eps').select('*').order('sort_order',{ascending:true});return data;}catch{return null;}},
+  async saveEp(ep){if(!supabase)return;try{await supabase.from('dc_tea_eps').upsert(ep,{onConflict:'id'});}catch{}},
+  async deleteEp(id){if(!supabase)return;try{await supabase.from('dc_tea_eps').delete().eq('id',id);}catch{}},
   async saveGymEntry(entry){if(!supabase)return;try{await supabase.from('dc_gym').upsert(entry,{onConflict:'user_name,date'});}catch{}},
 };
 
@@ -2423,69 +2437,115 @@ function NP({go}){
   const eps=local.get('tea_eps',[]);
   const npId=local.get('tea_np_id',null);
   const curEp=npId?eps.find(e=>e.id===npId):eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
-  const mediaRef=useRef(null);
+  const audioRef=useRef(null);
   const [p,setP]=useState(false);
   const [cur,setCur]=useState(0);
-  const [dur,setDur]=useState(curEp.duration?curEp.duration.split(':').reduce((a,b)=>a*60+Number(b),0):0);
+  const [dur,setDur]=useState(0);
   const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+  const epIdx=eps.indexOf(curEp);
 
-  useEffect(()=>{
-    if(curEp.mediaUrl){
-      const el=document.createElement(curEp.mediaType==='video'?'video':'audio');
-      el.src=curEp.mediaUrl;el.preload='metadata';
-      el.onloadedmetadata=()=>setDur(el.duration);
-      el.ontimeupdate=()=>setCur(el.currentTime);
-      el.onended=()=>{setP(false);setTimeout(()=>go("hw"),600);};
-      mediaRef.current=el;
-    }
-    return()=>{if(mediaRef.current){try{mediaRef.current.pause();}catch(e){}}mediaRef.current=null;};
-  },[]);
+  // Media Session API — lock screen / notification bar controls
+  const updateMediaSession=(playing)=>{
+    if(!('mediaSession' in navigator))return;
+    try{
+      navigator.mediaSession.metadata=new MediaMetadata({
+        title:curEp.t||"Tea Session",
+        artist:"Dane's Chai",
+        album:"Tea Sessions",
+        artwork:[
+          {src:'/icon-192.png',sizes:'192x192',type:'image/png'},
+          {src:'/icon-512.png',sizes:'512x512',type:'image/png'}
+        ]
+      });
+      navigator.mediaSession.playbackState=playing?'playing':'paused';
+      navigator.mediaSession.setActionHandler('play',()=>{if(audioRef.current){audioRef.current.play();setP(true);}});
+      navigator.mediaSession.setActionHandler('pause',()=>{if(audioRef.current){audioRef.current.pause();setP(false);}});
+      navigator.mediaSession.setActionHandler('seekbackward',()=>{if(audioRef.current)audioRef.current.currentTime=Math.max(0,audioRef.current.currentTime-15);});
+      navigator.mediaSession.setActionHandler('seekforward',()=>{if(audioRef.current)audioRef.current.currentTime=Math.min(audioRef.current.duration||0,audioRef.current.currentTime+15);});
+      navigator.mediaSession.setActionHandler('seekto',(d)=>{if(audioRef.current&&d.seekTime!=null)audioRef.current.currentTime=d.seekTime;});
+      if(audioRef.current&&audioRef.current.duration){
+        navigator.mediaSession.setPositionState({
+          duration:audioRef.current.duration,
+          playbackRate:audioRef.current.playbackRate,
+          position:audioRef.current.currentTime
+        });
+      }
+    }catch(e){}
+  };
 
   const togglePlay=()=>{
-    if(!mediaRef.current)return;
-    if(p){mediaRef.current.pause();setP(false);}
-    else{mediaRef.current.play().catch(()=>{});setP(true);}
+    if(!audioRef.current)return;
+    if(p){audioRef.current.pause();setP(false);updateMediaSession(false);}
+    else{audioRef.current.play().catch(()=>{});setP(true);updateMediaSession(true);}
   };
   const seek=(delta)=>{
-    if(!mediaRef.current)return;
-    mediaRef.current.currentTime=Math.max(0,Math.min(dur,mediaRef.current.currentTime+delta));
+    if(!audioRef.current)return;
+    audioRef.current.currentTime=Math.max(0,Math.min(audioRef.current.duration||0,audioRef.current.currentTime+delta));
   };
   const seekTo=(pct)=>{
-    if(!mediaRef.current||!dur)return;
-    mediaRef.current.currentTime=pct*dur;
+    if(!audioRef.current||!dur)return;
+    audioRef.current.currentTime=pct*dur;
   };
+  const onTimeUpdate=()=>{
+    if(!audioRef.current)return;
+    setCur(audioRef.current.currentTime);
+    // Update media session position periodically
+    if('mediaSession' in navigator&&audioRef.current.duration){
+      try{navigator.mediaSession.setPositionState({duration:audioRef.current.duration,playbackRate:1,position:audioRef.current.currentTime});}catch(e){}
+    }
+  };
+  const onLoaded=()=>{if(audioRef.current)setDur(audioRef.current.duration);};
+  const onEnded=()=>{setP(false);updateMediaSession(false);setTimeout(()=>go("hw"),600);};
+
+  // Cleanup media session on unmount
+  useEffect(()=>{
+    return()=>{
+      if(audioRef.current){try{audioRef.current.pause();}catch(e){}}
+      if('mediaSession' in navigator){try{navigator.mediaSession.playbackState='none';}catch(e){}}
+    };
+  },[]);
+
+  const hasMedia=!!curEp.mediaUrl;
+  const isVideo=curEp.mediaType==='video';
 
   return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}>
-      <button onClick={()=>{if(mediaRef.current)try{mediaRef.current.pause();}catch(e){}go("series");}} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button onClick={()=>{if(audioRef.current)try{audioRef.current.pause();}catch(e){}if('mediaSession' in navigator)try{navigator.mediaSession.playbackState='none';}catch(e){}go("series");}} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
       <div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div>
       <div style={{width:38}}/>
     </div>
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}>
-      {curEp.mediaType==='video'&&curEp.mediaUrl?
-        <video ref={el=>{if(el&&mediaRef.current){el.src=curEp.mediaUrl;el.ontimeupdate=()=>setCur(el.currentTime);el.onloadedmetadata=()=>setDur(el.duration);el.onended=()=>{setP(false);setTimeout(()=>go("hw"),600);};mediaRef.current=el;}}} style={{width:"90%",maxWidth:320,borderRadius:12}} playsInline/>
-      :<div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v={curEp.v||"main"} sh/></div>}
+      {isVideo&&hasMedia?
+        <video ref={audioRef} src={curEp.mediaUrl} onTimeUpdate={onTimeUpdate} onLoadedMetadata={onLoaded} onEnded={onEnded} playsInline style={{width:"90%",maxWidth:320,borderRadius:12}}/>
+      :<div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}>
+        <Cv size={999} r={8} v={curEp.v||"main"} sh/>
+        {hasMedia&&<audio ref={audioRef} src={curEp.mediaUrl} onTimeUpdate={onTimeUpdate} onLoadedMetadata={onLoaded} onEnded={onEnded} preload="auto"/>}
+      </div>}
     </div>
     <div style={{padding:"0 24px 40px"}}>
       <h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>{curEp.t}</h2>
-      <p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode {eps.indexOf(curEp)+1}{curEp.desc?" · "+curEp.desc.slice(0,50)+(curEp.desc.length>50?"...":""):""}</p>
+      <p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode {epIdx+1}{curEp.desc?" · "+curEp.desc.slice(0,50)+(curEp.desc.length>50?"...":""):""}</p>
       <div style={{marginBottom:8}}>
         <div style={{height:4,background:S.bar,borderRadius:2,cursor:"pointer"}} onClick={e=>{const rect=e.currentTarget.getBoundingClientRect();seekTo((e.clientX-rect.left)/rect.width);}}>
           <div style={{width:dur?Math.max((cur/dur)*100,0.5)+"%":"0%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}>
             <div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/>
           </div>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(cur)}</span><span style={{color:S.sub,fontSize:11}}>{dur?f(dur):curEp.duration||"--:--"}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+          <span style={{color:S.sub,fontSize:11}}>{f(cur)}</span>
+          <span style={{color:S.sub,fontSize:11}}>{dur?f(dur):curEp.duration||"--:--"}</span>
+        </div>
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}>
         <button onClick={()=>seek(-15)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
-        <button onClick={togglePlay} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <button onClick={()=>{togglePlay();updateMediaSession(!p);}} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:hasMedia?S.white:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>
           {p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          :<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}
+          :<svg width="26" height="26" viewBox="0 0 24 24" fill={hasMedia?S.black:"rgba(255,255,255,0.3)"}><path d="M8 5v14l11-7z"/></svg>}
         </button>
         <button onClick={()=>seek(15)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
       </div>
-      <button onClick={()=>{if(mediaRef.current)try{mediaRef.current.pause();}catch(e){}go("hw");}} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button>
+      {!hasMedia&&<p style={{textAlign:"center",color:S.muted,fontSize:12,marginTop:12}}>No audio uploaded yet</p>}
+      <button onClick={()=>{if(audioRef.current)try{audioRef.current.pause();}catch(e){}if('mediaSession' in navigator)try{navigator.mediaSession.playbackState='none';}catch(e){}go("hw");}} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button>
     </div>
   </div>);
 }
@@ -2498,47 +2558,73 @@ function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const
 function Series({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
   const [eps,setEps]=useState(()=>local.get('tea_eps',[
-    {id:1,t:"So... What Is Ramadan?",s:"available",desc:"An intro to what Ramadan actually is, why Muslims fast, and what it means to Shah.",v:"ep1"},
-    {id:2,t:"Why You Already Feel It",s:"locked",desc:"",v:"ep2"},
-    {id:3,t:"Who Is Allah?",s:"locked",desc:"",v:"ep3"},
-    {id:4,t:"The Quran Explained",s:"locked",desc:"",v:"main"},
+    {id:1,t:"So... What Is Ramadan?",s:"available",desc:"An intro to what Ramadan actually is, why Muslims fast, and what it means to Shah.",v:"ep1",sort_order:1},
+    {id:2,t:"Why You Already Feel It",s:"locked",desc:"",v:"ep2",sort_order:2},
+    {id:3,t:"Who Is Allah?",s:"locked",desc:"",v:"ep3",sort_order:3},
+    {id:4,t:"The Quran Explained",s:"locked",desc:"",v:"main",sort_order:4},
   ]));
   const [addEp,setAddEp]=useState(false);const [newEp,setNewEp]=useState({t:"",desc:""});
   const [comments,setComments]=useState(()=>local.get('tea_comments',{}));
   const [reflectId,setReflectId]=useState(null);const [reflectText,setReflectText]=useState("");
   const [editId,setEditId]=useState(null);
-  const [playingId,setPlayingId]=useState(null);
-  const audioRef=useRef(null);
+  const [uploading,setUploading]=useState(false);
   useEffect(()=>{local.set('tea_eps',eps);},[eps]);
   useEffect(()=>{local.set('tea_comments',comments);},[comments]);
 
-  const handleFile=(epId,file)=>{
-    if(!file)return;
-    const url=URL.createObjectURL(file);
-    const mediaType=file.type.startsWith("video")?"video":file.type.startsWith("audio")?"audio":"file";
-    // Get duration
-    if(mediaType==="audio"||mediaType==="video"){
-      const el=document.createElement(mediaType);
-      el.src=url;el.onloadedmetadata=()=>{
-        const dur=Math.floor(el.duration);const m=Math.floor(dur/60);const s=dur%60;
-        setEps(prev=>prev.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,duration:m+":"+String(s).padStart(2,"0"),fileName:file.name}:ep));
-      };
-    }else{
-      setEps(prev=>prev.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,fileName:file.name}:ep));
-    }
+  // Load from Supabase on mount
+  useEffect(()=>{
+    initSupabase.then(()=>{
+      sync.loadEps().then(data=>{
+        if(data&&data.length){
+          setEps(data);local.set('tea_eps',data);
+        }
+      });
+    });
+  },[]);
+
+  // Save eps to Supabase whenever they change
+  const saveEpsToSupabase=(updatedEps)=>{
+    setEps(updatedEps);
+    updatedEps.forEach(ep=>{
+      const{v,...rest}=ep;
+      sync.saveEp({...rest,cover_variant:v||'main'});
+    });
   };
 
-  const togglePlay=(epId)=>{
-    const ep=eps.find(e=>e.id===epId);
-    if(!ep?.mediaUrl)return;
-    if(playingId===epId){
-      if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
-      setPlayingId(null);
+  const handleFile=async(epId,file)=>{
+    if(!file)return;
+    const mediaType=file.type.startsWith("video")?"video":"audio";
+    setUploading(true);
+    // Upload to Supabase Storage
+    const url=await sync.uploadAudio(file,epId);
+    if(url){
+      // Get duration
+      const el=document.createElement(mediaType);
+      el.src=url;el.crossOrigin="anonymous";el.onloadedmetadata=()=>{
+        const dur=Math.floor(el.duration);const m=Math.floor(dur/60);const s=dur%60;
+        const updated=eps.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,duration:m+":"+String(s).padStart(2,"0"),fileName:file.name}:ep);
+        saveEpsToSupabase(updated);
+        setUploading(false);
+      };
+      el.onerror=()=>{
+        // Duration detect failed, save anyway
+        const updated=eps.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,fileName:file.name}:ep);
+        saveEpsToSupabase(updated);
+        setUploading(false);
+      };
     }else{
-      if(audioRef.current)audioRef.current.pause();
-      const el=new Audio(ep.mediaUrl);
-      el.play();el.onended=()=>setPlayingId(null);
-      audioRef.current=el;setPlayingId(epId);
+      // Fallback to base64 if storage fails
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const dataUrl=reader.result;
+        const el=document.createElement(mediaType);
+        el.src=dataUrl;el.onloadedmetadata=()=>{
+          const dur=Math.floor(el.duration);const m=Math.floor(dur/60);const s=dur%60;
+          setEps(prev=>prev.map(ep=>ep.id===epId?{...ep,mediaUrl:dataUrl,mediaType,duration:m+":"+String(s).padStart(2,"0"),fileName:file.name}:ep));
+          setUploading(false);
+        };
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -2561,7 +2647,8 @@ function Series({go}){
     </div>
     <button onClick={()=>{
       if(editEp.t.trim()){
-        setEps(eps.map(ep=>ep.id===editEp.id?{...ep,t:editEp.t.trim(),desc:editEp.desc.trim()}:ep));
+        const updated=eps.map(ep=>ep.id===editEp.id?{...ep,t:editEp.t.trim(),desc:editEp.desc.trim()}:ep);
+        saveEpsToSupabase(updated);
         setEditEp(null);
       }
     }} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:editEp.t.trim()?"#E13300":"rgba(255,255,255,0.06)",color:editEp.t.trim()?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:editEp.t.trim()?"pointer":"not-allowed",minHeight:44}}>Save Changes</button>
@@ -2590,25 +2677,31 @@ function Series({go}){
         <input type="file" accept="audio/*,video/*" onChange={e=>{if(e.target.files[0])setNewEp({...newEp,file:e.target.files[0]});}} style={{display:"none"}}/>
       </label>
     </div>
-    <button onClick={()=>{
+    <button onClick={async()=>{
       if(newEp.t.trim()){
-        const ep={id:Date.now(),t:newEp.t.trim(),desc:newEp.desc.trim(),s:"available",v:"main"};
+        const ep={id:Date.now(),t:newEp.t.trim(),desc:newEp.desc.trim(),s:"available",v:"main",sort_order:eps.length+1};
         if(newEp.file){
-          const url=URL.createObjectURL(newEp.file);
+          setUploading(true);
           const mt=newEp.file.type.startsWith("video")?"video":"audio";
-          ep.mediaUrl=url;ep.mediaType=mt;ep.fileName=newEp.file.name;
-          // Detect duration
-          const el=document.createElement(mt==="video"?"video":"audio");
-          el.src=url;el.onloadedmetadata=()=>{
-            const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);
-            ep.duration=m+":"+String(s).padStart(2,"0");
-            setEps([...eps,ep]);setNewEp({t:"",desc:"",file:null});setAddEp(false);
-          };
-          return; // wait for metadata
+          ep.mediaType=mt;ep.fileName=newEp.file.name;
+          const url=await sync.uploadAudio(newEp.file,ep.id);
+          if(url){
+            ep.mediaUrl=url;
+            // Try get duration
+            try{
+              const el=document.createElement(mt==="video"?"video":"audio");
+              el.src=url;el.crossOrigin="anonymous";
+              await new Promise((res)=>{el.onloadedmetadata=res;el.onerror=res;setTimeout(res,3000);});
+              if(el.duration&&isFinite(el.duration)){const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);ep.duration=m+":"+String(s).padStart(2,"0");}
+            }catch{}
+          }
+          setUploading(false);
         }
-        setEps([...eps,ep]);setNewEp({t:"",desc:"",file:null});setAddEp(false);
+        const updated=[...eps,ep];
+        saveEpsToSupabase(updated);
+        setNewEp({t:"",desc:"",file:null});setAddEp(false);
       }
-    }} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:newEp.t.trim()?"#E13300":"rgba(255,255,255,0.06)",color:newEp.t.trim()?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:newEp.t.trim()?"pointer":"not-allowed",minHeight:44}}>Add Episode</button>
+    }} disabled={uploading} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:newEp.t.trim()&&!uploading?"#E13300":"rgba(255,255,255,0.06)",color:newEp.t.trim()&&!uploading?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:newEp.t.trim()&&!uploading?"pointer":"not-allowed",minHeight:44}}>{uploading?"Uploading...":"Add Episode"}</button>
   </div>);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"linear-gradient(180deg,#1E3264 0%,#121212 35%)",WebkitOverflowScrolling:"touch"}}>
@@ -2632,20 +2725,20 @@ function Series({go}){
           <button onClick={e=>{e.stopPropagation();setEditEp({id:ep.id,t:ep.t,desc:ep.desc||""});}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title="Edit">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
           </button>
-          <button onClick={e=>{e.stopPropagation();setEps(eps.map((x,j)=>j===i?{...x,s:x.s==="locked"?"available":"locked"}:x));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title={ep.s==="locked"?"Unlock":"Lock"}>
+          <button onClick={e=>{e.stopPropagation();const updated=eps.map((x,j)=>j===i?{...x,s:x.s==="locked"?"available":"locked"}:x);saveEpsToSupabase(updated);}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title={ep.s==="locked"?"Unlock":"Lock"}>
             {ep.s==="locked"?<svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>
             :<svg width="14" height="14" viewBox="0 0 24 24" fill={S.green}><path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-9h-1V6A5 5 0 007 6h2a3 3 0 016 0v2H6a2 2 0 00-2 2v10c0 1.1.9 2 2 2h12a2 2 0 002-2V10a2 2 0 00-2-2z"/></svg>}
           </button>
-          <button onClick={e=>{e.stopPropagation();setEps(eps.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+          <button onClick={e=>{e.stopPropagation();sync.deleteEp(ep.id);setEps(eps.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
         </div>}
       </div>
       {/* Description */}
       {ep.desc&&ep.s!=="locked"&&<p style={{color:S.muted,fontSize:12,margin:"4px 0 4px 54px",lineHeight:1.4}}>{ep.desc}</p>}
       {/* Shah: upload file to existing episode */}
-      {isShah&&!ep.mediaUrl&&<label style={{display:"flex",alignItems:"center",gap:6,marginLeft:54,padding:"6px 12px",borderRadius:10,border:"1px dashed rgba(255,255,255,0.1)",cursor:"pointer",marginBottom:6,width:"fit-content"}}>
+      {isShah&&!ep.mediaUrl&&<label style={{display:"flex",alignItems:"center",gap:6,marginLeft:54,padding:"6px 12px",borderRadius:10,border:"1px dashed rgba(255,255,255,0.1)",cursor:uploading?"wait":"pointer",marginBottom:6,width:"fit-content",opacity:uploading?0.5:1}}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-        <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>Upload audio/video</span>
-        <input type="file" accept="audio/*,video/*" onChange={e=>{if(e.target.files[0])handleFile(ep.id,e.target.files[0]);}} style={{display:"none"}}/>
+        <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>{uploading?"Uploading...":"Upload audio/video"}</span>
+        <input type="file" accept="audio/*,video/*" onChange={e=>{if(e.target.files[0]&&!uploading)handleFile(ep.id,e.target.files[0]);}} style={{display:"none"}} disabled={uploading}/>
       </label>}
       {/* Video player */}
       {ep.mediaType==="video"&&ep.mediaUrl&&ep.s!=="locked"&&<div style={{marginLeft:54,marginBottom:8}}>
