@@ -4,6 +4,21 @@ import React, { useState, useEffect, useRef, useCallback, createContext, useCont
 let supabase = null;
 const initSupabase = import("./supabase").then(m => { supabase = m.supabase; }).catch(() => {});
 
+// Supabase sync helpers — write to both localStorage + Supabase
+const sync={
+  async loadWords(){if(!supabase)return null;try{const{data}=await supabase.from('dc_words').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
+  async addWord(text,from){if(!supabase)return;try{await supabase.from('dc_words').insert({text,from_name:from});}catch{}},
+  async deleteWord(id){if(!supabase)return;try{await supabase.from('dc_words').delete().eq('id',id);}catch{}},
+  async loadEvents(){if(!supabase)return null;try{const{data}=await supabase.from('dc_events').select('*').order('date',{ascending:true});return data;}catch{return null;}},
+  async addEvent(evt){if(!supabase)return;try{await supabase.from('dc_events').insert(evt);}catch{}},
+  async deleteEvent(id){if(!supabase)return;try{await supabase.from('dc_events').delete().eq('id',id);}catch{}},
+  async loadNotes(){if(!supabase)return null;try{const{data}=await supabase.from('dc_notes').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
+  async addNote(text,from){if(!supabase)return;try{await supabase.from('dc_notes').insert({text,from_name:from});}catch{}},
+  async deleteNote(id){if(!supabase)return;try{await supabase.from('dc_notes').delete().eq('id',id);}catch{}},
+  async loadGym(user){if(!supabase)return null;try{const{data}=await supabase.from('dc_gym').select('*').eq('user_name',user).order('date',{ascending:false});return data;}catch{return null;}},
+  async saveGymEntry(entry){if(!supabase)return;try{await supabase.from('dc_gym').upsert(entry,{onConflict:'user_name,date'});}catch{}},
+};
+
 // Dark mode context
 const DarkCtx = createContext(false);
 const useDark = () => useContext(DarkCtx);
@@ -1093,6 +1108,8 @@ function Home({go}){
   const ramStart=new Date(2026,1,18);
   const dayNum=Math.max(1,Math.min(30,Math.floor((new Date()-ramStart)/(1000*60*60*24))+1));
   const td=R[dayNum-1]||R[0];
+  const hr=new Date().getHours();
+  const greeting=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
   // Additional prayer times for Edmonton (approximate for late Feb - mid March 2026)
   const prayers=[
     {name:"Fajr",time:td.fajr,active:hr<6},{name:"Zuhr",time:"12:45",active:hr>=6&&hr<13},
@@ -1101,63 +1118,64 @@ function Home({go}){
   ];
   const nextPrayer=prayers.find(p=>p.active)||prayers[0];
 
-  // Word of the Day — cycles through vocab from all languages
-  const WOTD=[
-    {w:"Shukriya",m:"Thank you",lang:"Urdu",r:"shuk-REE-ya",emoji:"🤲"},
-    {w:"Mahal kita",m:"I love you",lang:"Tagalog",r:"ma-HAL kee-TA",emoji:"💛"},
-    {w:"Bismillah",m:"In the name of God",lang:"Arabic",r:"bis-MIL-lah",emoji:"📿"},
-    {w:"Magandang umaga",m:"Beautiful morning",lang:"Tagalog",r:"ma-gan-DANG oo-MA-ga",emoji:"☀️"},
-    {w:"Assalamu alaikum",m:"Peace be upon you",lang:"Arabic/Urdu",r:"as-sa-LAA-mu a-LAI-kum",emoji:"🕊️"},
-    {w:"Dil",m:"Heart",lang:"Urdu",r:"dil",emoji:"❤️"},
-    {w:"Salamat po",m:"Thank you (respectful)",lang:"Tagalog",r:"sa-LA-mat po",emoji:"🙏"},
-    {w:"Alhamdulillah",m:"Praise God",lang:"Arabic",r:"al-HAM-du-LIL-lah",emoji:"✨"},
-    {w:"Kya haal hai?",m:"How are you?",lang:"Urdu",r:"kya HAAL hai",emoji:"👋"},
-    {w:"Kumain ka na?",m:"Have you eaten?",lang:"Tagalog",r:"ku-MA-in ka na",emoji:"🍚"},
-    {w:"InshaAllah",m:"God willing",lang:"Arabic",r:"in-SHA-al-lah",emoji:"🤲"},
-    {w:"Chai",m:"Tea",lang:"Urdu",r:"chai",emoji:"☕"},
-    {w:"Mahal",m:"Love / Expensive",lang:"Tagalog",r:"ma-HAL",emoji:"💕"},
-    {w:"SubhanAllah",m:"Glory to God",lang:"Arabic",r:"sub-HAN-al-lah",emoji:"🌙"},
-    {w:"Meri jaan",m:"My life (endearment)",lang:"Urdu",r:"ME-ri jaan",emoji:"💫"},
-    {w:"Ingat",m:"Take care",lang:"Tagalog",r:"i-NGAT",emoji:"🫶"},
-    {w:"JazakAllah",m:"May God reward you",lang:"Arabic",r:"ja-ZAK-al-lah",emoji:"🌟"},
-    {w:"Acha",m:"OK / Really? / I see!",lang:"Urdu",r:"a-CHA",emoji:"👀"},
-    {w:"Miss na kita",m:"I miss you",lang:"Tagalog",r:"miss na kee-TA",emoji:"🥺"},
-    {w:"MashaAllah",m:"God has willed it",lang:"Arabic",r:"MA-sha-al-lah",emoji:"🤍"},
-    {w:"Khush",m:"Happy",lang:"Urdu",r:"khush",emoji:"😊"},
-    {w:"Opo",m:"Yes (respectful)",lang:"Tagalog",r:"o-PO",emoji:"✅"},
-    {w:"Tawakkul",m:"Trust in God",lang:"Arabic",r:"ta-WAK-kul",emoji:"🕊️"},
-    {w:"Mohabbat",m:"Love",lang:"Urdu",r:"mo-HAB-bat",emoji:"💖"},
-    {w:"Mabuhay",m:"Long live / Welcome",lang:"Tagalog",r:"ma-BU-hai",emoji:"🎉"},
-    {w:"Sabr",m:"Patience",lang:"Arabic",r:"sa-br",emoji:"🧘"},
-    {w:"Ghar",m:"Home",lang:"Urdu",r:"ghar",emoji:"🏠"},
-    {w:"Masarap",m:"Delicious",lang:"Tagalog",r:"ma-sa-RAP",emoji:"🤤"},
-    {w:"Shukr",m:"Gratitude",lang:"Arabic",r:"shukr",emoji:"🙌"},
-    {w:"Paani",m:"Water",lang:"Urdu",r:"PAA-ni",emoji:"💧"},
+  // Words of the Day — one from each language
+  const URDU_W=[
+    {w:"Shukriya",m:"Thank you",r:"shuk-REE-ya"},{w:"Dil",m:"Heart",r:"dil"},
+    {w:"Kya haal hai?",m:"How are you?",r:"kya HAAL hai"},{w:"Chai",m:"Tea",r:"chai"},
+    {w:"Meri jaan",m:"My life (endearment)",r:"ME-ri jaan"},{w:"Acha",m:"OK / Really?",r:"a-CHA"},
+    {w:"Khush",m:"Happy",r:"khush"},{w:"Mohabbat",m:"Love",r:"mo-HAB-bat"},
+    {w:"Ghar",m:"Home",r:"ghar"},{w:"Paani",m:"Water",r:"PAA-ni"},
+    {w:"Theek hai",m:"It's fine",r:"THEEK hai"},{w:"Bohut acha",m:"Very good",r:"bo-HUT a-CHA"},
+    {w:"Khaana",m:"Food",r:"KHAA-na"},{w:"Suno",m:"Listen",r:"su-NO"},
+    {w:"Pyaar",m:"Love",r:"pyaar"},
   ];
-  const todayIdx=Math.floor(Date.now()/86400000)%WOTD.length;
-  const wotd=WOTD[todayIdx];
-  const wotdRecKey='wotd_rec_'+todayIdx+'_'+user;
-  const partnerRecKey='wotd_rec_'+todayIdx+'_'+(user==='shah'?'dane':'shah');
-  const [myRec,setMyRec]=useState(()=>local.get(wotdRecKey,null));
-  const [recording,setRecording]=useState(false);
+  const TAGALOG_W=[
+    {w:"Mahal kita",m:"I love you",r:"ma-HAL kee-TA"},{w:"Magandang umaga",m:"Beautiful morning",r:"ma-gan-DANG oo-MA-ga"},
+    {w:"Salamat po",m:"Thank you (respectful)",r:"sa-LA-mat po"},{w:"Kumain ka na?",m:"Have you eaten?",r:"ku-MA-in ka na"},
+    {w:"Mahal",m:"Love / Expensive",r:"ma-HAL"},{w:"Ingat",m:"Take care",r:"i-NGAT"},
+    {w:"Miss na kita",m:"I miss you",r:"miss na kee-TA"},{w:"Opo",m:"Yes (respectful)",r:"o-PO"},
+    {w:"Mabuhay",m:"Long live / Welcome",r:"ma-BU-hai"},{w:"Masarap",m:"Delicious",r:"ma-sa-RAP"},
+    {w:"Maganda",m:"Beautiful",r:"ma-gan-DA"},{w:"Gutom na ako",m:"I'm hungry",r:"gu-TOM na a-KO"},
+    {w:"Tara",m:"Let's go",r:"ta-RA"},{w:"Sige",m:"OK / Go ahead",r:"si-GE"},
+    {w:"Tulog na",m:"Sleep now",r:"tu-LOG na"},
+  ];
+  const ARABIC_W=[
+    {w:"Bismillah",m:"In the name of God",r:"bis-MIL-lah"},{w:"Assalamu alaikum",m:"Peace be upon you",r:"as-sa-LAA-mu a-LAI-kum"},
+    {w:"Alhamdulillah",m:"Praise God",r:"al-HAM-du-LIL-lah"},{w:"InshaAllah",m:"God willing",r:"in-SHA-al-lah"},
+    {w:"SubhanAllah",m:"Glory to God",r:"sub-HAN-al-lah"},{w:"JazakAllah",m:"May God reward you",r:"ja-ZAK-al-lah"},
+    {w:"MashaAllah",m:"God has willed it",r:"MA-sha-al-lah"},{w:"Tawakkul",m:"Trust in God",r:"ta-WAK-kul"},
+    {w:"Sabr",m:"Patience",r:"sa-br"},{w:"Shukr",m:"Gratitude",r:"shukr"},
+    {w:"Hayati",m:"My life",r:"ha-YA-ti"},{w:"Yalla",m:"Let's go",r:"YAL-la"},
+    {w:"Habibi",m:"My love (m)",r:"ha-BEE-bi"},{w:"Khalas",m:"Done / Enough",r:"KHA-las"},
+    {w:"Tamam",m:"Perfect",r:"ta-MAM"},
+  ];
+  const todayIdx=Math.floor(Date.now()/86400000);
+  const wotdU=URDU_W[todayIdx%URDU_W.length];
+  const wotdT=TAGALOG_W[todayIdx%TAGALOG_W.length];
+  const wotdA=ARABIC_W[todayIdx%ARABIC_W.length];
+  const todayWords=[{...wotdU,lang:"Urdu",color:"#1DB954"},{...wotdT,lang:"Tagalog",color:"#E8115B"},{...wotdA,lang:"Arabic",color:"#C9A84C"}];
+  const [wotdRecs,setWotdRecs]=useState(()=>({u:local.get('wotd_'+todayIdx+'_u_'+user,null),t:local.get('wotd_'+todayIdx+'_t_'+user,null),a:local.get('wotd_'+todayIdx+'_a_'+user,null)}));
+  const [recording,setRecording]=useState(null);
 
   // Dua of the Day
   const DUAS=[
-    {ar:"رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",en:"Our Lord, give us good in this world and the Hereafter, and protect us from the Fire",ref:"2:201"},
-    {ar:"رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي",en:"My Lord, expand my chest and ease my task for me",ref:"20:25-26"},
-    {ar:"رَبِّ زِدْنِي عِلْمًا",en:"My Lord, increase me in knowledge",ref:"20:114"},
-    {ar:"حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",en:"Allah is sufficient for us, and He is the best disposer of affairs",ref:"3:173"},
-    {ar:"رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا",en:"Our Lord, do not hold us accountable if we forget or make mistakes",ref:"2:286"},
-    {ar:"رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ",en:"Our Lord, grant us from our spouses and offspring comfort to our eyes",ref:"25:74"},
-    {ar:"اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ",en:"O Allah, I ask You for well-being",ref:"Hadith"},
-    {ar:"رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِن ذُرِّيَّتِي",en:"My Lord, make me steadfast in prayer, and my descendants too",ref:"14:40"},
+    {ar:"رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",en:"Our Lord, give us good in this world and the Hereafter, and protect us from the Fire",pr:"Rabbanaa aatinaa fid-dunyaa hasanatan wa fil-aakhirati hasanatan wa qinaa 'adhaab an-naar",ref:"2:201"},
+    {ar:"رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي",en:"My Lord, expand my chest and ease my task for me",pr:"Rabbi-shrah lee sadree wa yassir lee amree",ref:"20:25-26"},
+    {ar:"رَبِّ زِدْنِي عِلْمًا",en:"My Lord, increase me in knowledge",pr:"Rabbi zidnee 'ilmaa",ref:"20:114"},
+    {ar:"حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",en:"Allah is sufficient for us, and He is the best disposer of affairs",pr:"Hasbunallahu wa ni'mal wakeel",ref:"3:173"},
+    {ar:"رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا",en:"Our Lord, do not hold us accountable if we forget or make mistakes",pr:"Rabbanaa laa tu'aakhidhnaa in naseenaa aw akhta'naa",ref:"2:286"},
+    {ar:"رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ",en:"Our Lord, grant us from our spouses and offspring comfort to our eyes",pr:"Rabbanaa hab lanaa min azwaajinaa wa dhurriyaatinaa qurrata a'yun",ref:"25:74"},
+    {ar:"اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ",en:"O Allah, I ask You for well-being",pr:"Allaahumma innee as'alukal 'aafiyah",ref:"Hadith"},
+    {ar:"رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِن ذُرِّيَّتِي",en:"My Lord, make me steadfast in prayer, and my descendants too",pr:"Rabbij-'alnee muqeemas-salaati wa min dhurriyyatee",ref:"14:40"},
   ];
   const dua=DUAS[dayNum%DUAS.length];
 
-  const recordWOTD=async()=>{
-    if(myRec){try{const a=new Audio(myRec);a.play();}catch(e){}return;}
+  const recordWord=async(langKey)=>{
+    const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
+    const existing=wotdRecs[langKey];
+    if(existing){try{new Audio(existing).play();}catch(e){}return;}
     try{
-      setRecording(true);
+      setRecording(langKey);
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
       const mr=new MediaRecorder(stream);const chunks=[];
       mr.ondataavailable=e=>chunks.push(e.data);
@@ -1165,14 +1183,14 @@ function Home({go}){
         stream.getTracks().forEach(t=>t.stop());
         const blob=new Blob(chunks,{type:'audio/webm'});
         const reader=new FileReader();
-        reader.onload=()=>{local.set(wotdRecKey,reader.result);setMyRec(reader.result);setRecording(false);};
+        reader.onload=()=>{local.set(recKey,reader.result);setWotdRecs(p=>({...p,[langKey]:reader.result}));setRecording(null);};
         reader.readAsDataURL(blob);
       };
       mr.start();setTimeout(()=>mr.stop(),4000);
-    }catch(e){setRecording(false);}
+    }catch(e){setRecording(null);}
   };
-  const playPartner=()=>{const r=local.get(partnerRecKey,null);if(r){try{new Audio(r).play();}catch(e){}}};
-  const hasPartnerRec=!!local.get(partnerRecKey,null);
+  const playPartnerWord=(langKey)=>{const pk='wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah');const r=local.get(pk,null);if(r){try{new Audio(r).play();}catch(e){}}};
+  const hasPartnerWord=(langKey)=>!!local.get('wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah'),null);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
     <div style={{background:"linear-gradient(180deg,#0B3D2E 0%,#121212 80%)",padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}>
@@ -1213,33 +1231,39 @@ function Home({go}){
 
     <div style={{padding:"16px 16px 0"}}>
 
-      {/* Word of the Day — record for partner */}
+      {/* Words of the Day — one from each language */}
       <div style={{background:S.card,borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(255,255,255,0.04)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-          <div>
-            <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 6px"}}>WORD OF THE DAY</p>
-            <p style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>{wotd.emoji} {wotd.w}</p>
-            <p style={{color:S.sub,fontSize:13,margin:"0 0 2px"}}>{wotd.m}</p>
-            <p style={{color:S.muted,fontSize:11,margin:0}}>{wotd.lang} · {wotd.r}</p>
+        <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 14px"}}>WORDS OF THE DAY</p>
+        {todayWords.map((tw,wi)=>{const lk=["u","t","a"][wi];const hasRec=!!wotdRecs[lk];const isRec=recording===lk;const hasPart=hasPartnerWord(lk);return(
+          <div key={wi} style={{marginBottom:wi<2?14:0,paddingBottom:wi<2?14:0,borderBottom:wi<2?"1px solid rgba(255,255,255,0.04)":"none"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{flex:1}}>
+                <p style={{color:tw.color,fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 4px"}}>{tw.lang.toUpperCase()}</p>
+                <p style={{color:S.white,fontSize:20,fontWeight:800,margin:"0 0 3px",letterSpacing:-0.3}}>{tw.w}</p>
+                <p style={{color:S.sub,fontSize:12,margin:"0 0 2px"}}>{tw.m}</p>
+                <p style={{color:S.muted,fontSize:11,margin:0}}>{tw.r}</p>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>recordWord(lk)} style={{flex:1,padding:"8px",borderRadius:10,border:"none",background:isRec?S.rose+"20":hasRec?tw.color+"12":"rgba(255,255,255,0.03)",color:isRec?S.rose:hasRec?tw.color:S.muted,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                {isRec?<><span style={{width:6,height:6,borderRadius:"50%",background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Rec...</>
+                :hasRec?<><svg width="12" height="12" viewBox="0 0 24 24" fill={tw.color}><path d="M8 5v14l11-7z"/></svg>Yours</>
+                :<><svg width="12" height="12" viewBox="0 0 24 24" fill={S.muted}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>Record</>}
+              </button>
+              {hasPart&&<button onClick={()=>playPartnerWord(lk)} style={{padding:"8px 12px",borderRadius:10,border:"none",background:S.rose+"10",color:S.rose,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={S.rose}><path d="M8 5v14l11-7z"/></svg>{partner}
+              </button>}
+            </div>
           </div>
-        </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={recordWOTD} style={{flex:1,padding:"12px",borderRadius:14,border:"none",background:recording?"#E8115B":myRec?"rgba(29,185,84,0.1)":"rgba(255,255,255,0.04)",color:recording?"#fff":myRec?S.green:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {recording?<><span style={{width:8,height:8,borderRadius:"50%",background:"#fff",animation:"dcFadeIn 0.5s infinite alternate"}}/>Recording...</>
-            :myRec?<><svg width="14" height="14" viewBox="0 0 24 24" fill={S.green}><path d="M8 5v14l11-7z"/></svg>Play yours</>
-            :<><svg width="14" height="14" viewBox="0 0 24 24" fill={S.sub}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>Record for {partner}</>}
-          </button>
-          {hasPartnerRec&&<button onClick={playPartner} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.rose+"15",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={S.rose}><path d="M8 5v14l11-7z"/></svg>{partner}
-          </button>}
-        </div>
+        );})}
       </div>
 
       {/* Dua of the Day */}
       <div style={{background:"linear-gradient(135deg,rgba(201,168,76,0.06),rgba(201,168,76,0.02))",borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(201,168,76,0.08)"}}>
         <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 10px"}}>DUA OF THE DAY</p>
         <p style={{color:S.white,fontSize:17,fontWeight:400,margin:"0 0 10px",lineHeight:1.6,direction:"rtl",textAlign:"right",fontFamily:"serif"}}>{dua.ar}</p>
-        <p style={{color:S.sub,fontSize:13,margin:"0 0 4px",lineHeight:1.5,fontStyle:"italic"}}>{dua.en}</p>
+        <p style={{color:S.gold,fontSize:12,margin:"0 0 8px",lineHeight:1.5,fontStyle:"italic",opacity:0.7}}>{dua.pr}</p>
+        <p style={{color:S.sub,fontSize:13,margin:"0 0 4px",lineHeight:1.5}}>{dua.en}</p>
         <p style={{color:S.muted,fontSize:11,margin:0}}>Quran {dua.ref}</p>
       </div>
 
@@ -1760,10 +1784,16 @@ function Us({onDark,isDark}){
   const W=useW();const dark=useDark();const {user,logout}=useUser()||{user:'shah'};
   const [events,setEvents]=useState(()=>local.get('us_events',[]));
   useEffect(()=>{local.set('us_events',events);},[events]);
+  // Sync events from Supabase on mount
+  useEffect(()=>{initSupabase.then(()=>{sync.loadEvents().then(d=>{if(d&&d.length)setEvents(d);});});},[]);
   const [addEvt,setAddEvt]=useState(false);const [ne,setNe]=useState({t:"",d:"",tm:""});
   const [tab,setTab]=useState("cal");const [calMonth,setCalMonth]=useState(new Date().getMonth());const [calYear,setCalYear]=useState(new Date().getFullYear());
   const [settings,setSettings]=useState({notif:true,alarms:true,sounds:false});
   const [notes,setNotes]=useState(()=>local.get('us_notes',[]));const [addNote,setAddNote]=useState(false);const [noteText,setNoteText]=useState("");
+  const [addingWord,setAddingWord]=useState(false);const [newWord,setNewWord]=useState("");
+  useEffect(()=>{local.set('us_notes',notes);},[notes]);
+  // Sync notes from Supabase on mount
+  useEffect(()=>{initSupabase.then(()=>{sync.loadNotes().then(d=>{if(d&&d.length)setNotes(d.map(n=>({text:n.text,from:n.from_name,dt:new Date(n.created_at).toLocaleDateString(),id:n.id})));});});},[]);
   useEffect(()=>{local.set('us_notes',notes);},[notes]);
 
   // Gym tracker
@@ -1849,7 +1879,7 @@ function Us({onDark,isDark}){
         <button onClick={()=>setTab("settings")} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.12)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><svg width="16" height="16" viewBox="0 0 24 24" fill={dark?"#E8E8E8":WL.cream}><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg></button>
       </div>
       {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>{[{k:"cal",l:"Calendar"},{k:"ourwords",l:"Our Words"},{k:"milestones",l:"Milestones"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 16px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E5E5E5":WL.cream,fontSize:12,fontWeight:tab===t.k?700:500,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>))}</div>
+      <div style={{display:"flex",gap:6,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>{[{k:"cal",l:"Calendar"},{k:"ourwords",l:"Our Words"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 16px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E5E5E5":WL.cream,fontSize:12,fontWeight:tab===t.k?700:500,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>))}</div>
     </div>
 
     <div style={{flex:1,overflowY:"auto",paddingBottom:92,WebkitOverflowScrolling:"touch"}}>
@@ -1881,42 +1911,35 @@ function Us({onDark,isDark}){
 
       {/* OUR WORDS TAB */}
       {tab==="ourwords"&&<div style={{padding:"16px"}}>
-        <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Our Words</p>
-        <p style={{color:W.textMuted,fontSize:12,margin:"0 0 16px"}}>Beautiful things we say to each other</p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Our Words</p>
+            <p style={{color:W.textMuted,fontSize:12,margin:0}}>Beautiful things we say to each other</p>
+          </div>
+        </div>
         {(()=>{
           const bWords=local.get('browse_bwords',[]);
           const setBWords=(v)=>{local.set('browse_bwords',v);};
           return(<>
-            {bWords.map((b,i)=>(<div key={i} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border,position:"relative"}}>
-              <p style={{color:W.text,fontSize:14,fontWeight:500,margin:"0 0 4px",lineHeight:1.5}}>&ldquo;{b.t}&rdquo;</p>
-              <p style={{color:W.textMuted,fontSize:11,margin:0}}>— {b.from}</p>
-            </div>))}
-            {bWords.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:W.textMuted,fontSize:13}}>Nothing yet — add something beautiful</p></div>}
-          </>);
-        })()}
-      </div>}
-
-      {/* MILESTONES TAB */}
-      {tab==="milestones"&&<div style={{padding:"16px"}}>
-        <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Looking Forward</p>
-        <p style={{color:W.textMuted,fontSize:12,margin:"0 0 16px"}}>Things we can't wait for</p>
-        {(()=>{
-          const ms=local.get('browse_milestones',[{t:"First Eid together",d:"March 2026",done:false},{t:"Meet each other's families",d:"2026",done:false},{t:"Cook Nihari together",d:"Ramadan 2026",done:false},{t:"Visit a masjid together",d:"2026",done:false},{t:"Learn 100 words in each language",d:"2026",done:false}]);
-          const setMs=(v)=>{local.set('browse_milestones',v);};
-          const doneCount=ms.filter(m=>m.done).length;
-          return(<>
-            <div style={{display:"inline-block",background:W.success+"12",borderRadius:12,padding:"4px 14px",marginBottom:12}}>
-              <span style={{color:W.success,fontSize:12,fontWeight:600}}>{doneCount} of {ms.length} done</span>
+            {addingWord?<div style={{background:W.card,borderRadius:14,padding:16,border:"1px solid "+W.border,marginBottom:12}}>
+              <textarea value={newWord} onChange={e=>setNewWord(e.target.value)} placeholder="Something beautiful..." autoFocus style={{width:"100%",minHeight:60,padding:0,background:"transparent",border:"none",color:W.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button onClick={()=>{if(newWord.trim()){const w={t:newWord.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString(),id:Date.now()};setBWords([w,...bWords]);sync.addWord(w.t,w.from);setNewWord("");setAddingWord(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Save</button>
+                <button onClick={()=>{setAddingWord(false);setNewWord("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
+              </div>
             </div>
-            {ms.map((m,i)=>(<div key={i} onClick={()=>{const n=[...ms];n[i]={...n[i],done:!n[i].done};setMs(n);}} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<ms.length-1?"1px solid "+W.border:"none",cursor:"pointer"}}>
-              <div style={{width:20,height:20,borderRadius:"50%",background:m.done?W.success:"transparent",border:m.done?"none":"2px solid "+W.border,flexShrink:0,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {m.done&&<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
-              </div>
-              <div>
-                <p style={{color:m.done?W.forest:W.textMuted,fontSize:14,fontWeight:m.done?600:400,margin:"0 0 2px",textDecoration:m.done?"line-through":"none"}}>{m.t}</p>
-                <p style={{color:W.textMuted,fontSize:11,margin:0}}>{m.d}</p>
+            :<button onClick={()=>setAddingWord(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid "+W.border,background:W.card,color:W.textMuted,fontSize:14,cursor:"pointer",marginBottom:12,textAlign:"left"}}>+ Add something beautiful</button>}
+            {bWords.map((b,i)=>(<div key={i} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border,position:"relative"}}>
+              <p style={{color:W.text,fontSize:14,fontWeight:500,margin:"0 0 6px",lineHeight:1.5}}>&ldquo;{b.t}&rdquo;</p>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{width:18,height:18,borderRadius:"50%",background:b.from==="Shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:7,fontWeight:700}}>{b.from[0]}</span></div>
+                  <span style={{color:W.textMuted,fontSize:11}}>{b.from}{b.dt?" · "+b.dt:""}</span>
+                </div>
+                <button onClick={()=>{const w=bWords[i];sync.deleteWord(w.id);setBWords(bWords.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
               </div>
             </div>))}
+            {bWords.length===0&&!addingWord&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:W.textMuted,fontSize:13}}>Nothing yet — add something beautiful</p></div>}
           </>);
         })()}
       </div>}
@@ -1926,7 +1949,7 @@ function Us({onDark,isDark}){
         {addNote?<div style={{background:W.card,borderRadius:14,padding:16,border:"1px solid "+W.border,marginBottom:12}}>
           <textarea value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Write something..." autoFocus style={{width:"100%",minHeight:100,padding:0,background:"transparent",border:"none",color:W.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
           <div style={{display:"flex",gap:8,marginTop:8}}>
-            <button onClick={()=>{if(noteText.trim()){setNotes([{text:noteText.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString(),id:Date.now()},...notes]);setNoteText("");setAddNote(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Save</button>
+            <button onClick={()=>{if(noteText.trim()){const n={text:noteText.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString(),id:Date.now()};setNotes([n,...notes]);sync.addNote(n.text,n.from);setNoteText("");setAddNote(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Save</button>
             <button onClick={()=>{setAddNote(false);setNoteText("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>
@@ -1939,7 +1962,7 @@ function Us({onDark,isDark}){
               <div style={{width:18,height:18,borderRadius:"50%",background:n.from==="Shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:7,fontWeight:700}}>{n.from[0]}</span></div>
               <span style={{color:W.textMuted,fontSize:11}}>{n.from} · {n.dt}</span>
             </div>
-            <button onClick={()=>setNotes(notes.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+            <button onClick={()=>{const n=notes[i];sync.deleteNote(n.id);setNotes(notes.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
           </div>
         </div>))}
       </div>}
@@ -2155,9 +2178,15 @@ function Us({onDark,isDark}){
   </div>);
 }
 
-function NP({go}){const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/804)*100);if(n>=804){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v="ep1" sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>So... What Is Ramadan?</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode 1</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>13:24</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(804,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
+function NP({go}){const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);
+  const eps=local.get('tea_eps',[]);const curEp=eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
+  const dur=curEp.duration?curEp.duration.split(':').reduce((a,b)=>a*60+Number(b),0):804;
+  useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/dur)*100);if(n>=dur){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("series")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v={curEp.v||"main"} sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>{curEp.t}</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode {curEp.id}</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>{curEp.duration||f(dur)}</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(dur,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
 
-function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const ok=a[1]&&a[1].length>5;if(d)return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:S.black}}><div style={{width:72,height:72,borderRadius:"50%",background:S.green,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}><svg width="36" height="36" viewBox="0 0 24 24" fill={S.black}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><h2 style={{color:S.white,fontSize:24,fontWeight:700,margin:"0 0 6px"}}>Saved</h2><p style={{color:S.sub,fontSize:15,margin:"0 0 28px"}}>Episode 2 unlocked</p><button onClick={()=>go("home")} style={{padding:"14px 48px",borderRadius:50,border:"none",background:S.white,color:S.black,fontSize:16,fontWeight:700,cursor:"pointer",minHeight:44}}>Done</button></div>);return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",WebkitOverflowScrolling:"touch"}}><div style={{padding:"12px 20px"}}><button onClick={()=>go("np")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button></div><div style={{padding:"0 24px 120px"}}><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"0 0 4px"}}>Time to reflect</h1><p style={{color:S.sub,fontSize:14,margin:"0 0 20px"}}>Episode 1</p>{[{id:1,p:"What surprised you most about Ramadan?",req:true},{id:2,p:"Any questions? I got you.",req:false}].map(h=>(<div key={h.id} style={{marginBottom:18}}>{h.req&&<p style={{color:S.green,fontSize:11,fontWeight:700,margin:"0 0 6px"}}>REQUIRED</p>}<p style={{color:S.white,fontSize:15,lineHeight:1.5,margin:"0 0 8px"}}>{h.p}</p><textarea value={a[h.id]||""} onChange={e=>setA({...a,[h.id]:e.target.value})} placeholder="Type here..." style={{width:"100%",minHeight:75,padding:14,borderRadius:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,lineHeight:1.6,resize:"vertical",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/></div>))}<button onClick={ok?()=>setD(true):undefined} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ok?S.green:S.faint,color:ok?S.black:S.muted,fontSize:16,fontWeight:700,cursor:ok?"pointer":"not-allowed",minHeight:44}}>{ok?"Submit":"Write a reflection to continue"}</button></div></div>);}
+function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const ok=a[1]&&a[1].length>5;
+  const eps=local.get('tea_eps',[]);const curEp=eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
+  const nextEp=eps.find(e=>e.id===curEp.id+1);
+  if(d)return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:S.black}}><div style={{width:72,height:72,borderRadius:"50%",background:S.green,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}><svg width="36" height="36" viewBox="0 0 24 24" fill={S.black}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><h2 style={{color:S.white,fontSize:24,fontWeight:700,margin:"0 0 6px"}}>Saved</h2><p style={{color:S.sub,fontSize:15,margin:"0 0 28px"}}>{nextEp?`Episode ${nextEp.id} unlocked`:"All caught up!"}</p><button onClick={()=>go("series")} style={{padding:"14px 48px",borderRadius:50,border:"none",background:S.white,color:S.black,fontSize:16,fontWeight:700,cursor:"pointer",minHeight:44}}>Done</button></div>);return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",WebkitOverflowScrolling:"touch"}}><div style={{padding:"12px 20px"}}><button onClick={()=>go("np")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button></div><div style={{padding:"0 24px 120px"}}><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"0 0 4px"}}>Time to reflect</h1><p style={{color:S.sub,fontSize:14,margin:"0 0 20px"}}>{curEp.t} · Episode {curEp.id}</p>{[{id:1,p:"What stood out to you most?",req:true},{id:2,p:"Any questions? I got you.",req:false}].map(h=>(<div key={h.id} style={{marginBottom:18}}>{h.req&&<p style={{color:S.green,fontSize:11,fontWeight:700,margin:"0 0 6px"}}>REQUIRED</p>}<p style={{color:S.white,fontSize:15,lineHeight:1.5,margin:"0 0 8px"}}>{h.p}</p><textarea value={a[h.id]||""} onChange={e=>setA({...a,[h.id]:e.target.value})} placeholder="Type here..." style={{width:"100%",minHeight:75,padding:14,borderRadius:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,lineHeight:1.6,resize:"vertical",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/></div>))}<button onClick={ok?()=>{setD(true);const saved=local.get('tea_comments',{});saved[curEp.id]={1:a[1],2:a[2]||""};local.set('tea_comments',saved);if(nextEp){const updEps=eps.map(e=>e.id===nextEp.id?{...e,s:"available"}:e);local.set('tea_eps',updEps);}}:undefined} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ok?S.green:S.faint,color:ok?S.black:S.muted,fontSize:16,fontWeight:700,cursor:ok?"pointer":"not-allowed",minHeight:44}}>{ok?"Submit":"Write a reflection to continue"}</button></div></div>);}
 
 function Series({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
