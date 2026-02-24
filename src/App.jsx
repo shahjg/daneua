@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 
+// Supabase — dynamic import so artifact preview doesn't crash
+let supabase = null;
+const initSupabase = import("./supabase").then(m => { supabase = m.supabase; }).catch(() => {});
+
 // Dark mode context
 const DarkCtx = createContext(false);
 const useDark = () => useContext(DarkCtx);
@@ -226,12 +230,12 @@ const WORD_CATS={
   arabic:["Religious Terms","Prayer & Worship","Quran & Knowledge","Calendar & Events","Daily Arabic","Character & Values"]
 };
 function wordCat(lang,w){return w.cat||"General";}
-const S={black:"#121212",card:"#1E1E1E",pill:"#2A2A2A",green:"#1DB954",white:"#FFF",sub:"#A7A7A7",muted:"#6A6A6A",faint:"#333",bar:"#4D4D4D",rose:"#E8115B",gold:"#D4A84B",purple:"#8D67AB",blue:"#4B9CD3",teal:"#1ED760"};
-const WL={bg:"#FFFCF7",card:"#FFF",cardAlt:"#F7F3ED",forest:"#1A3D34",accent:"#D4A574",text:"#1A3D34",textMuted:"#7A8B84",border:"#E8E2D9",cream:"#F5F0E8",error:"#E57373",success:"#4CAF50"};
-const WD={bg:"#121212",card:"#1E1E1E",cardAlt:"#252525",forest:"#A8D5BA",accent:"#D4A574",text:"#E8E8E8",textMuted:"#888",border:"#333",cream:"#1A3D34",error:"#E57373",success:"#4CAF50"};
+const S={black:"#121212",card:"#181818",pill:"#1F1F1F",green:"#1DB954",white:"#FAFAFA",sub:"#9A9A9A",muted:"#555",faint:"#252525",bar:"#383838",rose:"#E8115B",gold:"#C9A84C",purple:"#8D67AB",blue:"#4B9CD3",teal:"#1ED760"};
+const WL={bg:"#FDFAF5",card:"#FFFFFF",cardAlt:"#F5F0E8",forest:"#1A3D34",accent:"#C9A067",text:"#1A3D34",textMuted:"#8A9B94",border:"#E5DDD2",cream:"#F2EDE4",error:"#D94F4F",success:"#3D9B5A"};
+const WD={bg:"#121212",card:"#181818",cardAlt:"#1E1E1E",forest:"#A8D5BA",accent:"#C9A067",text:"#E5E5E5",textMuted:"#707070",border:"#222",cream:"#1A3D34",error:"#D94F4F",success:"#3D9B5A"};
 const useW=()=>{const d=useDark();return d?WD:WL;};
 
-const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","SF Pro Display",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}input,textarea,button{font-family:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .25s ease}.dc-slide-up{animation:dcSlideUp .3s ease}@keyframes dcFadeIn{from{opacity:0}to{opacity:1}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`;
+const CSS=`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`;
 
 const LANGS={
 urdu:{color:"#E67E22",label:"Urdu",char:"\u0627",sub:"Shah's language",
@@ -244,13 +248,21 @@ lessons:[
 {title:"Hey, Khay, Daal, Ḍaal (ح خ د ڈ)",text:"Hey (ح) — A breathy \"h\" from deep in the throat. Khay (خ) — Like clearing your throat, a guttural \"kh.\" Daal (د) — A soft \"d\" sound. Ḍaal (ڈ) — A hard retroflex \"D\" (tongue curled back). Again, this retroflex sound is uniquely South Asian."},
 {title:"Zaal, Ray, Ṛay, Zay, Zhay (ذ ر ڑ ز ژ)",text:"Zaal (ذ) — \"z\" sound. Ray (ر) — Rolling \"r\" sound. Ṛay (ڑ) — A flapped \"R\" unique to Urdu/Hindi, tongue flicks the roof of the mouth. Zay (ز) — Another \"z\" sound. Zhay (ژ) — \"zh\" like the \"s\" in \"measure.\" That's 5 letters in one card — all short, simple shapes."},
 {title:"Practice: Sound It Out",text:"Try reading these simple combinations: بابا (baba) = grandfather/old man. پانی (paani) = water. دال (daal) = lentils. چائے (chai) = tea. Don't worry about perfection — just connect the sounds to what you already know from speaking with Shah."},
-],quiz:[
+
+{title:"Pronunciation Guide: Retroflex Sounds",text:"Urdu has sounds English doesn't. The key ones are retroflex consonants: T (ٹ), D (ڈ), and R (ڑ). Curl your tongue backwards so the underside touches the roof of your mouth, then release. Try saying 'tamaatar' (tomato). English speakers say 't' with tongue behind teeth. Urdu retroflex T hits the palate further back. Ask Shah to say 'paani' vs 'tamaatar' and you'll hear the difference."},
+{title:"Memory Trick: Dot Patterns",text:"Many Urdu letters are the same shape with different dots. Bay (ب) = 1 dot below = Below. Pay (پ) = 3 dots below = Plenty below. Tay (ت) = 2 dots above = Two on Top. Say (ث) = 3 dots above = Say has three. The dot pattern IS the letter. Same shape, different dots = different letter. Think of them as families."},
+{title:"Mini Conversation: Your First Words",text:"Try with Shah: You: Assalamu alaikum! (Peace be upon you). Shah: Wa alaikum assalam! (And upon you peace). You: Chai? (Tea?). Shah: Haan, chai! (Yes, tea!). Three words and you can greet Shah and ask for tea. Assalamu alaikum is the universal Muslim greeting. Haan means yes."},
+{title:"Cultural Context: Why Urdu Matters",text:"About 230 million people speak Urdu worldwide. It's deeply intertwined with poetry — Urdu shayari is one of the richest literary traditions in the world. Poets like Mirza Ghalib, Faiz Ahmed Faiz, and Allama Iqbal are cultural icons. When Shah quotes a couplet, he's drawing from centuries of tradition. Learning Urdu connects you to this."},
+{title:"Writing Practice: Core Letters",text:"These 5 letters appear in almost every Urdu word: ا (Alif) a vertical line. ب (Bay) a boat with 1 dot under. م (Meem) like a circle. ن (Noon) like Bay but dot on top. ی (Yay) curves down with 2 dots under. Together: نام (naam) = name. You can trace these shapes with your finger."},],quiz:[
 {q:"What direction is Urdu written?",opts:["Right-to-left","Both directions","Top-to-bottom","Diagonal"],ans:0},
 {q:"What letter makes the \"ch\" sound?",opts:["A feeling","To sleep","To clean","Chay چ"],ans:3},
 {q:"What's special about the Ṭay (ٹ) sound?",opts:["Retroflex — tongue curled back","The k sound","The r sound","The t sound"],ans:0},
 {q:"اب means?",opts:["Thank you","Welcome","No","Father"],ans:3},
 {q:"How many letters does the Urdu alphabet have?",opts:["39","29","30","114"],ans:0},
-]},
+
+{q:"What does بابا (baba) mean?",opts:["Water","Grandfather/old man","Tea","Hello"],ans:1},
+{q:"How do you greet someone in Urdu?",opts:["Shukriya","Assalamu alaikum","Khuda hafiz","Theek hai"],ans:1},
+{q:"Urdu shares its script with which language?",opts:["Arabic","Hindi","English","Chinese"],ans:0},]},
 {id:"u2",title:"The Urdu Alphabet (Part 2)",desc:"Learn the remaining 20 letters and understand letter connections.",xp:20,unlockAfter:"u1",content:[
 {title:"Seen, Sheen, Suad, Zuad (س ش ص ض)",text:"Seen (س) — Makes an \"s\" sound, looks like a wavy line with teeth. Sheen (ش) — Makes a \"sh\" sound, same as Seen but with 3 dots above. Suad (ص) — An emphatic \"s\" (heavier, from further back in the mouth). Zuad (ض) — An emphatic \"z.\" The emphatic letters come from Arabic and give Urdu words a deeper, fuller sound."},
 {title:"Toy, Zoy, Ain, Ghain (ط ظ ع غ)",text:"Toy (ط) — An emphatic \"t.\" Zoy (ظ) — An emphatic \"z.\" Ain (ع) — This is the letter with NO English equivalent. It's a deep throat sound, like the beginning of \"uh-oh\" but from way back. It's the hardest letter for English speakers. Ghain (غ) — A gargling \"gh\" sound. Shah will appreciate you even attempting Ain correctly."},
@@ -259,13 +271,21 @@ lessons:[
 {title:"Wow, Hey, Hamza, Yay (و ہ ء ی)",text:"Wow (و) — Makes \"w,\" \"v,\" \"oo,\" or \"o\" sound depending on position. Very versatile. Hey (ہ) — Breathy \"h\" sound. Hamza (ء) — A glottal stop (like the pause in \"uh-oh\"). Yay (ی) — Makes \"y\" or \"ee\" sound. These are the final four. You now know all 39 letters."},
 {title:"How Letters Connect",text:"Most Urdu letters connect to the next letter in a word, which changes their shape. Some letters (like Alif, Daal, Ray, Wow) only connect to the letter before them but NOT the letter after. This is why Urdu words look like flowing connected script rather than individual letters. Reading takes practice, but the pattern becomes clear with exposure."},
 {title:"Practice: Common Words",text:"Now you can decode: نام (naam) = name. دل (dil) = heart. گھر (ghar) = home. محبت (mohabbat) = love. شکریہ (shukriya) = thank you. These all use the letters you just learned. You're reading Urdu."},
-],quiz:[
+
+{title:"The Hardest Sound: Ain",text:"Ain is famously difficult. Say uh-oh and feel that catch in your throat between uh and oh? Thats a glottal stop. Ain is similar but deeper. Open your mouth wide and make an aaa sound from deep in your THROAT, not your mouth. Try ilm (knowledge) with the initial vowel from deep in your throat. Even native speakers pronounce Ain differently by region."},
+{title:"Letter Groups: The Family System",text:"Urdu letters come in families — same basic shape, different dots: Family 1: ب پ ت ٹ ث (boat-shaped). Family 2: ج چ ح خ (hook-shaped). Family 3: د ڈ ذ (short curves). Family 4: ر ڑ ز ژ (tails). Family 5: س ش (teeth shapes). Learning 8-10 shapes is much easier than 39 individual letters."},
+{title:"Common Word Patterns",text:"Decode real words: محبت (mohabbat) = love. دوست (dost) = friend. خوبصورت (khoobsurat) = beautiful. زندگی (zindagi) = life. Notice how each letter maps to a sound you know. Reading Urdu is just connecting these sounds together."},
+{title:"Nastaliq vs Naskh",text:"Urdu uses Nastaliq — letters flow diagonally from upper-right to lower-left, giving it an elegant calligraphic look. Arabic uses Naskh — more horizontal. On phones you often see Naskh (easier to render digitally), but books and newspapers in Pakistan use Nastaliq. This is why Urdu looks slanted compared to Arabic."},
+{title:"Word Building Exercise",text:"Build words: ن + ا + م = نام (naam) = name. د + ل = دل (dil) = heart. گ + ھ + ر = گھر (ghar) = home. پ + ا + ک = پاک (paak) = pure/clean — where Pakistan comes from (Land of the Pure). ش + ک + ر + ی + ہ = شکریہ (shukriya) = thank you."},],quiz:[
 {q:"Which letter has no English equivalent?",opts:["Ain ع","Alif ا","Wow و","Yay ی"],ans:0},
 {q:"Gaaf (گ) was added for which languages?",opts:["English","Spanish","South Asian / Urdu","Arabic"],ans:2},
 {q:"What does ں represent?",opts:["Nasal N","Alif ا","Kaaf ک","Daal د"],ans:0},
 {q:"Which letters only connect to the previous letter?",opts:["Sheen ش","Alif, Daal, Ray, Wow","Seen س","Pay پ"],ans:1},
 {q:"نام means?",opts:["How are you","Name","Thank you","Excuse me"],ans:1},
-]},
+
+{q:"What is Nastaliq?",opts:["A font","Diagonal flowing script style","A greeting","A food"],ans:1},
+{q:"What does دل (dil) mean?",opts:["Home","Name","Heart","Life"],ans:2},
+{q:"Pakistan comes from پاک meaning?",opts:["Pure","Great","Land","River"],ans:0},]},
 {id:"u3",title:"Numbers 0-100",desc:"Count in Urdu, recognize number words, use them in daily life.",xp:20,unlockAfter:"u2",content:[
 {title:"0 to 10",text:"0 = sifr (صفر). 1 = aik (ایک). 2 = do (دو). 3 = teen (تین). 4 = chaar (چار). 5 = paanch (پانچ). 6 = chay (چھ — NOT like chai). 7 = saat (سات). 8 = aath (آٹھ). 9 = nau (نَو). 10 = das (دس). Practice: Count Shah's nihari ingredients — \"aik kilo gosht\" (1 kilo meat)."},
 {title:"11 to 20",text:"11 = gyarah. 12 = baarah. 13 = terah. 14 = chaudah. 15 = pandrah. 16 = solah. 17 = satrah. 18 = athaarah. 19 = unees. 20 = bees. Unlike English where teens follow a pattern, Urdu numbers 11-20 are each unique words. Memorize them as a set."},
@@ -273,14 +293,22 @@ lessons:[
 {title:"In-Between Numbers",text:"For 21-99, Urdu puts the ones digit first, then the tens. 21 = ikkees (not \"bees aik\"). 25 = pachchees. 32 = battees. 45 = paintaalees. 58 = athaawen. Each compound number has its own pronunciation. You won't memorize them all now, but recognizing the pattern is enough. Use \"aur\" (and) if you forget: \"paanch aur bees\" = 25."},
 {title:"Numbers in Daily Life",text:"Phone numbers are read digit by digit: \"paanch, teen, saat, nau...\" Money uses numbers constantly: \"do sau rupay\" = 200 rupees. Time: \"teen baj gaye\" = it's 3 o'clock. Age: \"meri umar sattaees saal hai\" = my age is 27 years. At a desi grocery, you'll hear \"paanch kilo\" (5 kilos) or \"ek dozen\" (borrowed from English)."},
 {title:"Urdu Number Script",text:"Urdu can also use its own numerals instead of 0-9: ۰ ۱ ۲ ۳ ۴ ۵ ۶ ۷ ۸ ۹. You'll see these on Pakistani currency, sign boards, and religious texts. Shah's parents might use them. The shapes are different from Arabic numerals but follow the same 0-9 system. Recognizing them is a bonus skill."},
-],quiz:[
+
+{title:"Counting Like a Native",text:"Numbers 1-10: aik, do, teen, chaar, paanch, chhe, saat, aath, nau, das. The rhythm matters — Pakistanis count with a musical bounce. Practice counting while tapping fingers. Shah probably counts this way when cooking."},
+{title:"Number Patterns: 11-100",text:"11-19: gyaarah, baarah, terah, chaudah, pandrah, solah, satrah, aathaarah, unees. Decades: bees (20), tees (30), chaalees (40), pachaas (50), saath (60), sattar (70), assi (80), nabbe (90), sau (100). 50+ dont follow obvious patterns — memorize them like phone numbers."},
+{title:"Numbers in Real Life",text:"Youll hear: Do chai lao (Bring 2 teas). Kitne ka hai? (How much?) → Teen sau rupay (300 rupees). Paanch minute (5 minutes — in desi time this means 15-30 min). Aath baje (At 8 oclock). Try saying your phone number in Urdu."},
+{title:"The Desi Number System",text:"South Asians group large numbers differently: 1,00,000 = 1 Lakh (not 100,000). 1,00,00,000 = 1 Crore (not 10 million). So das lakh = 1 million. This system is used across Pakistan, India, Bangladesh, Nepal, and Sri Lanka."},
+{title:"Practice: Haggling",text:"Role play at a bazaar: Shopkeeper: Yeh paanch sau ka hai (This is 500). You: Bahut zyada! Teen sau? (Too much! 300?). Shopkeeper: Chaar sau, final (400, final). You: Theek hai (OK). Key phrases: bahut zyada = too much, theek hai = OK, kitne ka = how much."},],quiz:[
 {q:"What is 7 in Urdu?",opts:["12","saat","A food item","Something different"],ans:1},
 {q:"What is 50 in Urdu?",opts:["pachaas","nau","tees","teen"],ans:0},
 {q:"How are compound numbers structured?",opts:["tees","Ones first, then tens","sau","paanch"],ans:1},
 {q:"\"Sau\" means?",opts:["Something different","A food item","Sad","100"],ans:3},
 {q:"How are phone numbers read?",opts:["Digit by digit","bees","gyarah","nau"],ans:0},
 {q:"What does \"do sau rupay\" mean?",opts:["The opposite","To cook","200 rupees","To pray"],ans:2},
-]},
+
+{q:"How do you say 50 in Urdu?",opts:["Chaalees","Pachaas","Saath","Tees"],ans:1},
+{q:"1 Lakh equals?",opts:["10,000","100,000","1,000,000","10"],ans:1},
+{q:"Kitne ka hai means?",opts:["How are you?","How much?","Where is it?","Who?"],ans:1},]},
 {id:"u4",title:"Essential Phrases for Every Day",desc:"Navigate daily conversations with must-know expressions.",xp:20,unlockAfter:"u3",content:[
 {title:"Please and Thank You",text:"Shukriya (shook-REE-yah) = thank you. Bohot shukriya = thank you very much. Meherbani (meh-her-BAH-nee) = kindness/please, used formally. In casual speech, Urdu doesn't use \"please\" as much as English — the politeness is built into the verb form instead. But \"shukriya\" after everything is always welcome."},
 {title:"Sorry and Excuse Me",text:"Maaf kijiye (MAHF kee-jee-YAY) = excuse me / I'm sorry (formal). Maafi (mah-FEE) = forgiveness. \"Mujhe maaf karo\" = forgive me (casual). If you bump into someone: \"maaf kijiye.\" If you're genuinely sorry: \"mujhe bohot afsos hai\" (I have a lot of regret). Afsos is a heavy word — only use for real apologies."},
@@ -288,21 +316,32 @@ lessons:[
 {title:"Where, When, How Much",text:"Kahan (kah-HAHN) = where. Kab (KUB) = when. Kitna/Kitne (kit-NAH/kit-NAY) = how much/how many. Kyun (kee-YOON) = why. Kaun (KOWN) = who. Kaise (KAY-say) = how. These question words are the foundation of asking anything: \"Ye kitne ka hai?\" = How much is this? \"Tum kab aaoge?\" = When will you come?"},
 {title:"Time Expressions",text:"Aaj (AHJ) = today. Kal (KUL) = tomorrow AND yesterday (same word, context tells you which). Parso = day after tomorrow / day before yesterday. Abhi (AH-bee) = right now. Baad mein (BAHD mayn) = later. Jaldi (JUL-dee) = quickly/soon. Desi time warning: when someone says \"abhi aata hoon\" (coming right now), add 30 minutes minimum."},
 {title:"Agreement and Disagreement",text:"Haan (HAHN) = yes. Nahi (nah-HEE) = no. Ji haan = respectful yes. Ji nahi = respectful no. Bilkul (bil-KOOL) = absolutely. Theek hai (TEEK hay) = okay/fine. Zaroor (zah-ROOR) = definitely/of course. Shaayad (SHAH-yud) = maybe. \"Chalo theek hai\" = okay let's go with it — you'll use this one constantly."},
-],quiz:[
+
+{title:"The Music of Urdu Phrases",text:"Urdu has natural melody. Greetings rise and fall: As-sa-LAA-mu a-LAI-kum — stress on LAA and LAI. Shu-KRI-ya — stress on KRI. Kya HAAL hai? — stress on HAAL. Mimicking this rhythm makes you sound more natural than getting every consonant perfect."},
+{title:"The Respect System: Tum vs Aap",text:"Tum = informal you (friends, younger people). Aap = formal you (elders, strangers, respect). ALWAYS use Aap with Shahs parents, older relatives, anyone youve just met. Using tum with an elder is rude. With Shah you can use tum since youre partners."},
+{title:"Essential Daily Phrases",text:"Morning: Subah bakhair (Good morning). Naashta ho gaya? (Had breakfast?). Chai banaaun? (Should I make tea?). Main jaa raha hoon (Im leaving). Allah hafiz (Goodbye). Evening: Ghar aa gaye? (Youre home?). Khaana kha liya? (Have you eaten?). Neend aa rahi hai (Im sleepy)."},
+{title:"Urdus Hindi Connection",text:"Urdu and Hindi are mutually intelligible in everyday speech. The difference is mainly formal vocabulary (Urdu borrows from Persian/Arabic, Hindi from Sanskrit) and script. By learning Urdu youre also learning to understand Hindi movies, songs, and 600+ million speakers across South Asia."},
+{title:"Sentence Structure: SOV",text:"Urdu is Subject-Object-Verb: English I eat food → Urdu Main khaana khaata hoon (I food eat). She speaks Urdu → Woh Urdu bolti hai (She Urdu speaks). We go home → Hum ghar jaate hain (We home go). The verb always goes at the end."},],quiz:[
 {q:"How do you say \"I didn't understand\"?",opts:["Hello","To clean","Mujhe samajh nahi aaya","To run"],ans:2},
 {q:"\"Kal\" can mean?",opts:["A food item","Thank you","A greeting","Both tomorrow AND yesterday"],ans:3},
 {q:"\"Kitna\" means?",opts:["How much","To clean","To cook","Happy"],ans:0},
 {q:"What does \"bilkul\" mean?",opts:["To cook","Absolutely","Welcome","Good morning"],ans:1},
 {q:"\"Maaf kijiye\" is used for?",opts:["A place","The opposite","Excuse me / Sorry — formal","An action"],ans:2},
 {q:"When someone says \"abhi aata hoon,\" you should?",opts:["Expect them in 30+ minutes","To sing","To write","To speak"],ans:0},
-]},
+
+{q:"Urdu sentence structure is?",opts:["SVO","SOV","VSO","OVS"],ans:1},
+{q:"When do you use Aap?",opts:["With friends","With pets","With elders","With children"],ans:2},
+{q:"Main hoon na means?",opts:["I am hungry","I am here for you","I am going","I am fine"],ans:1},]},
 {id:"u5",title:"Emotions and Feelings",desc:"Express how you feel and understand emotional expressions.",xp:20,unlockAfter:"u4",content:[
 {title:"Happy and Sad",text:"Khush (KHOOSH) = happy. Khushi = happiness. \"Main bohot khush hoon\" = I am very happy. Udaas (oo-DAHS) = sad. \"Dil udaas hai\" = the heart is sad (poetic way to say I'm down). Rona (ROH-nah) = to cry. Muskurana (mus-koo-RAH-nah) = to smile. Desi culture note: men don't usually express sadness openly. If Shah says \"kuch nahi\" (nothing) when he's clearly upset, just be there."},
 {title:"Anger and Frustration",text:"Gussa (GUS-sah) = anger. \"Mujhe gussa aa raha hai\" = I'm getting angry. Naraz (nah-RAHZ) = upset/offended, softer than gussa. \"Tum mujhse naraz ho?\" = Are you upset with me? Pareshaan (pah-ray-SHAHN) = worried/stressed. Tang (TAHNG) = annoyed/fed up. \"Mujhe tang mat karo\" = Don't annoy me. Know the difference between gussa (hot anger) and naraz (cold hurt feelings)."},
 {title:"Love and Affection Beyond Romance",text:"Izzat (IZ-zut) = respect/honor. Huge in desi culture. Khayal (KHAH-yaal) = thought/care. \"Mera khayal rakho\" = take care of me / keep me in your thoughts. Fikr (FIK-er) = concern/worry about someone. \"Mujhe tumhari fikr hoti hai\" = I worry about you. Dua = prayer/blessing. \"Meri duaein tumhare saath hain\" = my prayers are with you."},
 {title:"Surprise and Excitement",text:"Hairaan (hay-RAHN) = surprised/amazed. \"Main hairaan hoon\" = I'm amazed. Kamaal (kah-MAHL) = amazing/wonderful. \"Kamaal hai!\" = That's amazing! Josh (JOHSH) = excitement/enthusiasm. Waah! = Wow! (used constantly). \"Kya baat hai!\" (kee-YAH BAHT hay) = What a thing! — used to express being impressed. You'll hear Shah's family say \"waah waah\" when food is good."},
 {title:"Comfort and Care",text:"Fikar mat karo (FIK-er mutt KAH-roh) = Don't worry. Sab theek ho jayega = Everything will be okay. \"Main hoon na\" = I'm here (literally \"I am, right?\") — this is what Shah says when he wants to reassure you. \"Apna khayal rakhna\" = Take care of yourself. \"Dil se\" = from the heart — when something is genuine and sincere."},
-],quiz:[
+
+{title:"Expressing Emotions with Tone",text:"In Urdu HOW you say something matters: Acha flat = OK. Achaaaa? rising = Really? ACHA! sharp = I see! acha acha repeated = OK OK (dismissive). Similarly Haan (yes) can be enthusiastic, reluctant, or sarcastic. Shah probably uses acha 50 times a day with different meanings."},
+{title:"The Feeling Vocabulary",text:"Core emotions: Khushi (happiness), Gham/Dukh (sadness), Gussa (anger), Dar (fear), Pyaar (love), Hairat (surprise), Sharam (shame/shyness), Fiqr (worry), Umeed (hope), Mayoosi (disappointment). Desi culture expresses emotions through care — khaana kha lo (eat food) is how a Pakistani mom says I love you."},
+{title:"How to Check In",text:"Kya haal hai? = How are you? Tabiyat theek hai? = Are you feeling OK? Kuch pareshaan lag rahe ho = You seem worried. Koi baat nahi = No worries. Sab theek ho jaayega = Everything will be OK. Main hoon na = Im here for you — this is a powerful phrase in Urdu relationships."},],quiz:[
 {q:"\"Naraz\" vs \"Gussa\" — which is softer?",opts:["Naraz","Sorry","To pray","Welcome"],ans:0},
 {q:"\"Kya baat hai!\" expresses?",opts:["Being impressed","Bored","Tired","Confused"],ans:0},
 {q:"\"Main hoon na\" means?",opts:["Nervous","Scared","I'm here for you","To speak"],ans:2},
@@ -445,13 +484,19 @@ lessons:[
 {title:"The Glottal Stop",text:"Tagalog has a glottal stop — the pause in \"uh-oh.\" \"Oo\" (yes) is actually \"oh-OH\" with a tiny catch. \"Bata\" (child) vs \"bata\" (robe) differ only by where the glottal stop falls. You'll pick this up naturally by listening to Dane speak."},
 {title:"Stress Changes Meaning",text:"\"Basa\" (BAH-sah) = wet. \"Basa\" (bah-SAH) = to read. \"Gabi\" (GAH-bee) = night. \"Gabi\" (gah-BEE) = taro root. When in doubt, stress the second-to-last syllable. That's correct about 70% of the time."},
 {title:"Spelling is Phonetic",text:"Tagalog is spelled exactly how it sounds. No silent letters, no weird rules. \"Mahal\" = \"mah-HAHL.\" \"Salamat\" = \"sah-LAH-mat.\" Every letter pulls its weight. Coming from English with its \"through/though/thought\" chaos, this is a gift."},
-],quiz:[
+
+{title:"Filipino vs Tagalog",text:"Filipino is the national language based on Tagalog — about 95% the same. Tagalog is the ethnic language of Manila. Filipino includes more loanwords from English and Spanish. When Dane speaks Tagalog shes really speaking Filipino. Taglish (mixing both) is completely normal."},
+{title:"Good News: Pronunciation is Easy",text:"Unlike Urdu or Arabic, Tagalog is mostly phonetic. Vowels: A (ah), E (eh), I (ee), O (oh), U (oo) — these NEVER change. Consonants are almost all English. Only tricky ones: ng is one sound (like sing but at the START of words). R is always rolled. Thats it."},
+{title:"Taglish in Action",text:"Real conversations mix languages: Mag-lunch na tayo? = Lets have lunch? Na-late ako = I was late. I-send mo na = Just send it. Nag-shopping kami = We went shopping. This is normal — not bad Tagalog. Dane probably speaks Taglish naturally."},
+{title:"Philippine Language Landscape",text:"The Philippines has 180+ languages. Tagalog is most widespread but many Filipinos also speak Cebuano, Ilocano, Hiligaynon, Waray, and more. Danes family might speak another language at home. Asking What languages does your family speak? shows real interest."},],quiz:[
 {q:"How many letters in the Filipino alphabet?",opts:["28","26","A food item","39"],ans:0},
 {q:"What's special about \"NG\"?",opts:["Good morning","One letter, can start words","To write","To sleep"],ans:1},
 {q:"Tagalog vowels are?",opts:["Alif ا","Pure and consistent","Noon ن","Laam ل"],ans:1},
 {q:"What is a glottal stop?",opts:["A rolled r sound","A nasal hum","A sharp click","A tiny pause mid-word"],ans:3},
 {q:"Tagalog spelling is?",opts:["Phonetic — spelled how it sounds","Kaaf ک","Laam ل","Seen س"],ans:0},
-]},
+
+{q:"What is Taglish?",opts:["A dialect","Mixing Tagalog and English","Formal Tagalog","A food"],ans:1},
+{q:"How many languages in the Philippines?",opts:["2","50","180+","500"],ans:2},]},
 {id:"t2",title:"Numbers 0-100",desc:"Count in Tagalog, use numbers for money, time, and daily life.",xp:20,unlockAfter:"t1",content:[
 {title:"0 to 10 — Native Tagalog",text:"0 = wala. 1 = isa. 2 = dalawa. 3 = tatlo. 4 = apat. 5 = lima. 6 = anim. 7 = pito. 8 = walo. 9 = siyam. 10 = sampu. These are the original Tagalog numbers. But most Filipinos actually use Spanish numbers in daily life, especially for money and time."},
 {title:"0 to 10 — Spanish Numbers (Used Daily)",text:"1 = uno. 2 = dos. 3 = tres. 4 = kuwatro. 5 = singko. 6 = sais. 7 = siyete. 8 = otso. 9 = nuwebe. 10 = diyes. From 333 years of Spanish colonization. Money is almost always in Spanish: \"singkuwenta pesos\" (50 pesos), not \"limampung piso.\""},
@@ -473,13 +518,19 @@ lessons:[
 {title:"Polite Expressions",text:"Paumanhin (pow-mahn-HEEN) = excuse me/sorry. \"Opo\" is respectful yes. The gesture \"mano po\" — taking an elder's hand to your forehead — is the ultimate sign of respect."},
 {title:"Common Quick Phrases",text:"Tara (TAH-rah) = let's go. \"Sige\" (SEE-geh) = okay/go ahead, the most used filler word. \"Ano?\" (ah-NO) = what? \"Hala!\" (HAH-lah) = expression of surprise."},
 {title:"Practice Dialogue",text:"You see Dane's lola: \"Kamusta po!\" and do mano. She says \"Mabuti naman, ikaw?\" You say \"Mabuti rin po, salamat po.\" She smiles because you used \"po\" three times and did mano. You're now the favorite."},
-],quiz:[
+
+{title:"The Tagalog Po",text:"Adding po to ANY sentence makes it respectful: Oo → Opo (yes respectfully). Salamat → Salamat po. ALWAYS use po with Danes parents, older relatives, anyone older. This is non-negotiable in Filipino culture. Danes family will love you for it."},
+{title:"The Mano Gesture",text:"When greeting Filipino elders, mano po means taking their right hand and pressing the back of it to your forehead. Not all modern families practice this but many do. Ask Dane if her family does mano. Practicing it before meeting them makes an incredible impression."},
+{title:"Everyday Greetings Timeline",text:"Morning: Magandang umaga po! Late morning: Magandang tanghali po! Afternoon: Magandang hapon po! Evening: Magandang gabi po! Leaving: Paalam na po. Pattern: Magandang + time + po. Maganda means beautiful — youre saying Beautiful morning!"},
+{title:"Filipino Hospitality",text:"When visiting a Filipino home: You WILL be offered food. Refusing is rude — at least try. Kain tayo! (Lets eat!) means accept. Busog na po (Im full respectfully) to politely decline. Kumain ka na? (Have you eaten?) is a greeting, not just a question."},],quiz:[
 {q:"Kamusta comes from which language?",opts:["Arabic","Spanish","Chinese","Japanese"],ans:1},
 {q:"Adding \"po\" shows?",opts:["Good night","A feeling","Respect","To cook"],ans:2},
 {q:"\"Hindi\" means?",opts:["Angry","A place","Sad","No"],ans:3},
 {q:"What is \"mano po\"?",opts:["100","Taking elder's hand to forehead","42","39"],ans:1},
 {q:"\"Mabuti naman\" means?",opts:["To run","A person","A place","I'm good"],ans:3},
-]},
+
+{q:"What does po do?",opts:["Makes a question","Makes past tense","Makes it respectful","Makes negative"],ans:2},
+{q:"Magandang umaga literally means?",opts:["Good morning","Beautiful morning","New morning","Happy morning"],ans:1},]},
 {id:"t4",title:"Essential Phrases for Every Day",desc:"Navigate daily conversations with must-know expressions.",xp:20,unlockAfter:"t3",content:[
 {title:"Please and Thank You",text:"Salamat = thank you. Maraming salamat = thank you very much. \"Paki-\" is the closest to \"please\" as a prefix: \"Pakiabot\" = please hand over. \"Pakitawag\" = please call. Filipinos show politeness through tone and \"po/opo\" more than a direct \"please\" word."},
 {title:"Sorry and Excuse Me",text:"Pasensya na (pah-SEN-shah nah) = sorry/patience please. Paumanhin = formal apology. \"Sorry\" (English) is used constantly in casual speech. For a real apology: \"Pasensya ka na, hindi ko sinasadya\" = Sorry, I didn't mean to."},
@@ -684,13 +735,19 @@ lessons:[
 {title:"Dal, Dhal, Ra, Zay (د ذ ر ز)",text:"Dal (د) = \"d\" sound. Dhal (ذ) = \"th\" as in \"this\" (voiced). Ra (ر) = rolled \"r.\" Zay (ز) = \"z\" sound. These four are \"non-connecting\" letters, meaning they connect to the letter before them but NOT the one after. This creates natural breaks within words."},
 {title:"Sin, Shin, Sad, Dad (س ش ص ض)",text:"Sin (س) = \"s\" sound, looks like a wavy line with teeth. Shin (ش) = \"sh\" sound, same shape with three dots. Sad (ص) = emphatic \"s\" (heavier, fuller). Dad (ض) = emphatic \"d.\" The emphatic letters give Arabic its deep, resonant quality. They don't exist in English but are key to correct Quran recitation."},
 {title:"Practice: Recognize These Words",text:"Allah (الله) — you'll see this everywhere. Bismillah (بسم الله) — the most written Arabic phrase. Quran (قرآن). Salah (صلاة). Even without reading fluently, recognizing these common words connects you to the visual language of Islam."},
-],quiz:[
+
+{title:"Arabic Sounds That Dont Exist in English",text:"Several Arabic sounds have no English equivalent: Ain — deep throat vowel. Ghain — like gargling softly. Ha — breathy H from the throat. Kha — like Scottish loch. Qaf — deep K from very back of throat. Sad — emphatic S. Start with easy letters and add these gradually."},
+{title:"Arabic Letter Forms",text:"Each letter has up to 4 forms: Isolated, Initial, Medial, Final. Example Baa (ب): Isolated ب, Initial بـ, Medial ـبـ, Final ـب. Dont memorize all 4 at once. Letters keep their main shape but change connections — like cursive English."},
+{title:"Letters You Already Know",text:"If Shah taught you Urdu, you already know most Arabic letters! Arabic has 28. Urdu has 39. The 11 extra Urdu letters were added for South Asian sounds. So Urdus alphabet IS Arabic plus extras. Youre already ahead."},
+{title:"Arabics Global Reach",text:"Arabic is spoken by 420+ million people in 25+ countries. Spoken Arabic varies hugely: Egyptian, Gulf, Levantine, Moroccan — these can be mutually unintelligible. MSA is the formal written version everyone understands. For Islamic purposes we focus on Quranic Arabic vocabulary."},],quiz:[
 {q:"Arabic is written in which direction?",opts:["Right-to-left","Both directions","Left-to-right","Top-to-bottom"],ans:0},
 {q:"How many letters in the Arabic alphabet?",opts:["42","10","114","28"],ans:3},
 {q:"Ba, Ta, Tha differ by?",opts:["Seen س","Laam ل","Yay ی","Number of dots"],ans:3},
 {q:"What are \"emphatic\" letters?",opts:["A person","Deeper, fuller versions of regular consonants","A place","The opposite"],ans:1},
 {q:"Which letters don't connect forward?",opts:["Dal, Dhal, Ra, Zay","To sleep","Thank you","Something different"],ans:0},
-]},
+
+{q:"How many Arabic letters?",opts:["28","39","26","32"],ans:0},
+{q:"What is Hamza?",opts:["A vowel","A glottal stop","A consonant","A number"],ans:1},]},
 {id:"a2",title:"The Arabic Alphabet (Part 2)",desc:"Learn the remaining 14 letters and understand vowel marks.",xp:20,unlockAfter:"a1",content:[
 {title:"Ta, Za, Ain, Ghain (ط ظ ع غ)",text:"Ta (ط) = emphatic \"t.\" Za (ظ) = emphatic \"z/th.\" Ain (ع) = the hardest letter for English speakers, a deep throat sound with no equivalent. Ghain (غ) = a gargling \"gh.\" Ain appears in \"Arabic\" itself (Arabi = عربي). Mastering Ain takes time but even attempting it earns respect."},
 {title:"Fa, Qaf, Kaf, Lam (ف ق ك ل)",text:"Fa (ف) = \"f\" sound. Qaf (ق) = deep \"q\" from the back of the throat, deeper than Kaf. Kaf (ك) = regular \"k\" sound. Lam (ل) = \"l\" sound. Qaf vs Kaf: Qaf is further back, almost uvular. \"Quran\" starts with Qaf, not Kaf. The difference matters in religious recitation."},
@@ -741,7 +798,11 @@ lessons:[
 {title:"Key Short Surahs",text:"Al-Ikhlas (112) = pure monotheism, 4 verses — \"Say: He is God, the One.\" Al-Falaq (113) = seeking refuge from evil. An-Nas (114) = seeking refuge in God from whispers. These three short surahs are recited frequently and are usually the first ones children memorize. They're the \"starter pack\" for Quran learning."},
 {title:"Ayat al-Kursi — The Throne Verse",text:"Ayat al-Kursi (Surah 2, Verse 255) is considered the most powerful single verse of the Quran. It describes God's sovereignty over everything. Many Muslims recite it before sleep, after prayers, and for protection. Shah likely has this memorized by heart. It's about 2 minutes long when recited."},
 {title:"How to Interact with the Quran",text:"The Quran should be handled with respect. Perform wudu (washing) before touching it. Place it on a clean, elevated surface, never on the floor. When someone is reciting, listen quietly. You don't need to be Muslim to read a translation, and asking questions about it shows genuine interest. Many translations with commentary (tafsir) are available."},
-],quiz:[
+
+{title:"What IS the Quran?",text:"The central text of Islam — believed to be the literal word of God revealed to Prophet Muhammad over 23 years. It has 114 chapters (surahs), 6,236 verses (ayaat), about 77,000 words. Muslims believe every letter is divine and unchanged. Someone who memorizes the entire Quran is called a Hafiz."},
+{title:"Structure of the Quran",text:"114 Surahs organized roughly by length. Each has a name: Al-Fatiha (The Opening), Al-Baqara (The Cow). Divided into 30 Juz for reading 1/30th per day during Ramadan. The first revealed verses were Surah Al-Alaq 96:1-5: Read! In the name of your Lord who created."},
+{title:"Surahs Youll Hear Most",text:"Al-Fatiha — recited in EVERY prayer, most repeated passage. Al-Ikhlas — Say He is Allah, the One (summarizes monotheism). Al-Falaq and An-Nas — seeking protection. Ayat al-Kursi (2:255) — The Throne Verse, considered most powerful single verse. Shah likely recites these daily."},
+{title:"How to Approach the Quran Respectfully",text:"Handle a physical copy with clean hands. Its kept on the highest shelf. Listen quietly during recitation. Sadaqallahul Azeem means God Almighty has spoken the truth — said after recitation. You can read English translations. Asking Shah to recite for you would be meaningful."},],quiz:[
 {q:"How many surahs in the Quran?",opts:["36","100","28","114"],ans:3},
 {q:"What is an Ayah?",opts:["42","100","A verse — literally \"sign\"","A feeling"],ans:2},
 {q:"What is Al-Fatiha?",opts:["42","The opening chapter, recited in every prayer","28","A food item"],ans:1},
@@ -770,7 +831,11 @@ lessons:[
 {title:"Zakat — Charity",text:"Zakat is mandatory giving of 2.5% of your savings annually to those in need. It's not a donation, it's an obligation. The money belongs to the poor. Categories of recipients include the poor, those in debt, travelers in need, and new Muslims. Sadaqah is voluntary charity on top of Zakat. Islam views wealth as a trust from God, not personal property."},
 {title:"Sawm — Fasting",text:"Fasting during Ramadan: no food, water, or intimate relations from Fajr (dawn) to Maghrib (sunset). But it goes deeper: fasting from gossip, anger, bad thoughts. Some Muslims also fast Mondays and Thursdays throughout the year, or 3 days each Islamic month, following the Prophet's practice. Fasting builds empathy, discipline, and gratitude."},
 {title:"Hajj — Pilgrimage",text:"Every Muslim who is physically and financially able must perform Hajj at least once in their lifetime. It involves traveling to Mecca, wearing simple white garments (ihram), circling the Kaaba 7 times, standing at Arafat, and other rites over 5 days. Over 2 million people gather annually. It represents equality before God — kings and laborers wear the same white cloth."},
-],quiz:[
+
+{title:"The Five Pillars Complete",text:"1. Shahada — Declaration of faith. 2. Salah — 5 daily prayers. 3. Zakat — 2.5% of wealth to those in need. 4. Sawm — Fasting during Ramadan. 5. Hajj — Pilgrimage to Mecca at least once if able. These arent optional — theyre the minimum requirements of Muslim life."},
+{title:"Salah: The Daily Prayers",text:"5 prayers: Fajr (before sunrise ~5:30AM), Zuhr (after midday ~1PM), Asr (late afternoon ~4PM), Maghrib (after sunset ~6PM), Isha (nighttime ~8PM). Each takes 5-10 minutes. Involves standing, bowing, prostrating. Fajr 2 rakahs, Zuhr 4, Asr 4, Maghrib 3, Isha 4."},
+{title:"How to Be Supportive During Prayer",text:"When Shah prays: dont walk in front of him, keep noise down, dont interrupt. He faces Qibla (direction of Mecca — roughly southeast from Edmonton). Before prayer he does Wudu (ritual washing). You dont need to join but quietly respecting the space is deeply appreciated."},
+{title:"Zakat and Islamic Charity",text:"2.5% of qualifying wealth given annually to 8 categories including the poor and those in debt. Beyond Zakat theres Sadaqah (voluntary charity) — money, time, even a smile counts. During Ramadan giving increases dramatically. Shah might calculate his Zakat carefully — its taken very seriously."},],quiz:[
 {q:"What is the Shahadah?",opts:["Something different","A feeling","42","Declaration that there is no god but God and Muhammad is His messenger"],ans:3},
 {q:"How many rak'ahs total per day?",opts:["A food item","28","17","39"],ans:2},
 {q:"Zakat is what percentage?",opts:["2.5% of savings","Sawm (fasting)","Shahada (declaration)","Hajj (pilgrimage)"],ans:0},
@@ -906,8 +971,70 @@ function Shell({children,dark}){return(<div className="dc-shell" style={{width:"
 function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Browse",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
 
 function Home({go}){
-  const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';
+  const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';const partner=user==='shah'?'Dane':'Shah';
   const xp=local.get(user+'_xp',0);const completed=local.get(user+'_completed',[]);const streak=local.get(user+'_streak',0);
+  // Thinking of you — Supabase realtime with localStorage fallback
+  const [vibes,setVibes]=useState(()=>local.get('dc_vibes',[]));
+  const [vibesLoaded,setVibesLoaded]=useState(false);
+
+  useEffect(()=>{
+    let channel;
+    initSupabase.then(()=>{
+      if(!supabase){setVibesLoaded(true);return;}
+      // Load from Supabase
+      supabase.from('dc_vibes').select('*').order('created_at',{ascending:false}).limit(20)
+        .then(({data})=>{if(data&&data.length)setVibes(data);setVibesLoaded(true);})
+        .catch(()=>setVibesLoaded(true));
+      // Realtime
+      try{
+        channel=supabase.channel('vibes-realtime')
+          .on('postgres_changes',{event:'INSERT',schema:'public',table:'dc_vibes'},payload=>{
+            const nv=payload.new;
+            setVibes(prev=>[nv,...prev]);
+            if(nv.to_user===user&&notif.supported&&Notification.permission==='granted'){
+              notif.send(nv.from_user==='shah'?'Shah':'Dane',nv.emoji+' '+nv.label,{tag:'vibe-'+nv.id});
+            }
+          })
+          .on('postgres_changes',{event:'UPDATE',schema:'public',table:'dc_vibes'},payload=>{
+            setVibes(prev=>prev.map(v=>v.id===payload.new.id?payload.new:v));
+          })
+          .subscribe();
+      }catch(e){}
+    });
+    return()=>{if(channel)try{supabase.removeChannel(channel);}catch(e){}};
+  },[user]);
+
+  const lastVibe=vibes.find(v=>v.to_user===user&&!v.read);
+
+  const sendVibe=async(emoji,label,custom)=>{
+    const msg=custom||label;
+    const v={id:Date.now(),from_user:user,to_user:user==='shah'?'dane':'shah',emoji,label:msg,read:false,created_at:new Date().toISOString()};
+    if(supabase){
+      try{await supabase.from('dc_vibes').insert({from_user:v.from_user,to_user:v.to_user,emoji,label:msg,read:false});}
+      catch(e){/* fallback below */setVibes(prev=>[v,...prev]);local.set('dc_vibes',[v,...vibes]);}
+    }else{
+      setVibes(prev=>[v,...prev]);local.set('dc_vibes',[v,...vibes]);
+    }
+    setShowSend(false);setCustomMsg("");
+  };
+
+  const markRead=async()=>{
+    if(!lastVibe)return;
+    if(supabase)try{await supabase.from('dc_vibes').update({read:true}).eq('id',lastVibe.id);}catch(e){}
+    setVibes(prev=>prev.map(v=>v.id===lastVibe.id?{...v,read:true}:v));
+    local.set('dc_vibes',vibes.map(v=>v.id===lastVibe.id?{...v,read:true}:v));
+  };
+  const [showSend,setShowSend]=useState(false);const [customMsg,setCustomMsg]=useState("");
+  const QUICK_VIBES=[
+    {emoji:"🤲",label:"Made dua for you"},
+    {emoji:"💛",label:"Thinking of you"},
+    {emoji:"🌙",label:"Ramadan Mubarak"},
+    {emoji:"💪",label:"You got this"},
+    {emoji:"🫂",label:"Sending a hug"},
+    {emoji:"📿",label:"Praying for us"},
+    {emoji:"☀️",label:"Good morning habibi"},
+    {emoji:"🌸",label:"You make me proud"},
+  ];
   // Ramadan data
   const R=[
     {d:1,dt:"Feb 18",fajr:"5:49",mag:"5:53"},{d:2,dt:"Feb 19",fajr:"5:47",mag:"5:55"},
@@ -929,94 +1056,205 @@ function Home({go}){
   const ramStart=new Date(2026,1,18);
   const dayNum=Math.max(1,Math.min(30,Math.floor((new Date()-ramStart)/(1000*60*60*24))+1));
   const td=R[dayNum-1]||R[0];
-  const hr=new Date().getHours();
-  const greeting=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
+  // Additional prayer times for Edmonton (approximate for late Feb - mid March 2026)
+  const prayers=[
+    {name:"Fajr",time:td.fajr,active:hr<6},{name:"Zuhr",time:"12:45",active:hr>=6&&hr<13},
+    {name:"Asr",time:"3:45",active:hr>=13&&hr<16},{name:"Maghrib",time:td.mag,active:hr>=16&&hr<19},
+    {name:"Isha",time:"8:45",active:hr>=19}
+  ];
+  const nextPrayer=prayers.find(p=>p.active)||prayers[0];
+
+  // Word of the Day — cycles through vocab from all languages
+  const WOTD=[
+    {w:"Shukriya",m:"Thank you",lang:"Urdu",r:"shuk-REE-ya",emoji:"🤲"},
+    {w:"Mahal kita",m:"I love you",lang:"Tagalog",r:"ma-HAL kee-TA",emoji:"💛"},
+    {w:"Bismillah",m:"In the name of God",lang:"Arabic",r:"bis-MIL-lah",emoji:"📿"},
+    {w:"Magandang umaga",m:"Beautiful morning",lang:"Tagalog",r:"ma-gan-DANG oo-MA-ga",emoji:"☀️"},
+    {w:"Assalamu alaikum",m:"Peace be upon you",lang:"Arabic/Urdu",r:"as-sa-LAA-mu a-LAI-kum",emoji:"🕊️"},
+    {w:"Dil",m:"Heart",lang:"Urdu",r:"dil",emoji:"❤️"},
+    {w:"Salamat po",m:"Thank you (respectful)",lang:"Tagalog",r:"sa-LA-mat po",emoji:"🙏"},
+    {w:"Alhamdulillah",m:"Praise God",lang:"Arabic",r:"al-HAM-du-LIL-lah",emoji:"✨"},
+    {w:"Kya haal hai?",m:"How are you?",lang:"Urdu",r:"kya HAAL hai",emoji:"👋"},
+    {w:"Kumain ka na?",m:"Have you eaten?",lang:"Tagalog",r:"ku-MA-in ka na",emoji:"🍚"},
+    {w:"InshaAllah",m:"God willing",lang:"Arabic",r:"in-SHA-al-lah",emoji:"🤲"},
+    {w:"Chai",m:"Tea",lang:"Urdu",r:"chai",emoji:"☕"},
+    {w:"Mahal",m:"Love / Expensive",lang:"Tagalog",r:"ma-HAL",emoji:"💕"},
+    {w:"SubhanAllah",m:"Glory to God",lang:"Arabic",r:"sub-HAN-al-lah",emoji:"🌙"},
+    {w:"Meri jaan",m:"My life (endearment)",lang:"Urdu",r:"ME-ri jaan",emoji:"💫"},
+    {w:"Ingat",m:"Take care",lang:"Tagalog",r:"i-NGAT",emoji:"🫶"},
+    {w:"JazakAllah",m:"May God reward you",lang:"Arabic",r:"ja-ZAK-al-lah",emoji:"🌟"},
+    {w:"Acha",m:"OK / Really? / I see!",lang:"Urdu",r:"a-CHA",emoji:"👀"},
+    {w:"Miss na kita",m:"I miss you",lang:"Tagalog",r:"miss na kee-TA",emoji:"🥺"},
+    {w:"MashaAllah",m:"God has willed it",lang:"Arabic",r:"MA-sha-al-lah",emoji:"🤍"},
+    {w:"Khush",m:"Happy",lang:"Urdu",r:"khush",emoji:"😊"},
+    {w:"Opo",m:"Yes (respectful)",lang:"Tagalog",r:"o-PO",emoji:"✅"},
+    {w:"Tawakkul",m:"Trust in God",lang:"Arabic",r:"ta-WAK-kul",emoji:"🕊️"},
+    {w:"Mohabbat",m:"Love",lang:"Urdu",r:"mo-HAB-bat",emoji:"💖"},
+    {w:"Mabuhay",m:"Long live / Welcome",lang:"Tagalog",r:"ma-BU-hai",emoji:"🎉"},
+    {w:"Sabr",m:"Patience",lang:"Arabic",r:"sa-br",emoji:"🧘"},
+    {w:"Ghar",m:"Home",lang:"Urdu",r:"ghar",emoji:"🏠"},
+    {w:"Masarap",m:"Delicious",lang:"Tagalog",r:"ma-sa-RAP",emoji:"🤤"},
+    {w:"Shukr",m:"Gratitude",lang:"Arabic",r:"shukr",emoji:"🙌"},
+    {w:"Paani",m:"Water",lang:"Urdu",r:"PAA-ni",emoji:"💧"},
+  ];
+  const todayIdx=Math.floor(Date.now()/86400000)%WOTD.length;
+  const wotd=WOTD[todayIdx];
+  const wotdRecKey='wotd_rec_'+todayIdx+'_'+user;
+  const partnerRecKey='wotd_rec_'+todayIdx+'_'+(user==='shah'?'dane':'shah');
+  const [myRec,setMyRec]=useState(()=>local.get(wotdRecKey,null));
+  const [recording,setRecording]=useState(false);
+
+  // Dua of the Day
+  const DUAS=[
+    {ar:"رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",en:"Our Lord, give us good in this world and the Hereafter, and protect us from the Fire",ref:"2:201"},
+    {ar:"رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي",en:"My Lord, expand my chest and ease my task for me",ref:"20:25-26"},
+    {ar:"رَبِّ زِدْنِي عِلْمًا",en:"My Lord, increase me in knowledge",ref:"20:114"},
+    {ar:"حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",en:"Allah is sufficient for us, and He is the best disposer of affairs",ref:"3:173"},
+    {ar:"رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا",en:"Our Lord, do not hold us accountable if we forget or make mistakes",ref:"2:286"},
+    {ar:"رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ",en:"Our Lord, grant us from our spouses and offspring comfort to our eyes",ref:"25:74"},
+    {ar:"اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ",en:"O Allah, I ask You for well-being",ref:"Hadith"},
+    {ar:"رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِن ذُرِّيَّتِي",en:"My Lord, make me steadfast in prayer, and my descendants too",ref:"14:40"},
+  ];
+  const dua=DUAS[dayNum%DUAS.length];
+
+  const recordWOTD=async()=>{
+    if(myRec){try{const a=new Audio(myRec);a.play();}catch(e){}return;}
+    try{
+      setRecording(true);
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream);const chunks=[];
+      mr.ondataavailable=e=>chunks.push(e.data);
+      mr.onstop=()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob=new Blob(chunks,{type:'audio/webm'});
+        const reader=new FileReader();
+        reader.onload=()=>{local.set(wotdRecKey,reader.result);setMyRec(reader.result);setRecording(false);};
+        reader.readAsDataURL(blob);
+      };
+      mr.start();setTimeout(()=>mr.stop(),4000);
+    }catch(e){setRecording(false);}
+  };
+  const playPartner=()=>{const r=local.get(partnerRecKey,null);if(r){try{new Audio(r).play();}catch(e){}}};
+  const hasPartnerRec=!!local.get(partnerRecKey,null);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
-    {/* Header gradient */}
-    <div style={{background:"linear-gradient(180deg,#0B3D2E 0%,#121212 70%)",padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}>
-      {/* Greeting row */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:34,height:34,borderRadius:"50%",background:user==='shah'?S.green:S.rose,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:S.white,fontSize:14,fontWeight:800}}>{name[0]}</span></div>
-          <div>
-            <p style={{color:S.white,fontSize:20,fontWeight:700,margin:0}}>{greeting}, {name}</p>
-          </div>
+    <div style={{background:"linear-gradient(180deg,#0B3D2E 0%,#121212 80%)",padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:user==='shah'?"linear-gradient(135deg,#1DB954,#169C46)":"linear-gradient(135deg,#E8115B,#C70F4E)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:14,fontWeight:800}}>{name[0]}</span></div>
+          <p style={{color:S.white,fontSize:21,fontWeight:700,margin:0,letterSpacing:-0.5}}>{greeting}, {name}</p>
         </div>
-        <Sy mood="happy" size={32}/>
+        <Sy mood="happy" size={30}/>
       </div>
 
-      {/* Ramadan card */}
-      <div onClick={()=>go("browse")} style={{background:"linear-gradient(135deg,#1A3352,#0D1F33)",borderRadius:14,padding:"16px 18px",marginBottom:12,cursor:"pointer",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:-20,right:-20,width:80,height:80,borderRadius:"50%",background:"rgba(212,168,75,0.06)"}}/>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      {/* Ramadan + Prayer Schedule */}
+      <div style={{background:"linear-gradient(135deg,#152A45,#0C1A30)",borderRadius:20,padding:"20px",marginBottom:14,position:"relative",overflow:"hidden",border:"1px solid rgba(201,168,76,0.06)"}}>
+        <div style={{position:"absolute",top:-30,right:-30,width:100,height:100,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,0.05),transparent)"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
           <div>
-            <p style={{color:S.gold,fontSize:11,fontWeight:700,letterSpacing:1.5,margin:"0 0 4px"}}>RAMADAN 1447</p>
-            <p style={{color:S.white,fontSize:26,fontWeight:300,margin:"0 0 2px"}}>Day {dayNum}</p>
-            <p style={{color:"rgba(255,255,255,0.35)",fontSize:12,margin:0}}>{td.dt}, 2026</p>
+            <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 4px",textTransform:"uppercase"}}>Ramadan 1447</p>
+            <p style={{color:S.white,fontSize:32,fontWeight:300,margin:"0 0 2px",letterSpacing:-1,lineHeight:1}}>Day {dayNum}</p>
+            <p style={{color:"rgba(255,255,255,0.25)",fontSize:11,margin:0}}>{td.dt}, 2026</p>
           </div>
           <div style={{textAlign:"right"}}>
-            <p style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:600,margin:"0 0 4px"}}>SUHOOR ENDS</p>
-            <p style={{color:S.white,fontSize:18,fontWeight:500,margin:"0 0 8px"}}>{td.fajr}</p>
-            <p style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:600,margin:"0 0 4px"}}>IFTAR</p>
-            <p style={{color:S.gold,fontSize:18,fontWeight:500,margin:0}}>{td.mag}</p>
+            <p style={{color:nextPrayer.name==="Fajr"||nextPrayer.name==="Maghrib"?S.gold:"rgba(255,255,255,0.6)",fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 3px"}}>NEXT</p>
+            <p style={{color:S.white,fontSize:22,fontWeight:300,margin:0,letterSpacing:-0.5}}>{nextPrayer.name}</p>
+            <p style={{color:S.gold,fontSize:16,fontWeight:500,margin:"2px 0 0"}}>{nextPrayer.time}</p>
           </div>
         </div>
-      </div>
-
-      {/* Quick access grid — Spotify style compact cards */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:4}}>
-        {[
-          {label:"Learn",sub:completed.length>0?completed.length+" done":"Start here",icon:"📚",ck:"learn",bg:"#1DB954"},
-          {label:"Our Ramadan",sub:"Day "+dayNum+" · "+td.fajr,icon:"☽",ck:"browse",bg:"#1A3352"},
-          {label:"Ask Anything",sub:"Q&A",icon:"💬",ck:"browse",bg:"#5C1A6E"},
-          {label:"Tea Sessions",sub:"Episodes",icon:"☕",ck:"series",bg:"#E13300"},
-        ].map((c,i)=>(<div key={i} onClick={()=>go(c.ck)} style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.07)",borderRadius:6,overflow:"hidden",height:52,cursor:"pointer"}}>
-          <div style={{width:52,height:52,background:c.bg+"25",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:18}}>{c.icon}</span></div>
-          <div style={{padding:"0 10px",minWidth:0}}>
-            <p style={{color:S.white,fontSize:13,fontWeight:600,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.label}</p>
-          </div>
-        </div>))}
+        {/* 5 prayer times row */}
+        <div style={{display:"flex",justifyContent:"space-between",gap:4}}>
+          {prayers.map(p=>{const isNext=p.name===nextPrayer.name;const isPast=prayers.indexOf(p)<prayers.indexOf(nextPrayer);return(
+            <div key={p.name} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRadius:10,background:isNext?"rgba(201,168,76,0.12)":"transparent",border:isNext?"1px solid rgba(201,168,76,0.15)":"1px solid transparent"}}>
+              <p style={{color:isNext?S.gold:isPast?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.5)",fontSize:9,fontWeight:700,letterSpacing:0.5,margin:"0 0 2px"}}>{p.name}</p>
+              <p style={{color:isNext?S.white:isPast?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.4)",fontSize:12,fontWeight:isNext?700:500,margin:0}}>{p.time}</p>
+            </div>
+          );})}
+        </div>
       </div>
     </div>
 
     <div style={{padding:"16px 16px 0"}}>
-      {/* Progress — only show if they've started */}
-      {(xp>0||completed.length>0)?<div style={{marginBottom:20}}>
-        <h2 style={{color:S.white,fontSize:19,fontWeight:700,margin:"0 0 12px"}}>Your progress</h2>
-        <div style={{display:"flex",gap:10}}>
-          {[{v:xp,l:"XP",c:S.green},{v:completed.length+"/45",l:"Lessons",c:S.gold},{v:streak||"—",l:"Day streak",c:S.rose}].map((s,i)=>(<div key={i} style={{flex:1,background:S.card,borderRadius:12,padding:"14px 12px",textAlign:"center"}}>
-            <p style={{color:s.c,fontSize:22,fontWeight:700,margin:"0 0 2px"}}>{s.v}</p>
-            <p style={{color:S.sub,fontSize:11,margin:0}}>{s.l}</p>
-          </div>))}
-        </div>
-      </div>
-      :<button onClick={()=>go("learn")} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"18px 16px",background:"linear-gradient(135deg,#1A3D34,#2D5A4A)",borderRadius:14,border:"none",cursor:"pointer",marginBottom:20}}>
-        <Sy mood="thinking" size={40}/>
-        <div style={{flex:1,textAlign:"left"}}>
-          <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 2px"}}>Start your first lesson</p>
-          <p style={{color:"rgba(255,255,255,0.4)",fontSize:12,margin:0}}>Learn Urdu, Tagalog, or Arabic</p>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill={S.sub}><path d="M9 18l6-6-6-6"/></svg>
-      </button>}
 
-      {/* Browse sections as Spotify-style horizontal scroll */}
-      <h2 style={{color:S.white,fontSize:19,fontWeight:700,margin:"0 0 12px"}}>Made for you</h2>
-      <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:16,marginRight:-16,WebkitOverflowScrolling:"touch"}}>
-        {[
-          {id:"steps",t:"First Steps",s:"Video guides from Shah",c:"#0B4D3A",ic:"▶"},
-          {id:"stories",t:"Storytime",s:"Prophets' stories",c:"#4A2068",ic:"📖"},
-          {id:"food",t:"Soul Food",s:"Recipes from both worlds",c:"#8C1D3F",ic:"🍳"},
-          {id:"words",t:"Our Words",s:"A love archive",c:"#1A4A5C",ic:"✎"},
-          {id:"growth",t:"Looking Forward",s:"Things we can't wait for",c:"#2A4A8C",ic:"★"},
-        ].map(cat=>(<div key={cat.id} onClick={()=>go("browse")} style={{width:"40vw",maxWidth:160,flexShrink:0,cursor:"pointer"}}>
-          <div style={{aspectRatio:"1",borderRadius:8,background:"linear-gradient(160deg,"+cat.c+","+cat.c+"88)",display:"flex",alignItems:"flex-end",padding:12,marginBottom:8,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:10,right:10,fontSize:24,opacity:0.3}}>{cat.ic}</div>
-            <p style={{color:"#fff",fontSize:15,fontWeight:700,margin:0,lineHeight:1.2,position:"relative",zIndex:1}}>{cat.t}</p>
+      {/* Word of the Day — record for partner */}
+      <div style={{background:S.card,borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(255,255,255,0.04)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 6px"}}>WORD OF THE DAY</p>
+            <p style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>{wotd.emoji} {wotd.w}</p>
+            <p style={{color:S.sub,fontSize:13,margin:"0 0 2px"}}>{wotd.m}</p>
+            <p style={{color:S.muted,fontSize:11,margin:0}}>{wotd.lang} · {wotd.r}</p>
           </div>
-          <p style={{color:S.sub,fontSize:12,margin:0,lineHeight:1.3}}>{cat.s}</p>
-        </div>))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={recordWOTD} style={{flex:1,padding:"12px",borderRadius:14,border:"none",background:recording?"#E8115B":myRec?"rgba(29,185,84,0.1)":"rgba(255,255,255,0.04)",color:recording?"#fff":myRec?S.green:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {recording?<><span style={{width:8,height:8,borderRadius:"50%",background:"#fff",animation:"dcFadeIn 0.5s infinite alternate"}}/>Recording...</>
+            :myRec?<><svg width="14" height="14" viewBox="0 0 24 24" fill={S.green}><path d="M8 5v14l11-7z"/></svg>Play yours</>
+            :<><svg width="14" height="14" viewBox="0 0 24 24" fill={S.sub}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>Record for {partner}</>}
+          </button>
+          {hasPartnerRec&&<button onClick={playPartner} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.rose+"15",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={S.rose}><path d="M8 5v14l11-7z"/></svg>{partner}
+          </button>}
+        </div>
       </div>
+
+      {/* Dua of the Day */}
+      <div style={{background:"linear-gradient(135deg,rgba(201,168,76,0.06),rgba(201,168,76,0.02))",borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(201,168,76,0.08)"}}>
+        <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 10px"}}>DUA OF THE DAY</p>
+        <p style={{color:S.white,fontSize:17,fontWeight:400,margin:"0 0 10px",lineHeight:1.6,direction:"rtl",textAlign:"right",fontFamily:"serif"}}>{dua.ar}</p>
+        <p style={{color:S.sub,fontSize:13,margin:"0 0 4px",lineHeight:1.5,fontStyle:"italic"}}>{dua.en}</p>
+        <p style={{color:S.muted,fontSize:11,margin:0}}>Quran {dua.ref}</p>
+      </div>
+
+      {/* Thinking of You */}
+      <div style={{marginBottom:16}}>
+        {lastVibe&&<div onClick={markRead} style={{background:"linear-gradient(135deg,rgba(232,17,91,0.08),rgba(141,103,171,0.08))",borderRadius:20,padding:"20px",marginBottom:12,border:"1px solid rgba(232,17,91,0.08)",cursor:"pointer",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",top:-24,right:-16,fontSize:64,opacity:0.04}}>{lastVibe.emoji}</div>
+          <p style={{color:S.rose,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 8px"}}>FROM {(lastVibe.from_user||"").toUpperCase()}</p>
+          <p style={{color:S.white,fontSize:17,fontWeight:600,margin:"0 0 6px",lineHeight:1.4}}>{lastVibe.emoji} {lastVibe.label}</p>
+          <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,margin:0}}>{new Date(lastVibe.created_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · tap to dismiss</p>
+        </div>}
+
+        {!showSend?<button onClick={()=>setShowSend(true)} style={{width:"100%",padding:"16px",background:S.card,borderRadius:16,border:"1px solid rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer"}}>
+          <span style={{fontSize:16}}>💛</span>
+          <span style={{color:S.sub,fontSize:14,fontWeight:500,letterSpacing:-0.2}}>Send {partner} something</span>
+        </button>
+
+        :<div style={{background:S.card,borderRadius:20,padding:"20px",border:"1px solid rgba(255,255,255,0.03)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <p style={{color:S.white,fontSize:16,fontWeight:700,margin:0,letterSpacing:-0.3}}>Send to {partner}</p>
+            <button onClick={()=>setShowSend(false)} style={{background:"none",border:"none",color:S.muted,fontSize:12,cursor:"pointer",padding:"4px 8px"}}>Cancel</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6,marginBottom:14}}>
+            {QUICK_VIBES.map((v,i)=>(<button key={i} onClick={()=>sendVibe(v.emoji,v.label)} style={{padding:"14px 12px",borderRadius:14,border:"1px solid rgba(255,255,255,0.03)",background:"rgba(255,255,255,0.02)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:18}}>{v.emoji}</span>
+              <span style={{color:S.white,fontSize:12,fontWeight:500}}>{v.label}</span>
+            </button>))}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <input value={customMsg} onChange={e=>setCustomMsg(e.target.value)} placeholder="Write your own..." style={{flex:1,padding:"14px 16px",borderRadius:14,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",color:S.white,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={()=>{if(customMsg.trim())sendVibe("💌",customMsg.trim(),customMsg.trim());}} disabled={!customMsg.trim()} style={{padding:"14px 18px",borderRadius:14,border:"none",background:customMsg.trim()?S.rose:"rgba(255,255,255,0.03)",color:customMsg.trim()?"#fff":S.muted,fontSize:13,fontWeight:700,cursor:customMsg.trim()?"pointer":"not-allowed"}}>Send</button>
+          </div>
+        </div>}
+      </div>
+
+      {/* Progress — compact */}
+      {(xp>0||completed.length>0)&&<div style={{display:"flex",gap:8,marginBottom:16}}>
+        {[{v:xp,l:"XP",c:S.green},{v:completed.length+"/45",l:"Lessons",c:S.gold},{v:streak||"—",l:"Streak",c:S.rose}].map((s,i)=>(<div key={i} style={{flex:1,background:S.card,borderRadius:14,padding:"14px 10px",textAlign:"center",border:"1px solid rgba(255,255,255,0.03)"}}>
+          <p style={{color:s.c,fontSize:20,fontWeight:800,margin:"0 0 2px",letterSpacing:-0.5}}>{s.v}</p>
+          <p style={{color:S.muted,fontSize:10,margin:0,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{s.l}</p>
+        </div>))}
+      </div>}
+
+      {/* Tea Sessions */}
+      <button onClick={()=>go("series")} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:"linear-gradient(135deg,#1E3264,#0D1B3E)",borderRadius:16,border:"none",cursor:"pointer",marginBottom:16}}>
+        <div style={{width:48,height:48,borderRadius:12,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:20}}>☕</span></div>
+        <div style={{flex:1,textAlign:"left"}}>
+          <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 2px",letterSpacing:-0.2}}>Tea Sessions</p>
+          <p style={{color:"rgba(255,255,255,0.3)",fontSize:12,margin:0}}>Listen together · Share reflections</p>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.2)"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
     </div>
   </div>);
 }
@@ -1026,6 +1264,8 @@ function Home({go}){
 function Browse({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
   const [sel,setSel]=useState(null);const [askQ,setAskQ]=useState("");const [asked,setAsked]=useState(()=>local.get('browse_asked',[]));
+  const [editId,setEditId]=useState(null);const [editText,setEditText]=useState("");
+  const [addingWord,setAddingWord]=useState(false);const [newWord,setNewWord]=useState("");
   const [ms,setMs]=useState(()=>local.get('browse_ms',[]));
   const [addingM,setAddingM]=useState(false);const [newM,setNewM]=useState("");const [newD,setNewD]=useState("");const [playVid,setPlayVid]=useState(null);
   // Editable Browse content — stored in localStorage
@@ -1034,7 +1274,6 @@ function Browse({go}){
   const [bRecipes,setBRecipes]=useState(()=>local.get('browse_recipes',[]));
   const [bQA,setBQA]=useState(()=>local.get('browse_qa',[]));
   const [bWords,setBWords]=useState(()=>local.get('browse_words',[]));
-  const [addForm,setAddForm]=useState(null);const [formData,setFormData]=useState({});
   // Persist on change
   useEffect(()=>{local.set('browse_vids',bVids);},[bVids]);
   useEffect(()=>{local.set('browse_stories',bStories);},[bStories]);
@@ -1046,6 +1285,7 @@ function Browse({go}){
   // Helper: editable list with add/delete for Shah, view-only + comment for Dane
   const EditList=({items,setItems,fields,emptyMsg,color="#0B6B48",mediaType})=>{
     const fileRef=React.useRef(null);
+    const [addForm,setAddForm]=useState(null);const [formData,setFormData]=useState({});
     const handleFile=(file)=>{
       if(!file)return;
       const url=URL.createObjectURL(file);
@@ -1062,37 +1302,87 @@ function Browse({go}){
         setItems([...items,item]);setFormData({});setAddForm(null);
       }
     };
+    const [playItem,setPlayItem]=useState(null);
+    const playerRef=React.useRef(null);
+    const [playing,setPlaying]=useState(false);const [progress,setProgress]=useState(0);const [duration,setDuration]=useState(0);
+
+    // Player overlay
+    if(playItem)return(<div style={{position:"fixed",inset:0,zIndex:100,background:"linear-gradient(180deg,"+color+" 0%,#0D0D0D 50%)",display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",justifyContent:"space-between",padding:"max(12px,env(safe-area-inset-top)) 20px 8px"}}>
+        <button onClick={()=>{setPlayItem(null);setPlaying(false);if(playerRef.current){playerRef.current.pause();playerRef.current=null;}}} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0,alignSelf:"center"}}>PLAYING FROM</p>
+        <div style={{width:38}}/>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}>
+        {(playItem.type||"").startsWith("video/")?
+          <video ref={el=>{if(el&&!playerRef.current){playerRef.current=el;el.ontimeupdate=()=>{setProgress(el.currentTime);setDuration(el.duration||0);};el.onended=()=>setPlaying(false);}}} src={playItem.url} playsInline style={{width:"100%",maxHeight:"60vh",borderRadius:12,background:"#000"}}/>
+        :<div style={{width:"80%",maxWidth:300,aspectRatio:"1",borderRadius:20,background:"linear-gradient(135deg,"+color+","+color+"80)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/></svg>
+        </div>}
+      </div>
+      <div style={{padding:"0 24px 40px"}}>
+        <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:"0 0 3px"}}>{playItem.t}</h2>
+        {playItem.s&&<p style={{color:"rgba(255,255,255,0.4)",fontSize:13,margin:"0 0 16px"}}>{playItem.s}</p>}
+        <div style={{marginBottom:8}}>
+          <div style={{height:4,background:"rgba(255,255,255,0.1)",borderRadius:2,cursor:"pointer"}} onClick={e=>{if(playerRef.current&&duration){const rect=e.currentTarget.getBoundingClientRect();const pct=(e.clientX-rect.left)/rect.width;playerRef.current.currentTime=pct*duration;}}}>
+            <div style={{width:(duration?Math.min((progress/duration)*100,100):0)+"%",height:"100%",background:"#fff",borderRadius:2,transition:"width 0.1s"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+            <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>{Math.floor(progress/60)+":"+String(Math.floor(progress%60)).padStart(2,"0")}</span>
+            <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>{duration?Math.floor(duration/60)+":"+String(Math.floor(duration%60)).padStart(2,"0"):playItem.dur||"--:--"}</span>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}>
+          <button onClick={()=>{if(playerRef.current)playerRef.current.currentTime=Math.max(0,playerRef.current.currentTime-15);}} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+          <button onClick={()=>{
+            if(!playerRef.current){
+              if((playItem.type||"").startsWith("video/")){/* video ref set above */}
+              else{const a=new Audio(playItem.url);a.ontimeupdate=()=>{setProgress(a.currentTime);setDuration(a.duration||0);};a.onended=()=>setPlaying(false);playerRef.current=a;}
+            }
+            if(playing){playerRef.current.pause();setPlaying(false);}
+            else{playerRef.current.play();setPlaying(true);}
+          }} style={{width:64,height:64,borderRadius:32,border:"none",cursor:"pointer",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {playing?<svg width="26" height="26" viewBox="0 0 24 24" fill="#000"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            :<svg width="26" height="26" viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg>}
+          </button>
+          <button onClick={()=>{if(playerRef.current)playerRef.current.currentTime=Math.min(playerRef.current.duration||999,playerRef.current.currentTime+15);}} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+        </div>
+      </div>
+    </div>);
+
     return(<div style={{padding:"0 24px"}}>
       {items.length===0&&<div style={{textAlign:"center",padding:"40px 0"}}>
         <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:"1px solid rgba(255,255,255,0.06)"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></div>
         <p style={{color:"rgba(255,255,255,0.2)",fontSize:14}}>{emptyMsg}</p>
       </div>}
-      {items.map((item,i)=>(<div key={i} style={{padding:"14px 0",borderBottom:i<items.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
+      {items.map((item,i)=>(<div key={i} style={{padding:"10px 0",borderBottom:i<items.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+        <div onClick={item.url?()=>setPlayItem(item):undefined} style={{display:"flex",alignItems:"center",gap:12,cursor:item.url?"pointer":"default"}}>
+          {/* Thumbnail */}
           {item.url&&(item.type||'').startsWith('video/')?
-            <div style={{width:64,height:48,borderRadius:8,background:"#1E1E1E",overflow:"hidden",flexShrink:0,position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:52,height:52,borderRadius:8,background:color+"20",overflow:"hidden",flexShrink:0,position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <video src={item.url} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.3)"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.35)"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
             </div>
-          :item.url&&(item.type||'').startsWith('audio/')?
-            <div style={{width:40,height:40,borderRadius:10,background:color+"20",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z"/></svg>
-            </div>
-          :null}
+          :<div style={{width:52,height:52,borderRadius:item.url?26:8,background:item.url?color+"20":"rgba(255,255,255,0.04)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {item.url?<svg width="16" height="16" viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z"/></svg>
+            :<span style={{color:"rgba(255,255,255,0.15)",fontSize:18}}>📝</span>}
+          </div>}
           <div style={{flex:1,minWidth:0}}>
-            <p style={{color:"#fff",fontSize:15,fontWeight:500,margin:"0 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.t}</p>
-            {item.s&&<p style={{color:"rgba(255,255,255,0.3)",fontSize:12,margin:0}}>{item.s}</p>}
-            {item.dur&&<span style={{color:"rgba(255,255,255,0.2)",fontSize:11}}>{item.dur}</span>}
+            <p style={{color:"#fff",fontSize:14,fontWeight:500,margin:"0 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.t}</p>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              {item.s&&<span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>{item.s}</span>}
+              {item.dur&&<span style={{color:"rgba(255,255,255,0.2)",fontSize:10}}>· {item.dur}</span>}
+            </div>
           </div>
         </div>
-        {item.url&&<div style={{marginTop:8}}>
-          {(item.type||'').startsWith('audio/')&&<audio src={item.url} controls style={{width:"100%",height:32,borderRadius:8}}/>}
-          {(item.type||'').startsWith('video/')&&<video src={item.url} controls style={{width:"100%",borderRadius:8,marginTop:4,maxHeight:200}}/>}
-        </div>}
-        {item.comment&&<div style={{background:"rgba(232,17,91,0.06)",borderRadius:10,padding:"8px 12px",marginTop:8}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {item.comment}</p></div>}
-        <div style={{display:"flex",gap:8,marginTop:8}}>
-          {!isShah&&<button onClick={()=>{const c=prompt("Add a comment:");if(c){const n=[...items];n[i]={...n[i],comment:c};setItems(n);}}} style={{padding:"5px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.2)",background:"transparent",color:"#E8115B",fontSize:11,cursor:"pointer"}}>Reply</button>}
-          {isShah&&<button onClick={()=>setItems(items.filter((_,j)=>j!==i))} style={{padding:"5px 14px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
+        {item.comment&&<div style={{background:"rgba(232,17,91,0.06)",borderRadius:10,padding:"8px 12px",marginTop:8,marginLeft:64}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {item.comment}</p></div>}
+        <div style={{display:"flex",gap:8,marginTop:6,marginLeft:64}}>
+          {!isShah&&<button onClick={e=>{e.stopPropagation();setAddForm("comment_"+i);}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(232,17,91,0.2)",background:"transparent",color:"#E8115B",fontSize:11,cursor:"pointer"}}>Reply</button>}
+          {addForm==="comment_"+i&&<div style={{display:"flex",gap:4,flex:1}}>
+            <input value={formData.c||""} onChange={e=>setFormData({c:e.target.value})} placeholder="Your reply..." autoFocus style={{flex:1,padding:"6px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
+          </div>}
+          {isShah&&<button onClick={e=>{e.stopPropagation();setItems(items.filter((_,j)=>j!==i));}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
         </div>
       </div>))}
       {isShah&&<div style={{marginTop:12}}>
@@ -1113,250 +1403,22 @@ function Browse({go}){
       </div>}
     </div>);
   };
-  // Real Ramadan 1447 timetable — Jamia Riyadhul Jannah, Edmonton
-  const R=[
-    {d:1,dt:"Feb 18",day:"Wed",fajr:"5:49",sun:"7:45",zuhr:"12:47",asr:"3:59",mag:"5:53",isha:"7:42"},
-    {d:2,dt:"Feb 19",day:"Thu",fajr:"5:47",sun:"7:43",zuhr:"12:52",asr:"3:59",mag:"5:55",isha:"7:43"},
-    {d:3,dt:"Feb 20",day:"Fri",fajr:"5:45",sun:"7:41",zuhr:"12:52",asr:"4:01",mag:"5:57",isha:"7:45"},
-    {d:4,dt:"Feb 21",day:"Sat",fajr:"5:43",sun:"7:39",zuhr:"12:52",asr:"4:03",mag:"5:59",isha:"7:47"},
-    {d:5,dt:"Feb 22",day:"Sun",fajr:"5:41",sun:"7:37",zuhr:"12:52",asr:"4:04",mag:"6:01",isha:"7:49"},
-    {d:6,dt:"Feb 23",day:"Mon",fajr:"5:39",sun:"7:34",zuhr:"12:52",asr:"4:06",mag:"6:03",isha:"7:51"},
-    {d:7,dt:"Feb 24",day:"Tue",fajr:"5:37",sun:"7:32",zuhr:"12:52",asr:"4:08",mag:"6:05",isha:"7:53"},
-    {d:8,dt:"Feb 25",day:"Wed",fajr:"5:35",sun:"7:30",zuhr:"12:51",asr:"4:10",mag:"6:07",isha:"7:55"},
-    {d:9,dt:"Feb 26",day:"Thu",fajr:"5:33",sun:"7:28",zuhr:"12:51",asr:"4:11",mag:"6:09",isha:"7:56"},
-    {d:10,dt:"Feb 27",day:"Fri",fajr:"5:30",sun:"7:25",zuhr:"12:51",asr:"4:13",mag:"6:11",isha:"7:58"},
-    {d:11,dt:"Feb 28",day:"Sat",fajr:"5:28",sun:"7:23",zuhr:"12:51",asr:"4:15",mag:"6:13",isha:"8:00"},
-    {d:12,dt:"Mar 1",day:"Sun",fajr:"5:26",sun:"7:21",zuhr:"12:51",asr:"4:16",mag:"6:15",isha:"8:02"},
-    {d:13,dt:"Mar 2",day:"Mon",fajr:"5:24",sun:"7:18",zuhr:"12:51",asr:"4:18",mag:"6:17",isha:"8:04"},
-    {d:14,dt:"Mar 3",day:"Tue",fajr:"5:21",sun:"7:16",zuhr:"12:50",asr:"4:20",mag:"6:18",isha:"8:06"},
-    {d:15,dt:"Mar 4",day:"Wed",fajr:"5:19",sun:"7:14",zuhr:"12:50",asr:"4:21",mag:"6:20",isha:"8:08"},
-    {d:16,dt:"Mar 5",day:"Thu",fajr:"5:17",sun:"7:11",zuhr:"12:50",asr:"4:23",mag:"6:22",isha:"8:10"},
-    {d:17,dt:"Mar 6",day:"Fri",fajr:"5:14",sun:"7:09",zuhr:"12:50",asr:"4:25",mag:"6:24",isha:"8:12"},
-    {d:18,dt:"Mar 7",day:"Sat",fajr:"5:12",sun:"7:07",zuhr:"12:49",asr:"4:26",mag:"6:26",isha:"8:14"},
-    {d:19,dt:"Mar 8",day:"Sun",fajr:"6:09",sun:"8:04",zuhr:"1:49",asr:"5:30",mag:"7:28",isha:"9:16"},
-    {d:20,dt:"Mar 9",day:"Mon",fajr:"6:07",sun:"8:02",zuhr:"1:49",asr:"5:31",mag:"7:30",isha:"9:18"},
-    {d:21,dt:"Mar 10",day:"Tue",fajr:"6:04",sun:"8:00",zuhr:"1:49",asr:"5:33",mag:"7:32",isha:"9:20"},
-    {d:22,dt:"Mar 11",day:"Wed",fajr:"6:02",sun:"7:57",zuhr:"1:48",asr:"5:34",mag:"7:34",isha:"9:22"},
-    {d:23,dt:"Mar 12",day:"Thu",fajr:"5:59",sun:"7:55",zuhr:"1:48",asr:"5:36",mag:"7:35",isha:"9:24"},
-    {d:24,dt:"Mar 13",day:"Fri",fajr:"5:56",sun:"7:52",zuhr:"1:48",asr:"5:37",mag:"7:37",isha:"9:26"},
-    {d:25,dt:"Mar 14",day:"Sat",fajr:"5:54",sun:"7:50",zuhr:"1:48",asr:"5:39",mag:"7:39",isha:"9:28"},
-    {d:26,dt:"Mar 15",day:"Sun",fajr:"5:51",sun:"7:48",zuhr:"1:47",asr:"5:40",mag:"7:41",isha:"9:30"},
-    {d:27,dt:"Mar 16",day:"Mon",fajr:"5:48",sun:"7:45",zuhr:"1:47",asr:"5:42",mag:"7:43",isha:"9:32"},
-    {d:28,dt:"Mar 17",day:"Tue",fajr:"5:46",sun:"7:43",zuhr:"1:47",asr:"5:44",mag:"7:45",isha:"9:34"},
-    {d:29,dt:"Mar 18",day:"Wed",fajr:"5:43",sun:"7:40",zuhr:"1:46",asr:"5:44",mag:"7:47",isha:"9:36"},
-    {d:30,dt:"Mar 19",day:"Thu",fajr:"5:40",sun:"7:38",zuhr:"1:46",asr:"5:45",mag:"7:48",isha:"9:38"},
-  ];
-  const ramStart=new Date(2026,1,18);// Feb 18, 2026 = Ramadan Day 1
-  const TODAY=Math.max(1,Math.min(30,Math.floor((new Date()-ramStart)/(1000*60*60*24))+1));
-  const td=R[Math.min(TODAY-1,R.length-1)];
   const cats=[
     {id:"tea",t:"Tea\nSessions",c:"#E13300",ic:"☕",sub:"Gen Z convos over chai",eps:8,act:"series"},
-    {id:"ramadan",t:"Our\nRamadan",c:"#1A3352",ic:"☽",sub:"Day "+TODAY+" · Suhoor "+td.fajr,eps:30},
     {id:"steps",t:"First\nSteps",c:"#0B4D3A",ic:"▶",sub:"Shah's video guides",eps:8},
-    {id:"stories",t:"Storytime",c:"#4A2068",ic:"📖",sub:"Prophets' stories, Shah's voice",eps:7},
-    {id:"food",t:"Soul\nFood",c:"#8C1D3F",ic:"🍳",sub:"Recipes from both worlds",eps:10},
+    {id:"stories",t:"Storytime",c:"#4A2068",ic:"📖",sub:"Prophets' stories",eps:7},
     {id:"ask",t:"Ask\nAnything",c:"#5C1A6E",ic:"💬",sub:"Dane asks, Shah answers",eps:0},
-    {id:"words",t:"Our\nWords",c:"#1A4A5C",ic:"✎",sub:"A love archive",eps:0},
-    {id:"growth",t:"Looking\nForward",c:"#2A4A8C",ic:"★",sub:"Things we can't wait for",eps:0},
   ];
   const back=<div style={{padding:"max(12px,env(safe-area-inset-top)) 16px 6px"}}><button onClick={()=>setSel(null)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44,display:"flex",alignItems:"center",gap:6}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg><span style={{color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:500}}>Back</span></button></div>;
-
-  // ── OUR RAMADAN — Live prayer tracker ──
-  if(sel==="ramadan"){
-    const prayers=[{n:"Fajr",t:td.fajr,note:"Suhoor ends"},{n:"Zuhr",t:td.zuhr,note:""},{n:"Asr",t:td.asr,note:""},{n:"Maghrib",t:td.mag,note:"Iftar"},{n:"Isha",t:td.isha,note:"Taraweeh"}];
-    // Simulate "next prayer" based on current time
-    const nextPrayer=prayers[4]; // Maghrib for demo (iftar)
-    const fastHrs=Math.round((parseFloat(td.mag.replace(":","."))-parseFloat(td.fajr.replace(":","."))))||12;
-    return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#0A1225",WebkitOverflowScrolling:"touch"}}>
-      {back}
-      {/* Hero — Crescent and day counter */}
-      <div style={{padding:"0 24px 24px",textAlign:"center"}}>
-        <div style={{position:"relative",width:120,height:120,margin:"0 auto 16px"}}>
-          <svg width="120" height="120" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4"/>
-            <circle cx="60" cy="60" r="52" fill="none" stroke="#D4A84B" strokeWidth="4" strokeDasharray={2*Math.PI*52} strokeDashoffset={2*Math.PI*52*(1-TODAY/30)} strokeLinecap="round" transform="rotate(-90 60 60)" style={{transition:"stroke-dashoffset 1s"}}/>
-          </svg>
-          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-            <span style={{color:"#D4A84B",fontSize:36,fontWeight:200,lineHeight:1}}>{TODAY}</span>
-            <span style={{color:"rgba(255,255,255,0.35)",fontSize:10,fontWeight:500,letterSpacing:1}}>OF 30</span>
-          </div>
-        </div>
-        <h1 style={{color:"#fff",fontSize:24,fontWeight:300,margin:"0 0 2px",letterSpacing:1}}>Ramadan Mubarak</h1>
-        <p style={{color:"rgba(255,255,255,0.35)",fontSize:13,margin:"0 0 20px",fontWeight:400}}>{td.day}, {td.dt} · Ramadan {TODAY}, 1447</p>
-        {/* Next prayer card */}
-        <div style={{background:"linear-gradient(135deg,#D4A84B22,#D4A84B08)",border:"1px solid #D4A84B30",borderRadius:16,padding:"18px 20px",textAlign:"left"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div>
-              <p style={{color:"#D4A84B",fontSize:10,fontWeight:600,letterSpacing:1.5,margin:"0 0 4px"}}>NEXT — IFTAR</p>
-              <p style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0",letterSpacing:1}}>{nextPrayer.t} <span style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>PM</span></p>
-            </div>
-          </div>
-          <div style={{marginTop:10,height:3,background:"rgba(255,255,255,0.06)",borderRadius:2}}>
-            <div style={{width:"65%",height:"100%",background:"linear-gradient(90deg,#D4A84B,#E8C44B)",borderRadius:2}}/>
-          </div>
-          <p style={{color:"rgba(255,255,255,0.3)",fontSize:11,margin:"6px 0 0"}}>Fasting {fastHrs}h today · You got this</p>
-        </div>
-      </div>
-
-      {/* Today's prayer times */}
-      <div style={{padding:"0 24px",marginBottom:24}}>
-        <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:600,letterSpacing:1.5,margin:"0 0 12px"}}>TODAY'S TIMES</p>
-        <div style={{display:"flex",gap:0,background:"rgba(255,255,255,0.03)",borderRadius:12,border:"1px solid rgba(255,255,255,0.05)",overflow:"hidden"}}>
-          {prayers.map((p,i)=>{const isNext=p.n==="Maghrib";return(<div key={i} style={{flex:1,padding:"14px 6px",textAlign:"center",background:isNext?"rgba(212,168,75,0.08)":"transparent",borderRight:i<prayers.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-            <p style={{color:isNext?"#D4A84B":"rgba(255,255,255,0.35)",fontSize:10,fontWeight:600,margin:"0 0 4px",letterSpacing:0.5}}>{p.n}</p>
-            <p style={{color:isNext?"#D4A84B":"#fff",fontSize:15,fontWeight:500,margin:"0 0 2px"}}>{p.t}</p>
-            {p.note&&<p style={{color:isNext?"#D4A84B60":"rgba(255,255,255,0.15)",fontSize:9,margin:0}}>{p.note}</p>}
-          </div>);})}
-        </div>
-      </div>
-
-      {/* 30-day grid */}
-      <div style={{padding:"0 24px",marginBottom:20}}>
-        <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:600,letterSpacing:1.5,margin:"0 0 10px"}}>30 DAYS</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4}}>
-          {R.map((r,i)=>{const done=r.d<TODAY;const cur=r.d===TODAY;return(<div key={i} style={{aspectRatio:"1",borderRadius:6,background:cur?"#D4A84B":done?"#4CAF5025":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:cur?"#0A1225":done?"#4CAF50":"rgba(255,255,255,0.2)",fontSize:10,fontWeight:cur?700:500}}>{r.d}</span></div>);})}
-        </div>
-      </div>
-
-      {/* Week preview */}
-      <div style={{padding:"0 24px"}}>
-        <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:600,letterSpacing:1.5,margin:"0 0 10px"}}>THIS WEEK</p>
-        {R.slice(Math.max(0,TODAY-1),TODAY+4).map((r,i)=>{const isCur=r.d===TODAY;return(<div key={i} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",opacity:r.d<TODAY?0.4:1}}>
-          <div style={{width:28,textAlign:"center",marginRight:12}}><span style={{color:isCur?"#D4A84B":"rgba(255,255,255,0.5)",fontSize:13,fontWeight:isCur?700:400}}>{r.d}</span></div>
-          <span style={{color:"rgba(255,255,255,0.3)",fontSize:11,width:32}}>{r.day}</span>
-          <div style={{flex:1,display:"flex",justifyContent:"space-between",fontSize:12}}>
-            <span style={{color:"#6BA8CC"}}>{r.fajr}</span>
-            <span style={{color:"rgba(255,255,255,0.25)"}}>{r.zuhr}</span>
-            <span style={{color:"rgba(255,255,255,0.25)"}}>{r.asr}</span>
-            <span style={{color:"#D4A84B"}}>{r.mag}</span>
-            <span style={{color:"rgba(255,255,255,0.25)"}}>{r.isha}</span>
-          </div>
-        </div>);})}
-        <p style={{color:"rgba(255,255,255,0.15)",fontSize:10,marginTop:8,textAlign:"center"}}>Jamia Riyadhul Jannah · Edmonton, AB</p>
-      </div>
-    </div>);}
-
-  // ── FIRST STEPS — Shah's video guides ──
-  if(sel==="steps"){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#071A14",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 20px"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5}}>First Steps</h1>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:13,margin:"0 0 4px"}}>Videos from Shah</p>
-      <p style={{color:"rgba(255,255,255,0.15)",fontSize:12,margin:"0 0 20px",fontStyle:"italic"}}>I made these just for you. No judgment, no rush.</p>
-    </div>
-    <EditList items={bVids} setItems={setBVids} fields={[{k:"t",ph:"Video title"},{k:"s",ph:"Description"}]} emptyMsg="No videos yet — Shah will upload them" color="#0B6B48" mediaType="video"/>
-  </div>);}
-
-  // ── STORYTIME ──
-  if(sel==="stories"){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#0E0A18",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 20px"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5}}>Storytime</h1>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:13,margin:"0 0 4px"}}>Narrated by Shah</p>
-      <p style={{color:"rgba(255,255,255,0.15)",fontSize:12,margin:"0 0 20px",fontStyle:"italic"}}>The way I heard them growing up, now for you</p>
-    </div>
-    <EditList items={bStories} setItems={setBStories} fields={[{k:"t",ph:"Story title"},{k:"s",ph:"Description"}]} emptyMsg="No stories yet — Shah will record them" color="#4A2068" mediaType="audio"/>
-  </div>);}
-
-  // ── SOUL FOOD ──
-  if(sel==="food"){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#140A10",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 20px"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5}}>Soul Food</h1>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:13,margin:"0 0 20px"}}>Recipes from both worlds</p>
-    </div>
-    <EditList items={bRecipes} setItems={setBRecipes} fields={[{k:"t",ph:"Recipe name"},{k:"s",ph:"Short description"},{k:"origin",ph:"Origin (e.g. Pakistani, Filipino)"}]} emptyMsg="No recipes yet — add your favourites" color="#8C1D3F"/>
-  </div>);}
-
-  // ── ASK ANYTHING ──
-  if(sel==="ask"){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#100818",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 20px"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5}}>Ask Anything</h1>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:13,margin:"0 0 20px"}}>No question is too small</p>
-    </div>
-    <div style={{padding:"0 24px"}}>
-      <div style={{marginBottom:20}}>
-        <textarea value={askQ} onChange={e=>setAskQ(e.target.value)} placeholder="What do you want to know?" style={{width:"100%",minHeight:80,padding:14,borderRadius:14,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",color:"#fff",fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-        <button onClick={()=>{if(askQ.trim()){setAsked([{q:askQ.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString()},...asked]);setAskQ("");}}} style={{width:"100%",marginTop:8,padding:"12px",borderRadius:14,border:"none",background:askQ.trim()?"#8D67AB":"rgba(255,255,255,0.04)",color:askQ.trim()?"#fff":"rgba(255,255,255,0.2)",fontSize:14,fontWeight:600,cursor:askQ.trim()?"pointer":"default"}}>Send</button>
-      </div>
-      {asked.map((a,i)=>(<div key={i} style={{padding:"14px 0",borderBottom:i<asked.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-          <div style={{width:20,height:20,borderRadius:"50%",background:a.from==="Shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:8,fontWeight:700}}>{a.from[0]}</span></div>
-          <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>{a.from}</span>
-          {a.dt&&<span style={{color:"rgba(255,255,255,0.15)",fontSize:11}}>{a.dt}</span>}
-        </div>
-        <p style={{color:"rgba(255,255,255,0.7)",fontSize:14,margin:"0 0 6px"}}>{a.q}</p>
-        {a.a&&<div style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 12px",marginTop:6}}>
-          <p style={{color:"rgba(255,255,255,0.5)",fontSize:13,margin:0}}>{a.a}</p>
-        </div>}
-        {!a.a&&isShah&&<button onClick={()=>{const ans=prompt("Your answer:");if(ans){const n=[...asked];n[i]={...n[i],a:ans};setAsked(n);}}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(141,103,171,0.3)",background:"transparent",color:"#8D67AB",fontSize:11,cursor:"pointer",marginTop:4}}>Answer</button>}
-      </div>))}
-    </div>
-  </div>);}
-
-  // ── OUR WORDS ──
-  if(sel==="words"){return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#0A1A24",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 20px"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5,fontStyle:"italic"}}>Our Words</h1>
-      <p style={{color:"rgba(255,255,255,0.25)",fontSize:13,margin:"0 0 20px"}}>Things we never want to forget</p>
-    </div>
-    <div style={{padding:"0 24px"}}>
-      {bWords.map((e,i)=>(<div key={i} style={{marginBottom:20}}>
-        <p style={{color:"rgba(255,255,255,0.85)",fontSize:17,fontWeight:300,margin:"0 0 10px",lineHeight:1.65,fontStyle:"italic",letterSpacing:0.3}}>{e.t}</p>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{width:20,height:20,borderRadius:"50%",background:e.from==="Shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:8,fontWeight:700}}>{(e.from||"S")[0]}</span></div>
-          <span style={{color:"rgba(255,255,255,0.3)",fontSize:12}}>{e.from||"Shah"}</span>
-        </div>
-        {isShah&&<button onClick={()=>setBWords(bWords.filter((_,j)=>j!==i))} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.15)",fontSize:11,cursor:"pointer",marginTop:6}}>Remove</button>}
-      </div>))}
-      <button onClick={()=>{const txt=prompt("Something beautiful:");if(txt){setBWords([...bWords,{t:txt,from:user==='shah'?'Shah':'Dane'}]);}}} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.25)",fontSize:13,cursor:"pointer"}}>+ add something beautiful</button>
-    </div>
-  </div>);}
-
-  if(sel==="growth"){
-  const toggle=(i)=>{const n=[...ms];n[i]={...n[i],done:!n[i].done};setMs(n);};
-  const addMilestone=()=>{if(newM.trim()){setMs([...ms,{t:newM.trim(),d:newD.trim()||"TBD",done:false}]);setNewM("");setNewD("");setAddingM(false);}};
-  const doneCount=ms.filter(m=>m.done).length;
-  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"#0A1224",WebkitOverflowScrolling:"touch"}}>
-    {back}
-    <div style={{padding:"0 24px 24px",textAlign:"center"}}>
-      <h1 style={{color:"#fff",fontSize:28,fontWeight:300,margin:"0 0 4px",letterSpacing:1}}>Looking Forward</h1>
-      <p style={{color:"rgba(255,255,255,0.25)",fontSize:12,margin:"0 0 16px"}}>Things we can't wait for</p>
-      <div style={{display:"inline-block",background:"rgba(212,168,75,0.08)",border:"1px solid rgba(212,168,75,0.15)",borderRadius:20,padding:"6px 18px"}}>
-        <span style={{color:"#D4A84B",fontSize:13,fontWeight:500}}>{doneCount} of {ms.length} done</span>
-      </div>
-    </div>
-    <div style={{padding:"0 24px 0 44px"}}>{ms.map((m,i)=>(<div key={i} onClick={()=>toggle(i)} style={{display:"flex",gap:16,paddingBottom:i<ms.length-1?28:0,position:"relative",minHeight:20,cursor:"pointer"}}>
-      {i<ms.length-1&&<div style={{position:"absolute",left:6,top:14,bottom:-14,width:1,background:m.done?"rgba(74,175,80,0.15)":"rgba(255,255,255,0.04)"}}/>}
-      <div style={{width:14,height:14,borderRadius:"50%",background:m.done?"#4CAF50":"transparent",border:m.done?"none":"1.5px solid rgba(255,255,255,0.15)",flexShrink:0,marginTop:2,transition:"all 0.2s"}}/>
-      <div>
-        <p style={{color:m.done?"#fff":"rgba(255,255,255,0.3)",fontSize:14,fontWeight:m.done?500:400,margin:"0 0 1px",transition:"color 0.2s"}}>{m.t}</p>
-        <p style={{color:m.done?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.12)",fontSize:11,margin:0}}>{m.d}</p>
-      </div>
-    </div>))}</div>
-    <div style={{padding:"20px 24px"}}>
-      {addingM?<div style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.06)"}}>
-        <input value={newM} onChange={e=>setNewM(e.target.value)} placeholder="Milestone name" style={{width:"100%",padding:"10px 0",background:"transparent",border:"none",borderBottom:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:8}}/>
-        <input value={newD} onChange={e=>setNewD(e.target.value)} placeholder="When? (e.g. Summer 2026)" style={{width:"100%",padding:"10px 0",background:"transparent",border:"none",borderBottom:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:12}}/>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={addMilestone} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:newM.trim()?"#4CAF50":"rgba(255,255,255,0.06)",color:newM.trim()?"#fff":"rgba(255,255,255,0.2)",fontSize:13,fontWeight:600,cursor:newM.trim()?"pointer":"default"}}>Add</button>
-          <button onClick={()=>setAddingM(false)} style={{padding:"10px 16px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Cancel</button>
-        </div>
-      </div>
-      :<button onClick={()=>setAddingM(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.25)",fontSize:13,cursor:"pointer"}}>+ add a milestone</button>}
-    </div>
-  </div>);}
 
   // Fallback
   if(sel)return(<div className="dc-fade-in" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:S.black}}><Sy mood="thinking" size={80} msg="Coming soon!"/></div>);
 
   // ── Browse grid ──
-  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(12px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:22,fontWeight:300,margin:"0 0 4px",letterSpacing:0.5}}>Browse</h1><p style={{color:S.muted,fontSize:12,margin:"0 0 16px",fontWeight:400}}>Everything in one place</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:100,borderRadius:10,padding:"14px",background:`linear-gradient(155deg,${c.c},${c.c}99)`,position:"relative",overflow:"hidden",cursor:"pointer"}}>
-    <div style={{position:"absolute",right:-6,bottom:-6,width:48,height:48,borderRadius:24,background:"rgba(255,255,255,0.05)"}}/>
-    <p style={{color:"#fff",fontSize:15,fontWeight:600,margin:0,lineHeight:1.2,whiteSpace:"pre-line",position:"relative",zIndex:1}}>{c.t}</p>
-    <p style={{color:"rgba(255,255,255,0.4)",fontSize:10,margin:"4px 0 0",position:"relative",zIndex:1}}>{c.sub}</p>
+  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Browse</h1><p style={{color:S.muted,fontSize:13,margin:"0 0 20px",fontWeight:400}}>Everything in one place</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:140,borderRadius:18,padding:"20px",background:`linear-gradient(155deg,${c.c},${c.c}88)`,position:"relative",overflow:"hidden",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+    <div style={{position:"absolute",right:-8,bottom:-8,width:56,height:56,borderRadius:28,background:"rgba(255,255,255,0.04)"}}/>
+    <p style={{color:"#fff",fontSize:15,fontWeight:700,margin:0,lineHeight:1.25,whiteSpace:"pre-line",position:"relative",zIndex:1,letterSpacing:-0.2}}>{c.t}</p>
+    <p style={{color:"rgba(255,255,255,0.35)",fontSize:10,margin:"4px 0 0",position:"relative",zIndex:1,fontWeight:500}}>{c.sub}</p>
   </div>))}</div></div></div>);
 }
 
@@ -1370,7 +1432,20 @@ function Learn(){
   const isUnlocked=(ls)=>{if(!ls.unlockAfter)return true;return completed.includes(ls.unlockAfter);};
   const langProgress=(key)=>{const l=LANGS[key];const total=l.lessons.length;const done2=l.lessons.filter(ls=>completed.includes(ls.id)).length;return Math.round((done2/total)*100);};
 
-  const answer=(idx)=>{if(sel!==null)return;setSel(idx);const c=idx===lesson.quiz[qIdx].ans;setOk(c);if(!c)setHearts(h=>Math.max(0,h-1));else setScore(s=>s+1);setTimeout(()=>{if(qIdx<lesson.quiz.length-1){setQIdx(qIdx+1);setSel(null);setOk(null);}else{setDone(true);setXp(x=>x+(lesson.xp||15));if(!completed.includes(lesson.id))setCompleted([...completed,lesson.id]);}},900);};
+  const answer=(idx)=>{if(sel!==null)return;setSel(idx);const c=idx===lesson.quiz[qIdx].ans;setOk(c);if(!c)setHearts(h=>Math.max(0,h-1));else setScore(s=>s+1);setTimeout(()=>{if(qIdx<lesson.quiz.length-1){setQIdx(qIdx+1);setSel(null);setOk(null);}else{
+    setDone(true);setXp(x=>x+(lesson.xp||15));
+    if(!completed.includes(lesson.id)){
+      setCompleted([...completed,lesson.id]);
+      // Send notification to partner about lesson completion
+      const langName=lang==='urdu'?'Urdu':lang==='tagalog'?'Tagalog':'Arabic';
+      const partnerUser=user==='shah'?'dane':'shah';
+      const displayName=user==='shah'?'Shah':'Dane';
+      const vibeMsg=displayName+" just completed a "+langName+" lesson: "+lesson.t+" 🎉";
+      if(supabase){
+        supabase.from('dc_vibes').insert({from_user:user,to_user:partnerUser,emoji:"📚",label:vibeMsg,read:false}).then(()=>{}).catch(()=>{});
+      }
+    }
+  }},900);};
   const reset=()=>{setLesson(null);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);setView(lang?"browse":"home");};
   const Ic=({d,c,sz=22})=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><path d={d}/></svg>);
   const lockD="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z";
@@ -1398,19 +1473,19 @@ function Learn(){
         <div style={{flex:1,height:8,background:W.border,borderRadius:4,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:lc,borderRadius:4,transition:"width 0.3s"}}/></div>
         <span style={{color:lc,fontSize:12,fontWeight:700}}>{step+1}/{lesson.content.length}</span>
       </div>
-      <div style={{flex:1,padding:"16px 24px",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-        {isFirst&&<div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Sy mood="happy" size={60} msg="Let's learn!"/></div>}
-        <div style={{background:`linear-gradient(135deg,${lc}10,${lc}05)`,borderRadius:16,padding:"20px",border:`1px solid ${lc}15`,flex:isFirst?undefined:1,display:"flex",flexDirection:"column",justifyContent:"center"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-            <div style={{width:40,height:40,borderRadius:10,background:lc+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:lc,fontSize:18,fontWeight:800}}>{step+1}</span></div>
-            <h2 style={{color:W.forest,fontSize:20,fontWeight:700,margin:0,flex:1,lineHeight:1.2}}>{ct.title}</h2>
+      <div style={{flex:1,padding:"20px 20px",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        {isFirst&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Sy mood="happy" size={60} msg="Let's learn!"/></div>}
+        <div style={{background:`linear-gradient(135deg,${lc}10,${lc}05)`,borderRadius:20,padding:"24px 22px",border:`1px solid ${lc}15`,flex:isFirst?undefined:1,display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+            <div style={{width:44,height:44,borderRadius:12,background:lc+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{color:lc,fontSize:18,fontWeight:800}}>{step+1}</span></div>
+            <h2 style={{color:W.forest,fontSize:19,fontWeight:700,margin:0,flex:1,lineHeight:1.25}}>{ct.title}</h2>
           </div>
-          <p style={{color:W.text,fontSize:15.5,lineHeight:1.75,margin:0}}>{ct.text}</p>
+          <p style={{color:W.text,fontSize:16,lineHeight:1.85,margin:0,letterSpacing:0.1}}>{ct.text}</p>
         </div>
       </div>
-      <div style={{padding:"12px 24px 32px"}}><button onClick={()=>setStep(step+1)} style={{width:"100%",padding:"16px",borderRadius:50,border:"none",background:`linear-gradient(135deg,${W.forest},${lc})`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${lc}30`}}>{step===lesson.content.length-1?"Start Quiz \u2192":"Continue"}</button></div>
+      <div style={{padding:"12px 24px 32px",paddingBottom:"max(32px, calc(env(safe-area-inset-bottom) + 16px))"}}><button onClick={()=>setStep(step+1)} style={{width:"100%",padding:"16px",borderRadius:50,border:"none",background:`linear-gradient(135deg,${W.forest},${lc})`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${lc}30`}}>{step===lesson.content.length-1?"Start Quiz \u2192":"Continue"}</button></div>
     </div>);}
-    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px"}}>
+    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px",paddingBottom:"max(20px, env(safe-area-inset-bottom))"}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.textMuted} strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         <div style={{flex:1,height:8,background:W.border,borderRadius:4,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:lc,borderRadius:4,transition:"width 0.3s"}}/></div>
@@ -1459,8 +1534,68 @@ function Learn(){
           </div>))}
         </div>
       </div>);})()}
-    {!isW&&!isAlpha&&!isNums&&l.lessons.map((ls,i)=>{const unlocked=isUnlocked(ls);const comp=completed.includes(ls.id);return(<button key={ls.id} onClick={unlocked&&!comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);}:comp?()=>{}:undefined} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px",background:W.card,borderRadius:14,marginBottom:8,border:"1px solid "+(comp?W.success+"40":W.border),cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.35,textAlign:"left",boxShadow:unlocked?"0 1px 4px rgba(0,0,0,0.04)":"none",position:"relative"}}><div style={{width:44,height:44,borderRadius:12,background:comp?W.success+"20":!unlocked?W.cardAlt:l.color+"15",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{comp?<Ic d={checkD} c={W.success} sz={20}/>:!unlocked?<Ic d={lockD} c={W.textMuted} sz={18}/>:<span style={{color:l.color,fontSize:16,fontWeight:800}}>{i+1}</span>}</div><div style={{flex:1}}><p style={{color:W.forest,fontSize:15,fontWeight:600,margin:0}}>{ls.title}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{comp?"Completed ✓":!unlocked?"Complete "+l.lessons[i-1]?.title+" first":ls.desc}</p></div>{comp&&<span style={{color:W.textMuted,fontSize:11}}>+{ls.xp} XP</span>}</button>);})}
-    {isW&&(()=>{const cats=WORD_CATS[lang]||["All"];const grouped={};l.words.forEach(w=>{const c=wordCat(lang,w);if(!grouped[c])grouped[c]=[];grouped[c].push(w);});
+    {!isW&&!isAlpha&&!isNums&&(()=>{
+      // Group lessons into units
+      const units={
+        urdu:[
+          {name:"Unit 1: Foundations",desc:"Learn the alphabet, numbers, and how Urdu works",range:[0,3]},
+          {name:"Unit 2: Everyday Talk",desc:"Phrases, emotions, and daily conversations",range:[4,8]},
+          {name:"Unit 3: Culture & Style",desc:"Slang, taboos, and social skills",range:[9,10]},
+          {name:"Unit 4: Grammar & Faith",desc:"Sentence structure and Islamic terms",range:[11,13]},
+        ],
+        tagalog:[
+          {name:"Unit 1: Foundations",desc:"Alphabet, numbers, and greetings",range:[0,2]},
+          {name:"Unit 2: Connecting",desc:"Phrases, love, family, and emotions",range:[3,7]},
+          {name:"Unit 3: Daily Life",desc:"Food, home, shopping, and getting around",range:[8,11]},
+          {name:"Unit 4: Going Deeper",desc:"Slang, taboos, grammar, and culture",range:[12,16]},
+        ],
+        arabic:[
+          {name:"Unit 1: The Script",desc:"Arabic alphabet, numbers, and basic phrases",range:[0,3]},
+          {name:"Unit 2: Islamic Knowledge",desc:"Quran, calendar, pillars, and prophets",range:[4,8]},
+          {name:"Unit 3: Language & Life",desc:"Grammar, expressions, etiquette, and bridges",range:[9,13]},
+        ],
+      };
+      const myUnits=units[lang]||[{name:"All Lessons",desc:"",range:[0,l.lessons.length-1]}];
+      return myUnits.map((unit,ui)=>{
+        const unitLessons=l.lessons.slice(unit.range[0],unit.range[1]+1);
+        const unitDone=unitLessons.filter(ls=>completed.includes(ls.id)).length;
+        const unitTotal=unitLessons.length;
+        return(<div key={ui} style={{marginBottom:24}}>
+          {/* Unit header */}
+          <div style={{marginBottom:12,padding:"16px",background:`linear-gradient(135deg,${l.color}08,${l.color}04)`,borderRadius:16,border:`1px solid ${l.color}12`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <p style={{color:l.color,fontSize:11,fontWeight:700,letterSpacing:1.2,margin:"0 0 4px",textTransform:"uppercase"}}>{unit.name}</p>
+                <p style={{color:W.textMuted,fontSize:12,margin:0}}>{unit.desc}</p>
+              </div>
+              <div style={{background:unitDone===unitTotal&&unitTotal>0?W.success+"20":W.cardAlt,borderRadius:10,padding:"6px 10px",textAlign:"center"}}>
+                <p style={{color:unitDone===unitTotal&&unitTotal>0?W.success:W.textMuted,fontSize:13,fontWeight:700,margin:0}}>{unitDone}/{unitTotal}</p>
+              </div>
+            </div>
+          </div>
+          {/* Lessons in this unit */}
+          {unitLessons.map((ls,i)=>{
+            const globalIdx=unit.range[0]+i;
+            const unlocked=isUnlocked(ls);
+            const comp=completed.includes(ls.id);
+            return(<button key={ls.id} onClick={unlocked&&!comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);}:comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);}:undefined} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:W.card,borderRadius:16,marginBottom:10,border:comp?"1.5px solid "+W.success+"40":"1px solid "+W.border,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.3,textAlign:"left",boxShadow:unlocked?"0 2px 8px rgba(0,0,0,0.04)":"none",transition:"all 0.15s"}}>
+              <div style={{width:48,height:48,borderRadius:14,background:comp?W.success+"15":!unlocked?W.cardAlt:l.color+"12",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {comp?<Ic d={checkD} c={W.success} sz={22}/>:!unlocked?<Ic d={lockD} c={W.textMuted} sz={18}/>:<span style={{color:l.color,fontSize:17,fontWeight:800}}>{globalIdx+1}</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{color:W.forest,fontSize:15,fontWeight:600,margin:"0 0 3px"}}>{ls.title}</p>
+                <p style={{color:W.textMuted,fontSize:12,margin:0,lineHeight:1.3}}>{comp?"Completed ✓ — Tap to review":!unlocked?"Complete previous lesson first":ls.desc}</p>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
+                {comp?<span style={{color:W.success,fontSize:11,fontWeight:600}}>+{ls.xp} XP</span>
+                :unlocked?<span style={{color:l.color,fontSize:11,fontWeight:600}}>{ls.content.length} cards</span>
+                :null}
+              </div>
+            </button>);
+          })}
+        </div>);
+      });
+    })()}    {isW&&(()=>{const cats=WORD_CATS[lang]||["All"];const grouped={};l.words.forEach(w=>{const c=wordCat(lang,w);if(!grouped[c])grouped[c]=[];grouped[c].push(w);});
       const activeCat=wCat&&cats.includes(wCat)?wCat:cats[0];
       const ws=grouped[activeCat]||[];
       return(<>
@@ -1474,11 +1609,33 @@ function Learn(){
             <p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{w.m}</p>
           </div>
           <div style={{display:"flex",gap:4}}>
-            <button title="Shah records" style={{width:30,height:30,borderRadius:"50%",background:WL.forest+"12",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,border:"none"}}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill={WL.forest}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-            </button>
-            <button title="Dane records" style={{width:30,height:30,borderRadius:"50%",background:"#E8115B10",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,border:"none"}}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#E8115B"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            {/* Record button — records audio and saves to localStorage */}
+            <button onClick={async()=>{
+              const key='rec_'+lang+'_'+w.w.replace(/[^a-zA-Z]/g,'');
+              const existing=local.get(key,null);
+              if(existing){
+                // Play existing recording
+                try{const a=new Audio(existing);a.play();}catch(e){}
+                return;
+              }
+              try{
+                const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+                const mr=new MediaRecorder(stream);const chunks=[];
+                mr.ondataavailable=e=>chunks.push(e.data);
+                mr.onstop=()=>{
+                  stream.getTracks().forEach(t=>t.stop());
+                  const blob=new Blob(chunks,{type:'audio/webm'});
+                  const reader=new FileReader();
+                  reader.onload=()=>{local.set(key,reader.result);};
+                  reader.readAsDataURL(blob);
+                };
+                mr.start();
+                setTimeout(()=>mr.stop(),3000); // Record 3 seconds
+              }catch(e){console.log('Mic error:',e);}
+            }} title={local.get('rec_'+lang+'_'+w.w.replace(/[^a-zA-Z]/g,''),null)?"Tap to play":"Tap to record (3s)"} style={{width:30,height:30,borderRadius:"50%",background:local.get('rec_'+lang+'_'+w.w.replace(/[^a-zA-Z]/g,''),null)?W.success+"20":user==='shah'?WL.forest+"12":"#E8115B10",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,border:"none"}}>
+              {local.get('rec_'+lang+'_'+w.w.replace(/[^a-zA-Z]/g,''),null)?
+                <svg width="11" height="11" viewBox="0 0 24 24" fill={W.success}><path d="M8 5v14l11-7z"/></svg>
+              :<svg width="11" height="11" viewBox="0 0 24 24" fill={user==='shah'?WL.forest:"#E8115B"}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>}
             </button>
             <button title="Play" style={{width:30,height:30,borderRadius:"50%",background:W.cardAlt,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,border:"none"}}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill={W.textMuted}><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
@@ -1487,41 +1644,74 @@ function Learn(){
         </div>))}
       </>);})()}</div></div>);}
 
-  // Learn home
-  const syMsgs=["Meow! Ready to learn?","Sy believes in you!","Let's get those XP!","Purrfect day to study!","You're doing amazing!"];
+  // Learn home — Sy messages
+  const syMsgs=["Ready to learn?","Sy believes in you!","Let's get those XP!","Purrfect day to study!","You're doing amazing!"];
   const syMsg=syMsgs[Math.floor(Date.now()/86400000)%syMsgs.length];
+  // Leaderboard — both users' progress
+  const partnerUser=user==='shah'?'dane':'shah';
+  const myXp=xp;const partnerXp=local.get(partnerUser+'_xp',0);
+  const myLessons=completed.length;const partnerLessons=local.get(partnerUser+'_completed',[]).length;
+  const myName=user==='shah'?'Shah':'Dane';const partnerName=user==='shah'?'Dane':'Shah';
+  const iWin=myXp>=partnerXp;
+
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:W.bg,WebkitOverflowScrolling:"touch"}}>
-    <div style={{background:dark?WD.cardAlt:`linear-gradient(145deg,${WL.forest},#0A5C40)`,padding:"12px 16px 24px",borderRadius:"0 0 28px 28px",boxShadow:"0 4px 20px rgba(0,0,0,0.1)"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-        <h1 style={{color:dark?"#E8E8E8":WL.cream,fontSize:22,fontWeight:800,margin:0,letterSpacing:-0.5}}>Learn</h1>
-        <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.12)",borderRadius:20,padding:"4px 12px"}}>
-          <span style={{fontSize:14}}>🔥</span>
-          <span style={{color:"#FF9500",fontSize:15,fontWeight:800}}>{streak}</span>
+    <div style={{background:dark?WD.cardAlt:`linear-gradient(155deg,${WL.forest},#0A5C40)`,padding:"max(14px,env(safe-area-inset-top)) 20px 28px",borderRadius:"0 0 28px 28px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <h1 style={{color:dark?"#E5E5E5":"#F2EDE4",fontSize:24,fontWeight:800,margin:0,letterSpacing:-0.5}}>Learn</h1>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          {xp>0&&<div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.1)",borderRadius:20,padding:"5px 12px"}}><span style={{color:"#1DB954",fontSize:13,fontWeight:800}}>{xp}</span><span style={{color:"rgba(255,255,255,0.5)",fontSize:11}}>XP</span></div>}
+          <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.1)",borderRadius:20,padding:"5px 12px"}}><span style={{fontSize:12}}>🔥</span><span style={{color:"#FF9500",fontSize:13,fontWeight:800}}>{streak}</span></div>
         </div>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:14}}>
-        <Sy mood="happy" size={64}/>
-        <div style={{flex:1,background:"rgba(255,255,255,0.1)",borderRadius:14,padding:"12px 14px"}}>
-          <p style={{color:"rgba(255,255,255,0.95)",fontSize:14,fontWeight:600,margin:0,lineHeight:1.4}}>{syMsg}</p>
+      {/* Sy mascot */}
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+        <Sy mood={xp>100?"proud":xp>30?"happy":"thinking"} size={52}/>
+        <div style={{flex:1,background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"10px 14px"}}>
+          <p style={{color:"rgba(255,255,255,0.9)",fontSize:13,fontWeight:600,margin:0,lineHeight:1.4}}>{syMsg}</p>
         </div>
       </div>
-      <div style={{display:"flex",gap:8,marginTop:14}}>{[{v:xp,lb:"Total XP",c:"#4CAF50",ic:"⭐"},{v:hearts,lb:"Hearts",c:"#E74C3C",ic:"❤️"},{v:Object.keys(LANGS).reduce((a,k)=>a+LANGS[k].lessons.filter(l2=>completed.includes(l2.id)).length,0),lb:"Lessons",c:"#FF9500",ic:"📚"}].map((s,i)=>(<div key={i} style={{flex:1,background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
-        <p style={{fontSize:12,margin:"0 0 2px"}}>{s.ic}</p>
-        <p style={{color:"#fff",fontSize:20,fontWeight:800,margin:0}}>{s.v}</p>
-        <p style={{color:"rgba(255,255,255,0.5)",fontSize:10,margin:"2px 0 0"}}>{s.lb}</p>
-      </div>))}</div>
+      <p style={{color:"rgba(255,255,255,0.45)",fontSize:12,margin:"0 0 4px",fontWeight:500}}>{completed.length} of 45 lessons completed</p>
+      <div style={{height:4,background:"rgba(255,255,255,0.1)",borderRadius:2,overflow:"hidden",marginTop:6}}><div style={{width:Math.round((completed.length/45)*100)+"%",height:"100%",background:"rgba(255,255,255,0.4)",borderRadius:2,transition:"width 0.5s"}}/></div>
     </div>
-    <div style={{padding:"16px"}}>
-    {/* Motivation */}
-    <div style={{background:"linear-gradient(135deg,"+S.green+"15,"+S.gold+"10)",borderRadius:14,padding:"16px",marginBottom:16,border:"1px solid "+S.green+"15"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Sy mood={xp>50?"proud":"happy"} size={36}/><div><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:"0 0 2px"}}>{xp>100?"You're on fire!":xp>50?"Great progress!":"Let's get started!"}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>{completed.length} of 45 lessons completed</p></div></div></div>
-    {/* Progress summary */}
-    <div style={{background:W.card,borderRadius:14,padding:"14px",marginBottom:16,border:"1px solid "+W.border}}><p style={{color:W.forest,fontSize:15,fontWeight:700,margin:"0 0 10px"}}>Your Progress</p><div style={{display:"flex",gap:16}}>{[{v:xp,l:"XP",c:S.green},{v:completed.length,l:"Lessons Done",c:S.gold},{v:hearts,l:"Hearts",c:S.rose}].map((s,i)=>(<div key={i} style={{flex:1,textAlign:"center"}}><p style={{color:s.c,fontSize:22,fontWeight:700,margin:"0 0 2px"}}>{s.v}</p><p style={{color:W.textMuted,fontSize:11,margin:0}}>{s.l}</p></div>))}</div></div>
-    {/* Language cards with progress */}
-    {Object.entries(LANGS).map(([key,l])=>{const prog=langProgress(key);const r=20,circ=2*Math.PI*r,offset=circ-(prog/100)*circ;return(<button key={key} onClick={()=>{setLang(key);setView("browse");}} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:W.card,borderRadius:16,marginBottom:10,border:"1px solid "+W.border,cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(0,0,0,0.04)",transition:"transform 0.15s"}}><div style={{width:52,height:52,position:"relative",flexShrink:0}}><svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r={r} fill="none" stroke={W.border} strokeWidth="3"/><circle cx="26" cy="26" r={r} fill="none" stroke={l.color} strokeWidth="3" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" transform="rotate(-90 26 26)" style={{transition:"stroke-dashoffset 0.5s"}}/></svg><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:l.color,fontSize:20,fontWeight:800}}>{l.char}</span></div></div><div style={{flex:1}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><p style={{color:W.forest,fontSize:16,fontWeight:700,margin:0}}>{l.label}</p><span style={{color:l.color,fontSize:13,fontWeight:700}}>{prog}%</span></div><p style={{color:W.textMuted,fontSize:13,margin:"2px 0 0"}}>{l.sub} · {l.lessons.length} lessons</p></div><svg width="16" height="16" viewBox="0 0 24 24" fill={W.textMuted}><path d="M9 18l6-6-6-6"/></svg></button>);})}
+
+    <div style={{padding:"20px 16px"}}>
+
+    {/* Leaderboard */}
+    <div style={{background:W.card,borderRadius:18,padding:"16px",marginBottom:16,border:"1px solid "+W.border}}>
+      <p style={{color:W.forest,fontSize:13,fontWeight:700,margin:"0 0 12px",letterSpacing:-0.2}}>Leaderboard</p>
+      {[{name:iWin?myName:partnerName,xp:iWin?myXp:partnerXp,lessons:iWin?myLessons:partnerLessons,color:iWin?(user==='shah'?S.green:S.rose):(user==='shah'?S.rose:S.green),rank:1},
+        {name:iWin?partnerName:myName,xp:iWin?partnerXp:myXp,lessons:iWin?partnerLessons:myLessons,color:iWin?(user==='shah'?S.rose:S.green):(user==='shah'?S.green:S.rose),rank:2}
+      ].map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderTop:i>0?"1px solid "+W.border:"none"}}>
+        <div style={{width:28,height:28,borderRadius:"50%",background:i===0?S.gold+"20":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <span style={{color:i===0?S.gold:W.textMuted,fontSize:13,fontWeight:800}}>{p.rank}</span>
+        </div>
+        <div style={{width:32,height:32,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <span style={{color:"#fff",fontSize:12,fontWeight:800}}>{p.name[0]}</span>
+        </div>
+        <div style={{flex:1}}>
+          <p style={{color:W.forest,fontSize:14,fontWeight:600,margin:0}}>{p.name}</p>
+          <p style={{color:W.textMuted,fontSize:11,margin:0}}>{p.lessons} lessons</p>
+        </div>
+        <span style={{color:S.green,fontSize:16,fontWeight:800}}>{p.xp} <span style={{fontSize:11,fontWeight:500,color:W.textMuted}}>XP</span></span>
+      </div>))}
+    </div>
+
+    {Object.entries(LANGS).map(([key,l])=>{const prog=langProgress(key);const doneLessons=l.lessons.filter(ls=>completed.includes(ls.id)).length;return(<button key={key} onClick={()=>{setLang(key);setView("browse");}} style={{width:"100%",display:"flex",alignItems:"center",gap:16,padding:"20px",background:W.card,borderRadius:20,marginBottom:12,border:"1px solid "+W.border,cursor:"pointer",textAlign:"left",transition:"all 0.15s"}}>
+      <div style={{width:56,height:56,borderRadius:16,background:`linear-gradient(135deg,${l.color}15,${l.color}08)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:`1px solid ${l.color}20`}}><span style={{color:l.color,fontSize:24,fontWeight:800}}>{l.char}</span></div>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{color:W.forest,fontSize:17,fontWeight:700,margin:"0 0 3px",letterSpacing:-0.3}}>{l.label}</p>
+        <p style={{color:W.textMuted,fontSize:12,margin:"0 0 8px"}}>{l.sub}</p>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{flex:1,height:3,background:W.border,borderRadius:2,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:l.color,borderRadius:2,transition:"width 0.5s"}}/></div>
+          <span style={{color:W.textMuted,fontSize:11,fontWeight:600,flexShrink:0}}>{doneLessons}/{l.lessons.length}</span>
+        </div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted} style={{flexShrink:0}}><path d="M9 18l6-6-6-6"/></svg>
+    </button>);})}
+
+    {(xp>0||completed.length>0)&&<button onClick={()=>{setXp(0);setCompleted([]);setHearts(5);local.set(user+'_xp',0);local.set(user+'_completed',[]);local.set(user+'_hearts',5);}} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:12,border:"1px solid "+W.error+"15",background:"transparent",color:W.error,fontSize:12,cursor:"pointer",fontWeight:500}}>Reset all progress</button>}
   </div></div>);
 }
-
-// Logout button for Settings
 
 // Logout button for Settings
 function LogoutBtn(){
@@ -1553,6 +1743,8 @@ function Us({onDark,isDark}){
   const [buildName,setBuildName]=useState("");
   const [buildCardio,setBuildCardio]=useState(null);
   const [exCat,setExCat]=useState("Push");
+  const [selExercise,setSelExercise]=useState("");
+  const [buildSets,setBuildSets]=useState("3");const [buildReps,setBuildReps]=useState("8");
   const [selDay,setSelDay]=useState(null); // selected calendar day
   const EXERCISES={
     "Push":["Bench Press","Incline Bench Press","Dumbbell Press","Dumbbell Flyes","Overhead Press","Lateral Raises","Tricep Pushdown","Tricep Dips","Cable Crossover","Push Ups","Close Grip Bench","Skull Crushers"],
@@ -1620,7 +1812,7 @@ function Us({onDark,isDark}){
         <button onClick={()=>setTab("settings")} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.12)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><svg width="16" height="16" viewBox="0 0 24 24" fill={dark?"#E8E8E8":WL.cream}><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg></button>
       </div>
       {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginTop:14}}>{[{k:"cal",l:"Calendar"},{k:"upcoming",l:"Upcoming"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E8E8E8":WL.cream,fontSize:13,fontWeight:tab===t.k?700:500,cursor:"pointer"}}>{t.l}</button>))}</div>
+      <div style={{display:"flex",gap:6,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>{[{k:"cal",l:"Calendar"},{k:"ourwords",l:"Our Words"},{k:"milestones",l:"Milestones"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 16px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E5E5E5":WL.cream,fontSize:12,fontWeight:tab===t.k?700:500,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>))}</div>
     </div>
 
     <div style={{flex:1,overflowY:"auto",paddingBottom:92,WebkitOverflowScrolling:"touch"}}>
@@ -1635,27 +1827,61 @@ function Us({onDark,isDark}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:16}}>{calDays.map((day,i)=>{const ev=hasEvent(day);const tod=isToday(day);return(<div key={"d"+i} style={{textAlign:"center",padding:"8px 0",borderRadius:10,background:tod?W.forest+"20":ev?ev.c+"15":"transparent",cursor:day?"pointer":"default"}}><span style={{color:day?(tod?W.forest:ev?ev.c:W.text):"transparent",fontSize:14,fontWeight:tod||ev?700:500}}>{day||""}</span>{ev&&<div style={{width:4,height:4,borderRadius:2,background:ev.c,margin:"2px auto 0"}}/>}{tod&&!ev&&<div style={{width:4,height:4,borderRadius:2,background:W.forest,margin:"2px auto 0"}}/>}</div>);})}</div>
         <button onClick={()=>setAddEvt(true)} style={{width:"100%",padding:"13px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44}}>+ Add Event</button>
         {upcomingEvents.length>0&&<div style={{marginTop:16}}>
-          <p style={{color:W.forest,fontSize:14,fontWeight:700,margin:"0 0 8px"}}>Coming up</p>
-          {upcomingEvents.slice(0,5).map(ev=>(<div key={ev.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1px solid "+W.border}}>
-            <div style={{width:4,height:36,borderRadius:2,background:ev.c||W.forest,flexShrink:0}}/>
-            <div style={{flex:1}}><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:0}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{ev.d}{ev.tm?" · "+ev.tm:""}</p></div>
-            <button onClick={()=>setEvents(events.filter(e=>e.id!==ev.id))} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:36,minHeight:36}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-          </div>))}
+          <p style={{color:W.forest,fontSize:15,fontWeight:700,margin:"0 0 10px"}}>Upcoming</p>
+          {upcomingEvents.slice(0,8).map(ev=>{
+            const d=new Date(ev.d+"T12:00:00");const diff=Math.ceil((d-today)/(1000*60*60*24));
+            return(<div key={ev.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid "+W.border}}>
+              <div style={{width:4,height:40,borderRadius:2,background:ev.c||W.forest,flexShrink:0}}/>
+              <div style={{flex:1}}><p style={{color:W.forest,fontSize:14,fontWeight:600,margin:"0 0 2px"}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>{ev.d}{ev.tm?" · "+ev.tm:""}</p></div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{background:(ev.c||W.forest)+"12",borderRadius:8,padding:"4px 8px"}}><span style={{color:ev.c||W.forest,fontSize:11,fontWeight:700}}>{diff===0?"Today":diff===1?"Tmrw":diff+"d"}</span></div>
+                <button onClick={()=>setEvents(events.filter(e=>e.id!==ev.id))} style={{background:"none",border:"none",cursor:"pointer",padding:4,minWidth:32,minHeight:32}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+              </div>
+            </div>);
+          })}
         </div>}
       </div>}
 
-      {/* UPCOMING TAB */}
-      {tab==="upcoming"&&<div style={{padding:"16px"}}>
-        {upcomingEvents.length===0?<div style={{textAlign:"center",padding:"40px 0"}}><p style={{color:W.textMuted,fontSize:14}}>No upcoming events</p><button onClick={()=>{setTab("cal");setTimeout(()=>setAddEvt(true),100);}} style={{padding:"10px 24px",borderRadius:20,border:"1px solid "+W.border,background:"transparent",color:W.forest,fontSize:13,fontWeight:600,cursor:"pointer",marginTop:8}}>Add one</button></div>
-        :upcomingEvents.map((ev,i)=>{
-          const d=new Date(ev.d+"T12:00:00");const diff=Math.ceil((d-today)/(1000*60*60*24));
-          return(<div key={ev.id} style={{background:W.card,borderRadius:14,padding:16,marginBottom:10,borderLeft:"4px solid "+(ev.c||W.forest)}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div><p style={{color:W.forest,fontSize:16,fontWeight:600,margin:"0 0 2px"}}>{ev.t}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>{ev.d}{ev.tm?" at "+ev.tm:""}</p></div>
-              <div style={{background:(ev.c||W.forest)+"15",borderRadius:10,padding:"6px 12px"}}><p style={{color:ev.c||W.forest,fontSize:13,fontWeight:700,margin:0}}>{diff===0?"Today":diff===1?"Tomorrow":diff+" days"}</p></div>
+      {/* OUR WORDS TAB */}
+      {tab==="ourwords"&&<div style={{padding:"16px"}}>
+        <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Our Words</p>
+        <p style={{color:W.textMuted,fontSize:12,margin:"0 0 16px"}}>Beautiful things we say to each other</p>
+        {(()=>{
+          const bWords=local.get('browse_bwords',[]);
+          const setBWords=(v)=>{local.set('browse_bwords',v);};
+          return(<>
+            {bWords.map((b,i)=>(<div key={i} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border,position:"relative"}}>
+              <p style={{color:W.text,fontSize:14,fontWeight:500,margin:"0 0 4px",lineHeight:1.5}}>&ldquo;{b.t}&rdquo;</p>
+              <p style={{color:W.textMuted,fontSize:11,margin:0}}>— {b.from}</p>
+            </div>))}
+            {bWords.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:W.textMuted,fontSize:13}}>Nothing yet — add something beautiful</p></div>}
+          </>);
+        })()}
+      </div>}
+
+      {/* MILESTONES TAB */}
+      {tab==="milestones"&&<div style={{padding:"16px"}}>
+        <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Looking Forward</p>
+        <p style={{color:W.textMuted,fontSize:12,margin:"0 0 16px"}}>Things we can't wait for</p>
+        {(()=>{
+          const ms=local.get('browse_milestones',[{t:"First Eid together",d:"March 2026",done:false},{t:"Meet each other's families",d:"2026",done:false},{t:"Cook Nihari together",d:"Ramadan 2026",done:false},{t:"Visit a masjid together",d:"2026",done:false},{t:"Learn 100 words in each language",d:"2026",done:false}]);
+          const setMs=(v)=>{local.set('browse_milestones',v);};
+          const doneCount=ms.filter(m=>m.done).length;
+          return(<>
+            <div style={{display:"inline-block",background:W.success+"12",borderRadius:12,padding:"4px 14px",marginBottom:12}}>
+              <span style={{color:W.success,fontSize:12,fontWeight:600}}>{doneCount} of {ms.length} done</span>
             </div>
-          </div>);
-        })}
+            {ms.map((m,i)=>(<div key={i} onClick={()=>{const n=[...ms];n[i]={...n[i],done:!n[i].done};setMs(n);}} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<ms.length-1?"1px solid "+W.border:"none",cursor:"pointer"}}>
+              <div style={{width:20,height:20,borderRadius:"50%",background:m.done?W.success:"transparent",border:m.done?"none":"2px solid "+W.border,flexShrink:0,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {m.done&&<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
+              </div>
+              <div>
+                <p style={{color:m.done?W.forest:W.textMuted,fontSize:14,fontWeight:m.done?600:400,margin:"0 0 2px",textDecoration:m.done?"line-through":"none"}}>{m.t}</p>
+                <p style={{color:W.textMuted,fontSize:11,margin:0}}>{m.d}</p>
+              </div>
+            </div>))}
+          </>);
+        })()}
       </div>}
 
       {/* NOTES TAB */}
@@ -1861,7 +2087,18 @@ function Us({onDark,isDark}){
               {Object.keys(EXERCISES).map(cat=>(<button key={cat} onClick={()=>setExCat(cat)} style={{padding:"6px 12px",borderRadius:8,border:"none",background:exCat===cat?W.forest:"transparent",color:exCat===cat?(dark?"#000":WL.cream):W.textMuted,fontSize:11,fontWeight:600,cursor:"pointer"}}>{cat}</button>))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-              {EXERCISES[exCat].map(ex=>(<button key={ex} onClick={()=>{const s=parseInt(prompt("How many sets?","3"))||3;const r=parseInt(prompt("How many reps?","8"))||8;setBuildExercises([...buildExercises,{name:ex,sets:s,reps:r}]);}} style={{padding:"10px 8px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.text,fontSize:12,fontWeight:500,cursor:"pointer",textAlign:"left"}}>{ex}</button>))}
+              {EXERCISES[exCat].map(ex=>{
+                const isSel=selExercise===ex;
+                return(<div key={ex}>
+                  <button onClick={()=>setSelExercise(isSel?"":ex)} style={{width:"100%",padding:"10px 8px",borderRadius:10,border:isSel?"2px solid "+W.forest:"1px solid "+W.border,background:isSel?W.forest+"12":"transparent",color:isSel?W.forest:W.text,fontSize:12,fontWeight:isSel?700:500,cursor:"pointer",textAlign:"left"}}>{ex}</button>
+                  {isSel&&<div style={{display:"flex",gap:4,padding:"6px 0"}}>
+                    <input value={buildSets} onChange={e=>setBuildSets(e.target.value)} type="number" placeholder="3" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontWeight:700,textAlign:"center",fontFamily:"inherit"}}/>
+                    <span style={{color:W.textMuted,fontSize:11,alignSelf:"center"}}>×</span>
+                    <input value={buildReps} onChange={e=>setBuildReps(e.target.value)} type="number" placeholder="8" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontWeight:700,textAlign:"center",fontFamily:"inherit"}}/>
+                    <button onClick={()=>{setBuildExercises([...buildExercises,{name:ex,sets:parseInt(buildSets)||3,reps:parseInt(buildReps)||8}]);setSelExercise("");setBuildSets("3");setBuildReps("8");}} style={{padding:"8px 12px",borderRadius:6,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:11,fontWeight:700,cursor:"pointer"}}>Add</button>
+                  </div>}
+                </div>);
+              })}
             </div>
           </div>
 
@@ -1895,6 +2132,7 @@ function Series({go}){
   ]));
   const [addEp,setAddEp]=useState(false);const [newEp,setNewEp]=useState({t:"",desc:""});
   const [comments,setComments]=useState(()=>local.get('tea_comments',{}));
+  const [reflectId,setReflectId]=useState(null);const [reflectText,setReflectText]=useState("");
   const [editId,setEditId]=useState(null);
   const [playingId,setPlayingId]=useState(null);
   const audioRef=useRef(null);
@@ -1956,13 +2194,21 @@ function Series({go}){
     </div>
     <button onClick={()=>{
       if(newEp.t.trim()){
-        const ep={id:Date.now(),t:newEp.t.trim(),desc:newEp.desc.trim(),s:"locked",v:"main"};
+        const ep={id:Date.now(),t:newEp.t.trim(),desc:newEp.desc.trim(),s:"available",v:"main"};
         if(newEp.file){
           const url=URL.createObjectURL(newEp.file);
           const mt=newEp.file.type.startsWith("video")?"video":"audio";
           ep.mediaUrl=url;ep.mediaType=mt;ep.fileName=newEp.file.name;
+          // Detect duration
+          const el=document.createElement(mt==="video"?"video":"audio");
+          el.src=url;el.onloadedmetadata=()=>{
+            const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);
+            ep.duration=m+":"+String(s).padStart(2,"0");
+            setEps([...eps,ep]);setNewEp({t:"",desc:"",file:null});setAddEp(false);
+          };
+          return; // wait for metadata
         }
-        setEps([...eps,ep]);setNewEp({t:"",desc:""});setAddEp(false);
+        setEps([...eps,ep]);setNewEp({t:"",desc:"",file:null});setAddEp(false);
       }
     }} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:newEp.t.trim()?"#E13300":"rgba(255,255,255,0.06)",color:newEp.t.trim()?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:newEp.t.trim()?"pointer":"not-allowed",minHeight:44}}>Add Episode</button>
   </div>);
@@ -2007,7 +2253,7 @@ function Series({go}){
       </div>}
       {/* Dane's comment */}
       {comments[ep.id]&&<div style={{marginLeft:54,padding:"8px 12px",background:"rgba(232,17,91,0.06)",borderRadius:10,marginBottom:6}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {comments[ep.id]}</p></div>}
-      {!isShah&&ep.s!=="locked"&&<button onClick={()=>{const c=prompt("Your thoughts on this episode:");if(c)setComments({...comments,[ep.id]:c});}} style={{marginLeft:54,padding:"6px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>Reflect</button>}
+      {!isShah&&ep.s!=="locked"&&(reflectId===ep.id?<div style={{display:"flex",gap:4,marginLeft:54,marginBottom:6}}><input value={reflectText} onChange={e=>setReflectText(e.target.value)} autoFocus placeholder="Your thoughts..." style={{flex:1,padding:"8px 12px",borderRadius:10,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(232,17,91,0.12)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/><button onClick={()=>{if(reflectText.trim()){setComments({...comments,[ep.id]:reflectText.trim()});setReflectId(null);setReflectText("");}}} style={{padding:"8px 12px",borderRadius:10,border:"none",background:"#E8115B",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Save</button></div>:<button onClick={()=>{setReflectId(ep.id);setReflectText(comments[ep.id]||"");}} style={{marginLeft:54,padding:"6px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>{comments[ep.id]?"Edit reflection":"Reflect"}</button>)}
     </div>))}
     {/* Shah: add episode */}
     {isShah&&<div style={{marginTop:16}}>
@@ -2022,8 +2268,8 @@ function Series({go}){
 
 export default function App(){
   const[user,setUser]=useState(()=>local.get('user',null));
-  const[s,setS]=useState(()=>local.get('lastScreen','home'));
-  const[tab,setTab]=useState(()=>local.get('lastTab','home'));
+  const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","series","np","hw"].includes(saved)?saved:'home';});
+  const[tab,setTab]=useState(()=>{const saved=local.get('lastTab','home');return["home","browse","learn","us"].includes(saved)?saved:'home';});
   const[dark,setDark]=useState(()=>local.get('dark',false));
   const[notifStatus,setNotifStatus]=useState(()=>notif.supported?Notification.permission:'unsupported');
   const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us"].includes(t)){setTab(t);local.set('lastTab',t);}};
@@ -2031,13 +2277,7 @@ export default function App(){
   const logout=()=>{setUser(null);local.set('user',null);setS('home');setTab('home');};
   const nav=["home","browse","learn","us","series"].includes(s);
 
-  // Request notification permission on first load
-  useEffect(()=>{
-    if(user&&notif.supported&&Notification.permission==='default'){
-      const t=setTimeout(()=>notif.requestPermission().then(ok=>setNotifStatus(ok?'granted':'denied')),2000);
-      return()=>clearTimeout(t);
-    }
-  },[user]);
+  // Don't auto-prompt for notifications — let user enable in settings
 
   // Ramadan notifications — check on load + every 5 minutes
   useEffect(()=>{
