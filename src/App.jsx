@@ -1285,7 +1285,65 @@ function Home({go}){
     setWotdRecs(p=>({...p,[langKey]:null}));
     sync.deleteRec(todayIdx,langKey,user);
   };
+  const [wotdPlayer,setWotdPlayer]=useState(null);
   const hasPartnerWord=(langKey)=>!!partnerRecs[langKey];
+
+  // WOTD Player overlay
+  const wotdPlayerRef=React.useRef(null);
+  const [wpPlaying,setWpPlaying]=useState(false);
+  const [wpProgress,setWpProgress]=useState(0);
+  const [wpDuration,setWpDuration]=useState(0);
+  const openWotdPlayer=(src,title,sub,color)=>{
+    stopEverything();
+    setWotdPlayer({src,title,sub,color});setWpPlaying(false);setWpProgress(0);setWpDuration(0);
+  };
+  const closeWotdPlayer=()=>{
+    if(wotdPlayerRef.current){try{wotdPlayerRef.current.pause();}catch(e){}}
+    wotdPlayerRef.current=null;setWotdPlayer(null);setWpPlaying(false);
+  };
+
+  if(wotdPlayer)return(<div style={{position:"fixed",inset:0,zIndex:100,background:`linear-gradient(180deg,${wotdPlayer.color} 0%,#0D0D0D 50%)`,display:"flex",flexDirection:"column"}}>
+    <div style={{display:"flex",justifyContent:"space-between",padding:"max(12px,env(safe-area-inset-top)) 20px 8px"}}>
+      <button onClick={closeWotdPlayer} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0,alignSelf:"center"}}>WORDS OF THE DAY</p>
+      <div style={{width:38}}/>
+    </div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}>
+      <div style={{width:"75%",maxWidth:260,aspectRatio:"1",borderRadius:24,background:`linear-gradient(135deg,${wotdPlayer.color},${wotdPlayer.color}60)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+      </div>
+    </div>
+    <div style={{padding:"0 24px 40px"}}>
+      <h2 style={{color:"#fff",fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>{wotdPlayer.title}</h2>
+      <p style={{color:"rgba(255,255,255,0.4)",fontSize:14,margin:"0 0 20px"}}>{wotdPlayer.sub}</p>
+      <div style={{marginBottom:12}}>
+        <div style={{height:4,background:"rgba(255,255,255,0.1)",borderRadius:2,cursor:"pointer"}} onClick={e=>{if(wotdPlayerRef.current&&wpDuration){const rect=e.currentTarget.getBoundingClientRect();wotdPlayerRef.current.currentTime=((e.clientX-rect.left)/rect.width)*wpDuration;}}}>
+          <div style={{width:(wpDuration?Math.min((wpProgress/wpDuration)*100,100):0)+"%",height:"100%",background:"#fff",borderRadius:2,transition:"width 0.1s"}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+          <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>{Math.floor(wpProgress/60)+":"+String(Math.floor(wpProgress%60)).padStart(2,"0")}</span>
+          <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>{wpDuration?Math.floor(wpDuration/60)+":"+String(Math.floor(wpDuration%60)).padStart(2,"0"):"0:04"}</span>
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}>
+        <button onClick={()=>{if(wotdPlayerRef.current)wotdPlayerRef.current.currentTime=0;}} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+        <button onClick={()=>{
+          if(!wotdPlayerRef.current){
+            const a=new Audio(wotdPlayer.src);
+            a.ontimeupdate=()=>{setWpProgress(a.currentTime);setWpDuration(a.duration||0);};
+            a.onended=()=>setWpPlaying(false);
+            wotdPlayerRef.current=a;
+          }
+          if(wpPlaying){wotdPlayerRef.current.pause();setWpPlaying(false);}
+          else{wotdPlayerRef.current.play().catch(()=>{});setWpPlaying(true);}
+        }} style={{width:64,height:64,borderRadius:32,border:"none",cursor:"pointer",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {wpPlaying?<svg width="26" height="26" viewBox="0 0 24 24" fill="#000"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          :<svg width="26" height="26" viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg>}
+        </button>
+        <button onClick={()=>{if(wotdPlayerRef.current){wotdPlayerRef.current.currentTime=0;wotdPlayerRef.current.play().catch(()=>{});setWpPlaying(true);}}} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+      </div>
+    </div>
+  </div>);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
     <div style={{background:"linear-gradient(180deg,#072E22 0%,#121212 75%)",padding:"max(12px, env(safe-area-inset-top)) 16px 0"}}>
@@ -1340,8 +1398,8 @@ function Home({go}){
             {/* Recording buttons — full width, clear */}
             <div style={{display:"flex",gap:8}}>
               {hasRec?<>
-                <button onClick={()=>playAudio(wotdRecs[lk],lk)} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:playing===lk?tw.color+"25":tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
-                  {playing===lk?<><span style={{width:8,height:8,borderRadius:4,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing · tap to stop</>:"▶ Play yours"}
+                <button onClick={()=>{const tw2=todayWords[wotdSlide];openWotdPlayer(wotdRecs[lk],tw2.w,tw2.m+" · "+name+"'s recording",tw2.color);}} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                  ▶ Play yours
                 </button>
                 <button onClick={()=>deleteRecording(lk)} style={{padding:"12px 14px",borderRadius:12,border:"none",background:"rgba(217,79,79,0.08)",color:"#D94F4F",cursor:"pointer",display:"flex",alignItems:"center",minHeight:44}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -1355,8 +1413,8 @@ function Home({go}){
               </button>}
             </div>
             {/* Partner recording */}
-            {hasPart&&<button onClick={()=>playAudio(partnerRecs[lk],'p_'+lk)} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:playing==='p_'+lk?S.rose+"20":S.rose+"08",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44,marginTop:8}}>
-              {playing==='p_'+lk?<><span style={{width:8,height:8,borderRadius:4,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing {partner}'s...</>:"▶ Listen to "+partner+"'s"}
+            {hasPart&&<button onClick={()=>{const tw2=todayWords[wotdSlide];openWotdPlayer(partnerRecs[lk],tw2.w,tw2.m+" · "+partner+"'s recording",S.rose);}} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:S.rose+"08",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44,marginTop:8}}>
+              ▶ Listen to {partner}'s
             </button>}
           </div>
         );})()}
@@ -2361,10 +2419,76 @@ function Us({onDark,isDark}){
   </div>);
 }
 
-function NP({go}){const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);
-  const eps=local.get('tea_eps',[]);const curEp=eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
-  const dur=curEp.duration?curEp.duration.split(':').reduce((a,b)=>a*60+Number(b),0):804;
-  useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/dur)*100);if(n>=dur){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("series")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v={curEp.v||"main"} sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>{curEp.t}</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode {curEp.id}</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>{curEp.duration||f(dur)}</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(dur,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
+function NP({go}){
+  const eps=local.get('tea_eps',[]);
+  const npId=local.get('tea_np_id',null);
+  const curEp=npId?eps.find(e=>e.id===npId):eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
+  const mediaRef=useRef(null);
+  const [p,setP]=useState(false);
+  const [cur,setCur]=useState(0);
+  const [dur,setDur]=useState(curEp.duration?curEp.duration.split(':').reduce((a,b)=>a*60+Number(b),0):0);
+  const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+
+  useEffect(()=>{
+    if(curEp.mediaUrl){
+      const el=document.createElement(curEp.mediaType==='video'?'video':'audio');
+      el.src=curEp.mediaUrl;el.preload='metadata';
+      el.onloadedmetadata=()=>setDur(el.duration);
+      el.ontimeupdate=()=>setCur(el.currentTime);
+      el.onended=()=>{setP(false);setTimeout(()=>go("hw"),600);};
+      mediaRef.current=el;
+    }
+    return()=>{if(mediaRef.current){try{mediaRef.current.pause();}catch(e){}}mediaRef.current=null;};
+  },[]);
+
+  const togglePlay=()=>{
+    if(!mediaRef.current)return;
+    if(p){mediaRef.current.pause();setP(false);}
+    else{mediaRef.current.play().catch(()=>{});setP(true);}
+  };
+  const seek=(delta)=>{
+    if(!mediaRef.current)return;
+    mediaRef.current.currentTime=Math.max(0,Math.min(dur,mediaRef.current.currentTime+delta));
+  };
+  const seekTo=(pct)=>{
+    if(!mediaRef.current||!dur)return;
+    mediaRef.current.currentTime=pct*dur;
+  };
+
+  return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}>
+      <button onClick={()=>{if(mediaRef.current)try{mediaRef.current.pause();}catch(e){}go("series");}} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div>
+      <div style={{width:38}}/>
+    </div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}>
+      {curEp.mediaType==='video'&&curEp.mediaUrl?
+        <video ref={el=>{if(el&&mediaRef.current){el.src=curEp.mediaUrl;el.ontimeupdate=()=>setCur(el.currentTime);el.onloadedmetadata=()=>setDur(el.duration);el.onended=()=>{setP(false);setTimeout(()=>go("hw"),600);};mediaRef.current=el;}}} style={{width:"90%",maxWidth:320,borderRadius:12}} playsInline/>
+      :<div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v={curEp.v||"main"} sh/></div>}
+    </div>
+    <div style={{padding:"0 24px 40px"}}>
+      <h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>{curEp.t}</h2>
+      <p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode {eps.indexOf(curEp)+1}{curEp.desc?" · "+curEp.desc.slice(0,50)+(curEp.desc.length>50?"...":""):""}</p>
+      <div style={{marginBottom:8}}>
+        <div style={{height:4,background:S.bar,borderRadius:2,cursor:"pointer"}} onClick={e=>{const rect=e.currentTarget.getBoundingClientRect();seekTo((e.clientX-rect.left)/rect.width);}}>
+          <div style={{width:dur?Math.max((cur/dur)*100,0.5)+"%":"0%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}>
+            <div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/>
+          </div>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(cur)}</span><span style={{color:S.sub,fontSize:11}}>{dur?f(dur):curEp.duration||"--:--"}</span></div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}>
+        <button onClick={()=>seek(-15)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+        <button onClick={togglePlay} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          :<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}
+        </button>
+        <button onClick={()=>seek(15)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+      </div>
+      <button onClick={()=>{if(mediaRef.current)try{mediaRef.current.pause();}catch(e){}go("hw");}} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button>
+    </div>
+  </div>);
+}
 
 function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const ok=a[1]&&a[1].length>5;
   const eps=local.get('tea_eps',[]);const curEp=eps.find(e=>e.s==='available')||eps[0]||{t:"Episode",id:1};
@@ -2418,6 +2542,31 @@ function Series({go}){
     }
   };
 
+  // Edit episode state
+  const [editEp,setEditEp]=useState(null); // {id, t, desc}
+
+  // Edit episode screen
+  if(editEp)return(<div className="dc-slide-up" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",padding:"max(12px,env(safe-area-inset-top)) 20px 40px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+      <button onClick={()=>setEditEp(null)} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <h1 style={{color:S.white,fontSize:21,fontWeight:700,margin:0}}>Edit Episode</h1>
+    </div>
+    <div style={{marginBottom:16}}>
+      <p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:"0 0 6px"}}>TITLE</p>
+      <input value={editEp.t} onChange={e=>setEditEp({...editEp,t:e.target.value})} style={{width:"100%",padding:"14px",borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
+    </div>
+    <div style={{marginBottom:20}}>
+      <p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:"0 0 6px"}}>DESCRIPTION</p>
+      <textarea value={editEp.desc} onChange={e=>setEditEp({...editEp,desc:e.target.value})} placeholder="What's this episode about..." style={{width:"100%",minHeight:120,padding:14,borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:14,lineHeight:1.5,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+    </div>
+    <button onClick={()=>{
+      if(editEp.t.trim()){
+        setEps(eps.map(ep=>ep.id===editEp.id?{...ep,t:editEp.t.trim(),desc:editEp.desc.trim()}:ep));
+        setEditEp(null);
+      }
+    }} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:editEp.t.trim()?"#E13300":"rgba(255,255,255,0.06)",color:editEp.t.trim()?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:editEp.t.trim()?"pointer":"not-allowed",minHeight:44}}>Save Changes</button>
+  </div>);
+
   // Add episode form
   if(addEp)return(<div className="dc-slide-up" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",padding:"max(12px,env(safe-area-inset-top)) 20px 40px"}}>
     <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
@@ -2468,11 +2617,10 @@ function Series({go}){
     <div style={{padding:"0 20px"}}>{eps.map((ep,i)=>(<div key={ep.id} style={{marginBottom:4}}>
       <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",opacity:ep.s==="locked"?0.35:1}}>
         {/* Play button or art */}
-        {ep.mediaUrl?<button onClick={e=>{e.stopPropagation();togglePlay(ep.id);}} style={{width:42,height:42,borderRadius:ep.mediaType==="video"?4:21,background:playingId===ep.id?S.green+"30":"rgba(255,255,255,0.08)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
-          {playingId===ep.id?<div style={{display:"flex",gap:2,alignItems:"center"}}><div style={{width:3,height:14,background:S.green,borderRadius:1}}/><div style={{width:3,height:14,background:S.green,borderRadius:1}}/></div>
-          :<svg width="16" height="16" viewBox="0 0 24 24" fill={S.white}><path d="M8 5v14l11-7z"/></svg>}
+        {ep.mediaUrl?<button onClick={e=>{e.stopPropagation();local.set('tea_np_id',ep.id);go("np");}} style={{width:42,height:42,borderRadius:ep.mediaType==="video"?4:21,background:"rgba(255,255,255,0.08)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={S.white}><path d="M8 5v14l11-7z"/></svg>
         </button>:<Cv size={42} r={4} v={ep.v||"main"}/>}
-        <div style={{flex:1,minWidth:0}} onClick={ep.s!=="locked"&&ep.mediaUrl?()=>togglePlay(ep.id):undefined}>
+        <div style={{flex:1,minWidth:0}} onClick={ep.s!=="locked"&&ep.mediaUrl?()=>{local.set('tea_np_id',ep.id);go("np");}:undefined}>
           <p style={{color:ep.s==="available"?S.green:S.white,fontSize:15,fontWeight:500,margin:0}}>{ep.t}</p>
           <p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>
             Episode {i+1}{ep.duration?" · "+ep.duration:""}{ep.mediaType==="video"?" · Video":ep.mediaType==="audio"?" · Audio":""}
@@ -2481,6 +2629,9 @@ function Series({go}){
         {ep.s==="locked"&&!isShah&&<svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted}><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>}
         {/* Shah controls */}
         {isShah&&<div style={{display:"flex",gap:2}}>
+          <button onClick={e=>{e.stopPropagation();setEditEp({id:ep.id,t:ep.t,desc:ep.desc||""});}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title="Edit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          </button>
           <button onClick={e=>{e.stopPropagation();setEps(eps.map((x,j)=>j===i?{...x,s:x.s==="locked"?"available":"locked"}:x));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title={ep.s==="locked"?"Unlock":"Lock"}>
             {ep.s==="locked"?<svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>
             :<svg width="14" height="14" viewBox="0 0 24 24" fill={S.green}><path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-9h-1V6A5 5 0 007 6h2a3 3 0 016 0v2H6a2 2 0 00-2 2v10c0 1.1.9 2 2 2h12a2 2 0 002-2V10a2 2 0 00-2-2z"/></svg>}
