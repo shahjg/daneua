@@ -278,6 +278,8 @@ function Sy({mood="happy",size=80,msg}){
     thinking:{mouth:"M"+(sz*.45)+" "+(sz*.53)+"L"+(sz*.55)+" "+(sz*.54),eyes:"half",tail:5,brow:1},
     celebrate:{mouth:"M"+(sz*.4)+" "+(sz*.5)+"Q"+(sz*.5)+" "+(sz*.59)+" "+(sz*.6)+" "+(sz*.5),eyes:"wide",tail:28,brow:-1},
     sleeping:{mouth:"M"+(sz*.46)+" "+(sz*.53)+"Q"+(sz*.5)+" "+(sz*.55)+" "+(sz*.54)+" "+(sz*.53),eyes:"closed",tail:0,brow:0},
+    excited:{mouth:"M"+(sz*.4)+" "+(sz*.5)+"Q"+(sz*.5)+" "+(sz*.6)+" "+(sz*.6)+" "+(sz*.5),eyes:"wide",tail:30,brow:-2},
+    love:{mouth:"M"+(sz*.42)+" "+(sz*.52)+"Q"+(sz*.5)+" "+(sz*.57)+" "+(sz*.58)+" "+(sz*.52),eyes:"open",tail:20,brow:-1},
   };
   const m=moods[mood]||moods.happy;
   const eyeH=m.eyes==="wide"?sz*.05:m.eyes==="half"?sz*.028:sz*.04;
@@ -337,6 +339,17 @@ function Sy({mood="happy",size=80,msg}){
         <path d={`M${sz*.35} ${sz*.48}Q${sz*.5} ${sz*.52} ${sz*.65} ${sz*.48}`} stroke="#D4A84B" strokeWidth={1.5} fill="none"/>
         <circle cx={sz*.5} cy={sz*.505} r={sz*.012} fill="#D4A84B"/>
       </>}
+      {/* Hearts floating for love mood */}
+      {mood==="love"&&<>
+        <text x={sz*.18} y={sz*.18} fontSize={sz*.1} style={{animation:"floatHeart 2s ease infinite"}}>❤️</text>
+        <text x={sz*.75} y={sz*.15} fontSize={sz*.08} style={{animation:"floatHeart 2.5s ease 0.5s infinite"}}>💕</text>
+      </>}
+      {/* Sparkle stars for excited mood */}
+      {mood==="excited"&&<>
+        <text x={sz*.12} y={sz*.2} fontSize={sz*.09} style={{animation:"pulse 1s ease infinite"}}>✨</text>
+        <text x={sz*.78} y={sz*.18} fontSize={sz*.08} style={{animation:"pulse 1.2s ease 0.3s infinite"}}>⭐</text>
+        <text x={sz*.82} y={sz*.4} fontSize={sz*.07} style={{animation:"pulse 1.4s ease 0.6s infinite"}}>✨</text>
+      </>}
     </svg>
     {msg&&<div style={{background:"rgba(61,36,24,0.08)",borderRadius:12,padding:"6px 12px",maxWidth:sz*2.2}}>
       <p style={{fontSize:Math.max(11,sz*.14),color:"#3D2418",margin:0,textAlign:"center",fontWeight:600,lineHeight:1.3}}>{msg}</p>
@@ -356,7 +369,7 @@ const WL={bg:"#FDFAF5",card:"#FFFFFF",cardAlt:"#F5F0E8",forest:"#1A3D34",accent:
 const WD={bg:"#121212",card:"#181818",cardAlt:"#1E1E1E",forest:"#A8D5BA",accent:"#C9A067",text:"#E5E5E5",textMuted:"#707070",border:"#222",cream:"#1A3D34",error:"#D94F4F",success:"#3D9B5A"};
 const useW=()=>{const d=useDark();return d?WD:WL;};
 
-const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes dcSlideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}`;
+const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes dcSlideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}.dc-bounce{animation:dcBounce .6s cubic-bezier(.16,1,.3,1)}@keyframes dcBounce{0%{transform:scale(0.5) translateY(20px);opacity:0}50%{transform:scale(1.1) translateY(-8px)}100%{transform:scale(1) translateY(0);opacity:1}}`;
 
 const LANGS={
 urdu:{color:"#E67E22",label:"Urdu",char:"\u0627",sub:"Shah's language",
@@ -1832,12 +1845,12 @@ function Learn(){
   const checkD="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
 
   // Lesson complete — with Sy celebration
-  if(done&&lesson){const lc=LANGS[lang].color;return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(180deg,${W.bg} 0%,${lc}08 100%)`,padding:32}}>
-    <Sy mood="celebrate" size={100} msg={score===lesson.quiz.length?"Purr-fect score!":"Great job, keep going!"}/>
-    <div style={{height:16}}/>
+  if(done&&lesson){const lc=LANGS[lang].color;return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(180deg,${W.bg} 0%,${lc}08 100%)`,padding:"32px 32px max(100px, calc(env(safe-area-inset-bottom) + 92px))"}}>
+    <div className="dc-bounce" style={{marginBottom:8}}><Sy mood="celebrate" size={100} msg={score===lesson.quiz.length?"Purr-fect score! 🎉":"Great job, keep going!"}/></div>
+    <div style={{height:12}}/>
     <h2 style={{color:W.forest,fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Lesson Complete!</h2>
-    <p style={{color:W.textMuted,fontSize:15,margin:"0 0 24px"}}>{score}/{lesson.quiz.length} correct</p>
-    <div style={{display:"flex",gap:32,marginBottom:36}}>
+    <p style={{color:W.textMuted,fontSize:15,margin:"0 0 28px"}}>{score}/{lesson.quiz.length} correct</p>
+    <div style={{display:"flex",gap:32,marginBottom:40}}>
       <div style={{textAlign:"center"}}><p style={{color:lc,fontSize:32,fontWeight:800,margin:0}}>+{lesson.xp||15}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>XP earned</p></div>
       <div style={{textAlign:"center"}}><p style={{color:"#FF9500",fontSize:32,fontWeight:800,margin:0}}>{streak}</p><p style={{color:W.textMuted,fontSize:12,margin:0}}>Day streak</p></div>
     </div>
@@ -1846,34 +1859,63 @@ function Learn(){
 
   // Active lesson — teaching or quiz
   if(lesson){const lc=LANGS[lang].color;const total=lesson.content.length+lesson.quiz.length;const cur=step<lesson.content.length?step:lesson.content.length+qIdx+(sel!==null?1:0);const prog=(cur/total)*100;
-    if(step<lesson.content.length){const ct=lesson.content[step];const isFirst=step===0;return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg}}>
-      <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+    if(step<lesson.content.length){const ct=lesson.content[step];const isFirst=step===0;const isLast=step===lesson.content.length-1;
+    // Fun cat moods per slide
+    const catMoods=["happy","proud","thinking","excited","love","celebrate","happy","proud"];
+    const catMsgs=["Let's learn!","Keep going!","Hmm, interesting...","This is exciting!","Love this topic!","You're amazing!","So cool!","Smart cookie!"];
+    const catMood=isFirst?"happy":isLast?"celebrate":catMoods[step%catMoods.length];
+    const catMsg=isFirst?"Let's learn!":isLast?"Quiz time soon!":catMsgs[step%catMsgs.length];
+    // Split long text into paragraphs for readability
+    const paragraphs=ct.text.split(/(?<=[.!?])\s+(?=[A-Z"'])/);
+    return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg}}>
+      {/* Top bar — progress */}
+      <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
         <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.textMuted} strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         <div style={{flex:1,height:8,background:W.border,borderRadius:4,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:lc,borderRadius:4,transition:"width 0.3s"}}/></div>
-        <span style={{color:lc,fontSize:12,fontWeight:700}}>{step+1}/{lesson.content.length}</span>
+        <span style={{color:lc,fontSize:12,fontWeight:700,flexShrink:0}}>{step+1}/{lesson.content.length}</span>
       </div>
-      <div style={{flex:1,padding:"20px 20px",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-        {isFirst&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Sy mood="happy" size={60} msg="Let's learn!"/></div>}
-        <div style={{background:`linear-gradient(135deg,${lc}10,${lc}05)`,borderRadius:20,padding:"24px 22px",border:`1px solid ${lc}15`,flex:isFirst?undefined:1,display:"flex",flexDirection:"column"}}>
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-            <div style={{width:44,height:44,borderRadius:12,background:lc+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{color:lc,fontSize:18,fontWeight:800}}>{step+1}</span></div>
-            <h2 style={{color:W.forest,fontSize:19,fontWeight:700,margin:0,flex:1,lineHeight:1.25}}>{ct.title}</h2>
-          </div>
-          <p style={{color:W.text,fontSize:16,lineHeight:1.85,margin:0,letterSpacing:0.1}}>{ct.text}</p>
+      {/* Scrollable content area */}
+      <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"8px 20px 0"}}>
+        {/* Sy cat with animation */}
+        <div className="dc-slide-up" style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+          <Sy mood={catMood} size={isFirst?64:52} msg={catMsg}/>
         </div>
+        {/* Lesson title card */}
+        <div className="dc-fade-in" style={{marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+            <div style={{width:40,height:40,borderRadius:20,background:lc+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <span style={{color:lc,fontSize:16,fontWeight:800}}>{step+1}</span>
+            </div>
+            <h2 style={{color:W.forest,fontSize:20,fontWeight:700,margin:0,flex:1,lineHeight:1.3,letterSpacing:-0.3}}>{ct.title}</h2>
+          </div>
+          {/* Content — split into readable paragraphs */}
+          <div style={{background:`linear-gradient(135deg,${lc}08,${lc}03)`,borderRadius:20,padding:"20px 20px",border:`1px solid ${lc}10`}}>
+            {paragraphs.map((p,pi)=>(
+              <p key={pi} style={{color:W.text,fontSize:16,lineHeight:1.9,margin:pi<paragraphs.length-1?"0 0 16px":"0",letterSpacing:0.1}}>{p}</p>
+            ))}
+          </div>
+        </div>
+        {/* Fun facts / tips callout for longer content */}
+        {ct.text.length>300&&<div style={{display:"flex",gap:10,padding:"14px 16px",background:lc+"08",borderRadius:14,marginBottom:16,alignItems:"flex-start"}}>
+          <span style={{fontSize:18,flexShrink:0,marginTop:1}}>💡</span>
+          <p style={{color:W.textMuted,fontSize:13,margin:0,lineHeight:1.5,fontStyle:"italic"}}>Take your time with this one — there's no rush!</p>
+        </div>}
       </div>
-      <div style={{padding:"12px 24px 32px",paddingBottom:"max(32px, calc(env(safe-area-inset-bottom) + 16px))"}}><button onClick={()=>setStep(step+1)} style={{width:"100%",padding:"16px",borderRadius:50,border:"none",background:`linear-gradient(135deg,${W.forest},${lc})`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${lc}30`}}>{step===lesson.content.length-1?"Start Quiz \u2192":"Continue"}</button></div>
+      {/* Continue button — always visible, pushed above nav */}
+      <div style={{padding:"12px 20px",paddingBottom:"max(100px, calc(env(safe-area-inset-bottom) + 92px))",flexShrink:0}}>
+        <button onClick={()=>setStep(step+1)} className="dc-slide-up" style={{width:"100%",padding:"16px",borderRadius:50,border:"none",background:`linear-gradient(135deg,${W.forest},${lc})`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${lc}30`}}>{isLast?"Start Quiz \u2192":"Continue"}</button>
+      </div>
     </div>);}
-    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px",paddingBottom:"max(20px, env(safe-area-inset-bottom))"}}>
+    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px",paddingBottom:"max(100px, calc(env(safe-area-inset-bottom) + 92px))"}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.textMuted} strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         <div style={{flex:1,height:8,background:W.border,borderRadius:4,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:lc,borderRadius:4,transition:"width 0.3s"}}/></div>
         <div style={{display:"flex",alignItems:"center",gap:3}}><Ic d={heartD} c={W.error} sz={16}/><span style={{color:W.error,fontSize:15,fontWeight:800}}>{hearts}</span></div>
       </div>
-      {sel!==null&&<div style={{display:"flex",justifyContent:"center",marginBottom:8}}><Sy mood={ok?"proud":"sad"} size={56}/></div>}
+      {sel!==null&&<div className="dc-slide-up" style={{display:"flex",justifyContent:"center",marginBottom:12}}><Sy mood={ok?"proud":"sad"} size={56} msg={ok?"Nailed it!":"Keep trying!"}/></div>}
       <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:sel!==null?"flex-start":"center"}}>
         <p style={{color:W.forest,fontSize:21,fontWeight:700,margin:"0 0 24px",lineHeight:1.35}}>{q.q}</p>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>{q.opts.map((opt,idx)=>{let bg=W.card,bdr="2px solid "+W.border,col=W.text;if(sel!==null){if(idx===q.ans){bg=dark?"#1B3A1B":"#E8F5E9";bdr="2px solid "+W.success;col=W.success;}else if(idx===sel&&!ok){bg=dark?"#3A1B1B":"#FFEBEE";bdr="2px solid "+W.error;col=W.error;}}return(<button key={idx} onClick={()=>answer(idx)} style={{padding:"15px 16px",borderRadius:14,background:bg,border:bdr,color:col,fontSize:16,fontWeight:600,cursor:sel!==null?"default":"pointer",textAlign:"left",transition:"all 0.15s",minHeight:44}}>{opt}</button>);})}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>{q.opts.map((opt,idx)=>{let bg=W.card,bdr="2px solid "+W.border,col=W.text;if(sel!==null){if(idx===q.ans){bg=dark?"#1B3A1B":"#E8F5E9";bdr="2px solid "+W.success;col=W.success;}else if(idx===sel&&!ok){bg=dark?"#3A1B1B":"#FFEBEE";bdr="2px solid "+W.error;col=W.error;}}return(<button key={idx} onClick={()=>answer(idx)} style={{padding:"16px 18px",borderRadius:16,background:bg,border:bdr,color:col,fontSize:16,fontWeight:600,cursor:sel!==null?"default":"pointer",textAlign:"left",transition:"all 0.15s",minHeight:48}}>{opt}</button>);})}</div>
       </div>
       {sel!==null&&<div style={{padding:"14px 0",textAlign:"center"}}><p style={{color:ok?W.success:W.error,fontSize:17,fontWeight:700,margin:0}}>{ok?"\u2713 Correct!":"\u2717 It's: "+q.opts[q.ans]}</p></div>}
     </div>);
