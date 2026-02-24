@@ -89,59 +89,96 @@ const notif={
 
 // PIN Login Screen
 function Login({onLogin}){
-  const [who,setWho]=useState(null);const [pin,setPin]=useState("");const [error,setError]=useState(false);const [shake,setShake]=useState(false);const [splash,setSplash]=useState(true);
-  const PINS={shah:"1234",dane:"5678"};// Change these
+  const [who,setWho]=useState(null);const [pin,setPin]=useState("");const [error,setError]=useState(false);const [shake,setShake]=useState(false);const [splash,setSplash]=useState(true);const [fadeOut,setFadeOut]=useState(false);
+  const PINS={shah:"0953",dane:"2202"};
   const tryPin=(digit)=>{
     const next=pin+digit;
     if(next.length<4){setPin(next);setError(false);return;}
-    if(next===PINS[who]){local.set('user',who);onLogin(who);}
+    if(next===PINS[who]){setFadeOut(true);setTimeout(()=>{local.set('user',who);onLogin(who);},600);}
     else{setError(true);setShake(true);setTimeout(()=>{setPin("");setShake(false);},500);}
   };
   const del=()=>{setPin(pin.slice(0,-1));setError(false);};
 
-  // Splash screen — like D(ane)ua
-  if(splash)return(<div onClick={()=>setSplash(false)} style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#0A2E22 40%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",overflow:"hidden"}}>
-    <div style={{position:"absolute",top:"15%",left:"10%",width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(29,185,84,0.08),transparent)",filter:"blur(40px)"}}/>
-    <div style={{position:"absolute",bottom:"20%",right:"5%",width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle,rgba(212,168,75,0.06),transparent)",filter:"blur(30px)"}}/>
+  // Animated floating hearts CSS
+  const heartCSS=`
+    @keyframes floatHeart{0%{transform:translateY(0) scale(0);opacity:0}10%{opacity:1;transform:translateY(-10vh) scale(1)}90%{opacity:0.6}100%{transform:translateY(-100vh) scale(0.5) rotate(25deg);opacity:0}}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    @keyframes fadeUp{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes glow{0%,100%{opacity:0.04}50%{opacity:0.08}}
+    @keyframes catBlink{0%,42%,46%,100%{transform:scaleY(1)}44%{transform:scaleY(0.1)}}
+    @keyframes splashFade{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.05)}}
+    .dc-heart{position:absolute;bottom:-20px;animation:floatHeart linear infinite;pointer-events:none}
+    .dc-splash-exit{animation:splashFade 0.5s ease forwards}
+  `;
+  const hearts=Array.from({length:12},(_,i)=>({
+    left:Math.random()*100,size:12+Math.random()*18,delay:Math.random()*8,dur:6+Math.random()*6,
+    color:['rgba(232,17,91,0.3)','rgba(201,168,76,0.25)','rgba(29,185,84,0.25)','rgba(232,17,91,0.15)','rgba(255,255,255,0.08)'][Math.floor(Math.random()*5)]
+  }));
+
+  // Splash screen
+  if(splash)return(<div onClick={()=>{setFadeOut(true);setTimeout(()=>{setSplash(false);setFadeOut(false);},500);}} className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",overflow:"hidden"}}>
+    <style>{heartCSS}</style>
+    {/* Floating hearts */}
+    {hearts.map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
+      <svg width={h.size} height={h.size} viewBox="0 0 24 24" fill={h.color}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </div>))}
+    {/* Ambient glow */}
+    <div style={{position:"absolute",top:"12%",left:"5%",width:220,height:220,borderRadius:"50%",background:"radial-gradient(circle,rgba(29,185,84,0.06),transparent)",filter:"blur(60px)",animation:"glow 4s ease infinite"}}/>
+    <div style={{position:"absolute",bottom:"15%",right:"0%",width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(232,17,91,0.04),transparent)",filter:"blur(50px)",animation:"glow 5s ease infinite 1s"}}/>
+    <div style={{position:"absolute",top:"40%",right:"20%",width:120,height:120,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,0.04),transparent)",filter:"blur(40px)",animation:"glow 6s ease infinite 2s"}}/>
+    {/* Main content */}
     <div style={{textAlign:"center",position:"relative",zIndex:1}}>
-      <Sy mood="happy" size={72}/>
-      <h1 style={{color:"#fff",fontSize:36,fontWeight:300,margin:"20px 0 8px",letterSpacing:2,fontFamily:"Georgia,serif"}}>Dane's Chai</h1>
-      <div style={{width:40,height:1.5,background:"#D4A84B",margin:"0 auto 16px",borderRadius:2}}/>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:13,fontWeight:400,letterSpacing:1}}>made by Shah, for Dane</p>
+      <div style={{animation:"pulse 3s ease infinite",marginBottom:24}}>
+        <Sy mood="happy" size={88}/>
+      </div>
+      <h1 style={{color:"#fff",fontSize:42,fontWeight:200,margin:"0 0 6px",letterSpacing:4,fontFamily:"Georgia,'Times New Roman',serif",animation:"fadeUp 1s ease 0.2s both"}}>Dane's Chai</h1>
+      <div style={{width:48,height:1.5,background:"linear-gradient(90deg,transparent,#C9A84C,transparent)",margin:"0 auto 14px",borderRadius:2,animation:"fadeUp 1s ease 0.4s both"}}/>
+      <p style={{color:"rgba(255,255,255,0.25)",fontSize:12,fontWeight:400,letterSpacing:2,textTransform:"uppercase",animation:"fadeUp 1s ease 0.6s both"}}>made by Shah, for Dane</p>
     </div>
-    <p style={{position:"absolute",bottom:40,color:"rgba(255,255,255,0.15)",fontSize:12}}>tap anywhere</p>
+    <p style={{position:"absolute",bottom:40,color:"rgba(255,255,255,0.12)",fontSize:11,letterSpacing:1,animation:"pulse 2s ease infinite"}}>tap anywhere</p>
   </div>);
 
   // Who's drinking?
-  if(!who)return(<div style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#0A2E22 40%,#071A14 100%)",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
-    <div style={{position:"absolute",top:"10%",right:"15%",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(29,185,84,0.06),transparent)",filter:"blur(50px)"}}/>
+  if(!who)return(<div style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
+    <style>{heartCSS}</style>
+    {hearts.slice(0,6).map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
+      <svg width={h.size*0.7} height={h.size*0.7} viewBox="0 0 24 24" fill={h.color}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </div>))}
+    <div style={{position:"absolute",top:"8%",right:"10%",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(29,185,84,0.04),transparent)",filter:"blur(50px)"}}/>
     <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
-      <Sy mood="thinking" size={56}/>
-      <h2 style={{color:"#fff",fontSize:24,fontWeight:300,margin:"16px 0 4px",letterSpacing:1}}>Who's drinking?</h2>
-      <p style={{color:"rgba(255,255,255,0.25)",fontSize:13,margin:"0 0 36px"}}>Pick your cup</p>
-      <div style={{display:"flex",gap:20,width:"100%",maxWidth:300}}>
-        {[{id:"shah",name:"Shah",color:"#1DB954",sub:"The one who made it"},{id:"dane",name:"Dane",color:"#E8115B",sub:"The one it's for"}].map(u=>(<button key={u.id} onClick={()=>setWho(u.id)} style={{flex:1,padding:"32px 16px",borderRadius:24,border:"1px solid rgba(255,255,255,0.06)",background:"rgba(255,255,255,0.03)",cursor:"pointer",transition:"all 0.2s",backdropFilter:"blur(10px)"}}>
-          <div style={{width:52,height:52,borderRadius:"50%",background:u.color,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:"0 4px 20px "+u.color+"40"}}><span style={{color:"#fff",fontSize:20,fontWeight:700}}>{u.name[0]}</span></div>
-          <p style={{color:"#fff",fontSize:17,fontWeight:500,margin:"0 0 4px"}}>{u.name}</p>
-          <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,margin:0}}>{u.sub}</p>
+      <div style={{animation:"fadeUp 0.6s ease both"}}><Sy mood="thinking" size={56}/></div>
+      <h2 style={{color:"#fff",fontSize:26,fontWeight:200,margin:"18px 0 4px",letterSpacing:1.5,fontFamily:"Georgia,serif",animation:"fadeUp 0.6s ease 0.1s both"}}>Who's drinking?</h2>
+      <p style={{color:"rgba(255,255,255,0.2)",fontSize:12,margin:"0 0 40px",letterSpacing:1,animation:"fadeUp 0.6s ease 0.2s both"}}>Pick your cup</p>
+      <div style={{display:"flex",gap:20,width:"100%",maxWidth:320,animation:"fadeUp 0.6s ease 0.3s both"}}>
+        {[{id:"shah",name:"Shah",color:"#1DB954",sub:"The one who made it",emoji:"☕"},{id:"dane",name:"Dane",color:"#E8115B",sub:"The one it's for",emoji:"🫖"}].map(u=>(<button key={u.id} onClick={()=>setWho(u.id)} style={{flex:1,padding:"28px 16px",borderRadius:24,border:"1px solid rgba(255,255,255,0.04)",background:"rgba(255,255,255,0.02)",cursor:"pointer",transition:"all 0.25s",backdropFilter:"blur(10px)"}}>
+          <div style={{width:56,height:56,borderRadius:"50%",background:`linear-gradient(135deg,${u.color},${u.color}BB)`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",boxShadow:`0 6px 24px ${u.color}30`}}><span style={{color:"#fff",fontSize:22,fontWeight:800}}>{u.name[0]}</span></div>
+          <p style={{color:"#fff",fontSize:18,fontWeight:500,margin:"0 0 4px",letterSpacing:0.5}}>{u.name}</p>
+          <p style={{color:"rgba(255,255,255,0.18)",fontSize:11,margin:0,letterSpacing:0.3}}>{u.sub}</p>
         </button>))}
       </div>
     </div>
   </div>);
 
   // PIN entry
-  return(<div style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#0A2E22 40%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
-    <button onClick={()=>{setWho(null);setPin("");}} style={{position:"absolute",top:16,left:16,background:"none",border:"none",cursor:"pointer",padding:12}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <div style={{width:52,height:52,borderRadius:"50%",background:who==="shah"?"#1DB954":"#E8115B",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,boxShadow:"0 4px 20px "+(who==="shah"?"#1DB95440":"#E8115B40")}}><span style={{color:"#fff",fontSize:20,fontWeight:700}}>{who==="shah"?"S":"D"}</span></div>
-    <p style={{color:"#fff",fontSize:18,fontWeight:400,margin:"0 0 4px"}}>{who==="shah"?"Shah":"Dane"}</p>
-    <p style={{color:"rgba(255,255,255,0.25)",fontSize:13,margin:"0 0 36px"}}>Enter your PIN</p>
-    <div className={shake?"dc-shake":""} style={{display:"flex",gap:16,marginBottom:12}}>
-      {[0,1,2,3].map(i=>(<div key={i} style={{width:14,height:14,borderRadius:"50%",background:i<pin.length?(error?"#E74C3C":"#1DB954"):"transparent",border:"1.5px solid "+(i<pin.length?(error?"#E74C3C":"#1DB954"):"rgba(255,255,255,0.15)"),transition:"all 0.15s"}}/>))}
+  return(<div className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,position:"relative",overflow:"hidden"}}>
+    <style>{heartCSS}</style>
+    {hearts.slice(0,4).map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
+      <svg width={h.size*0.5} height={h.size*0.5} viewBox="0 0 24 24" fill={h.color}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </div>))}
+    <button onClick={()=>{setWho(null);setPin("");}} style={{position:"absolute",top:16,left:16,background:"none",border:"none",cursor:"pointer",padding:12,zIndex:2}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div style={{animation:"fadeUp 0.4s ease both"}}>
+      <div style={{width:56,height:56,borderRadius:"50%",background:`linear-gradient(135deg,${who==="shah"?"#1DB954":"#E8115B"},${who==="shah"?"#169C46":"#C70F4E"})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",boxShadow:`0 6px 24px ${who==="shah"?"#1DB95430":"#E8115B30"}`}}><span style={{color:"#fff",fontSize:22,fontWeight:800}}>{who==="shah"?"S":"D"}</span></div>
     </div>
-    {error&&<p style={{color:"#E74C3C",fontSize:12,margin:"0 0 8px",fontWeight:500}}>Wrong PIN</p>}
+    <p style={{color:"#fff",fontSize:18,fontWeight:400,margin:"0 0 4px",letterSpacing:0.5,animation:"fadeUp 0.4s ease 0.1s both"}}>{who==="shah"?"Shah":"Dane"}</p>
+    <p style={{color:"rgba(255,255,255,0.2)",fontSize:12,margin:"0 0 32px",letterSpacing:1,animation:"fadeUp 0.4s ease 0.15s both"}}>Enter your PIN</p>
+    <div className={shake?"dc-shake":""} style={{display:"flex",gap:18,marginBottom:14,animation:"fadeUp 0.4s ease 0.2s both"}}>
+      {[0,1,2,3].map(i=>(<div key={i} style={{width:14,height:14,borderRadius:"50%",background:i<pin.length?(error?"#D94F4F":who==="shah"?"#1DB954":"#E8115B"):"transparent",border:"1.5px solid "+(i<pin.length?(error?"#D94F4F":who==="shah"?"#1DB954":"#E8115B"):"rgba(255,255,255,0.1)"),transition:"all 0.15s",boxShadow:i<pin.length&&!error?`0 0 8px ${who==="shah"?"#1DB95440":"#E8115B40"}`:"none"}}/>))}
+    </div>
+    {error&&<p style={{color:"#D94F4F",fontSize:12,margin:"0 0 8px",fontWeight:500}}>Wrong PIN</p>}
     <div style={{height:error?0:20}}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,maxWidth:264}}>
-      {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((d,i)=>(<button key={i} onClick={d==="del"?del:d!==null?()=>tryPin(String(d)):undefined} style={{width:74,height:74,borderRadius:"50%",border:d!==null?"1px solid rgba(255,255,255,0.08)":"none",background:d!==null?"rgba(255,255,255,0.03)":"transparent",color:"#fff",fontSize:d==="del"?14:26,fontWeight:300,cursor:d!==null?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",letterSpacing:1}}>{d==="del"?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>:d}</button>))}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,maxWidth:264,animation:"fadeUp 0.4s ease 0.25s both"}}>
+      {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((d,i)=>(<button key={i} onClick={d==="del"?del:d!==null?()=>tryPin(String(d)):undefined} style={{width:72,height:72,borderRadius:"50%",border:d!==null?"1px solid rgba(255,255,255,0.06)":"none",background:d!==null?"rgba(255,255,255,0.02)":"transparent",color:"#fff",fontSize:d==="del"?14:24,fontWeight:300,cursor:d!==null?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",letterSpacing:0.5,transition:"background 0.15s"}}>{d==="del"?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>:d}</button>))}
     </div>
   </div>);
 }
@@ -235,7 +272,7 @@ const WL={bg:"#FDFAF5",card:"#FFFFFF",cardAlt:"#F5F0E8",forest:"#1A3D34",accent:
 const WD={bg:"#121212",card:"#181818",cardAlt:"#1E1E1E",forest:"#A8D5BA",accent:"#C9A067",text:"#E5E5E5",textMuted:"#707070",border:"#222",cream:"#1A3D34",error:"#D94F4F",success:"#3D9B5A"};
 const useW=()=>{const d=useDark();return d?WD:WL;};
 
-const CSS=`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`;
+const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`;
 
 const LANGS={
 urdu:{color:"#E67E22",label:"Urdu",char:"\u0627",sub:"Shah's language",
@@ -1415,10 +1452,10 @@ function Browse({go}){
   if(sel)return(<div className="dc-fade-in" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:S.black}}><Sy mood="thinking" size={80} msg="Coming soon!"/></div>);
 
   // ── Browse grid ──
-  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Browse</h1><p style={{color:S.muted,fontSize:13,margin:"0 0 20px",fontWeight:400}}>Everything in one place</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:140,borderRadius:18,padding:"20px",background:`linear-gradient(155deg,${c.c},${c.c}88)`,position:"relative",overflow:"hidden",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-    <div style={{position:"absolute",right:-8,bottom:-8,width:56,height:56,borderRadius:28,background:"rgba(255,255,255,0.04)"}}/>
-    <p style={{color:"#fff",fontSize:15,fontWeight:700,margin:0,lineHeight:1.25,whiteSpace:"pre-line",position:"relative",zIndex:1,letterSpacing:-0.2}}>{c.t}</p>
-    <p style={{color:"rgba(255,255,255,0.35)",fontSize:10,margin:"4px 0 0",position:"relative",zIndex:1,fontWeight:500}}>{c.sub}</p>
+  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Browse</h1><p style={{color:S.muted,fontSize:13,margin:"0 0 20px",fontWeight:400}}>Everything in one place</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:180,borderRadius:20,padding:"22px",background:`linear-gradient(155deg,${c.c},${c.c}80)`,position:"relative",overflow:"hidden",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+    <div style={{position:"absolute",right:-10,bottom:-10,width:64,height:64,borderRadius:32,background:"rgba(255,255,255,0.04)"}}/>
+    <p style={{color:"#fff",fontSize:18,fontWeight:800,margin:0,lineHeight:1.2,whiteSpace:"pre-line",position:"relative",zIndex:1,letterSpacing:-0.3}}>{c.t}</p>
+    <p style={{color:"rgba(255,255,255,0.4)",fontSize:11,margin:"6px 0 0",position:"relative",zIndex:1,fontWeight:500}}>{c.sub}</p>
   </div>))}</div></div></div>);
 }
 
@@ -2266,6 +2303,22 @@ function Series({go}){
   </div>);
 }
 
+
+class ErrorBoundary extends React.Component{
+  constructor(props){super(props);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(error){return{hasError:true,error};}
+  render(){
+    if(this.state.hasError){
+      return React.createElement('div',{style:{padding:40,textAlign:'center',background:'#121212',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}},
+        React.createElement('p',{style:{color:'#E8115B',fontSize:18,fontWeight:700,marginBottom:8}},'Something went wrong'),
+        React.createElement('p',{style:{color:'#9A9A9A',fontSize:13,marginBottom:16}},String(this.state.error)),
+        React.createElement('button',{onClick:()=>{localStorage.clear();window.location.reload();},style:{padding:'12px 24px',borderRadius:20,border:'none',background:'#1DB954',color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer'}},'Reset & Reload')
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App(){
   const[user,setUser]=useState(()=>local.get('user',null));
   const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","series","np","hw"].includes(saved)?saved:'home';});
@@ -2309,7 +2362,7 @@ export default function App(){
   `}</style><Login onLogin={(u)=>setUser(u)}/></>);
 
   return(<UserCtx.Provider value={{user,logout}}>
-    <DarkCtx.Provider value={dark}><Shell dark={dark}>
+    <ErrorBoundary><DarkCtx.Provider value={dark}><Shell dark={dark}>
       {s==="home"&&<Home go={go}/>}
       {s==="browse"&&<Browse go={go}/>}
       {s==="learn"&&<Learn/>}
@@ -2318,6 +2371,6 @@ export default function App(){
       {s==="hw"&&<HW go={go}/>}
       {s==="series"&&<Series go={go}/>}
       {nav&&<NavBar active={tab} go={go}/>}
-    </Shell></DarkCtx.Provider>
+    </Shell></DarkCtx.Provider></ErrorBoundary>
   </UserCtx.Provider>);
 }
