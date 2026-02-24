@@ -1214,9 +1214,6 @@ function Home({go}){
   const dua=DUAS[dayNum%DUAS.length];
 
   const recordWord=async(langKey)=>{
-    const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
-    const existing=wotdRecs[langKey];
-    if(existing){try{setPlaying(langKey);const a=new Audio(existing);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}return;}
     try{
       setRecording(langKey);
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -1228,6 +1225,7 @@ function Home({go}){
         const reader=new FileReader();
         reader.onload=()=>{
           const ad=reader.result;
+          const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
           local.set(recKey,ad);setWotdRecs(p=>({...p,[langKey]:ad}));setRecording(null);
           sync.saveRec(todayIdx,langKey,user,ad);
         };
@@ -1236,14 +1234,24 @@ function Home({go}){
       mr.start();setTimeout(()=>mr.stop(),4000);
     }catch(e){setRecording(null);}
   };
+  const audioRef=React.useRef(null);
+  const playAudio=(src,key)=>{
+    // Stop any currently playing audio
+    if(audioRef.current){try{audioRef.current.pause();audioRef.current.src="";}catch(e){}}
+    if(playing===key){setPlaying(null);return;}
+    const a=new Audio(src);
+    audioRef.current=a;
+    a.onended=()=>{setPlaying(null);audioRef.current=null;};
+    a.onerror=()=>{setPlaying(null);audioRef.current=null;};
+    setPlaying(key);
+    a.play().catch(()=>{setPlaying(null);audioRef.current=null;});
+  };
   const deleteRecording=(langKey)=>{
+    if(audioRef.current){try{audioRef.current.pause();}catch(e){}}
+    setPlaying(null);
     local.set('wotd_'+todayIdx+'_'+langKey+'_'+user,null);
     setWotdRecs(p=>({...p,[langKey]:null}));
     sync.deleteRec(todayIdx,langKey,user);
-  };
-  const playPartnerWord=(langKey)=>{
-    const audio=partnerRecs[langKey];
-    if(audio){try{setPlaying('p_'+langKey);const a=new Audio(audio);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}}
   };
   const hasPartnerWord=(langKey)=>!!partnerRecs[langKey];
 
@@ -1289,30 +1297,32 @@ function Home({go}){
           <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:0}}>WORDS OF THE DAY</p>
           <div style={{display:"flex",gap:5}}>{todayWords.map((tw,i)=>(<div key={i} onClick={()=>setWotdSlide(i)} style={{width:7,height:7,borderRadius:4,background:wotdSlide===i?tw.color:"rgba(255,255,255,0.12)",cursor:"pointer",transition:"background 0.2s"}}/>))}</div>
         </div>
-        {(()=>{const tw=todayWords[wotdSlide];const lk=["u","t","a"][wotdSlide];const hasRec=!!wotdRecs[lk];const isRec=recording===lk;const isPlay=playing===lk;const hasPart=hasPartnerWord(lk);const isPlayPart=playing==='p_'+lk;return(
-          <div style={{display:"flex",gap:14,alignItems:"center"}}>
-            <div style={{flex:1,minWidth:0}} onClick={()=>setWotdSlide((wotdSlide+1)%3)}>
+        {(()=>{const tw=todayWords[wotdSlide];const lk=["u","t","a"][wotdSlide];const hasRec=!!wotdRecs[lk];const isRec=recording===lk;const hasPart=hasPartnerWord(lk);return(
+          <div>
+            <div onClick={()=>setWotdSlide((wotdSlide+1)%3)} style={{cursor:"pointer",marginBottom:12}}>
               <p style={{color:tw.color,fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 4px"}}>{tw.lang.toUpperCase()}</p>
               <p style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>{tw.w}</p>
               <p style={{color:S.sub,fontSize:13,margin:"0 0 2px"}}>{tw.m}</p>
               <p style={{color:S.muted,fontSize:11,margin:0}}>{tw.r}</p>
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-              {hasRec?<div style={{display:"flex",gap:4}}>
-                <button onClick={()=>recordWord(lk)} style={{padding:"8px 12px",borderRadius:10,border:"none",background:isPlay?tw.color+"20":tw.color+"12",color:tw.color,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                  {isPlay?<><span style={{width:6,height:6,borderRadius:3,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>▶</>:<>▶ Play</>}
+            {/* Recording buttons — full width, clear */}
+            <div style={{display:"flex",gap:8}}>
+              {hasRec?<>
+                <button onClick={()=>playAudio(wotdRecs[lk],lk)} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:playing===lk?tw.color+"25":tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                  {playing===lk?<><span style={{width:8,height:8,borderRadius:4,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing...</>:"▶ Play yours"}
                 </button>
-                <button onClick={()=>deleteRecording(lk)} style={{padding:"8px",borderRadius:10,border:"none",background:"rgba(217,79,79,0.1)",color:"#D94F4F",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                <button onClick={()=>deleteRecording(lk)} style={{padding:"12px 14px",borderRadius:12,border:"none",background:"rgba(217,79,79,0.08)",color:"#D94F4F",cursor:"pointer",display:"flex",alignItems:"center",minHeight:44}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>
-              </div>
-              :<button onClick={()=>recordWord(lk)} style={{padding:"8px 14px",borderRadius:10,border:"none",background:isRec?S.rose+"20":"rgba(255,255,255,0.04)",color:isRec?S.rose:S.muted,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                {isRec?<><span style={{width:6,height:6,borderRadius:3,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Rec</>:<>🎙 Record</>}
-              </button>}
-              {hasPart&&<button onClick={()=>playPartnerWord(lk)} style={{padding:"8px 14px",borderRadius:10,border:"none",background:S.rose+"10",color:S.rose,fontSize:11,fontWeight:600,cursor:"pointer"}}>
-                {isPlayPart?"▶ Playing":"▶ "+partner}
+              </>
+              :<button onClick={()=>recordWord(lk)} style={{flex:1,padding:"12px",borderRadius:12,border:isRec?"none":"1px dashed rgba(255,255,255,0.12)",background:isRec?S.rose+"15":"rgba(255,255,255,0.02)",color:isRec?S.rose:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                {isRec?<><span style={{width:8,height:8,borderRadius:4,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Recording...</>:"🎙 Record your pronunciation"}
               </button>}
             </div>
+            {/* Partner recording */}
+            {hasPart&&<button onClick={()=>playAudio(partnerRecs[lk],'p_'+lk)} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:playing==='p_'+lk?S.rose+"20":S.rose+"08",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44,marginTop:8}}>
+              {playing==='p_'+lk?<><span style={{width:8,height:8,borderRadius:4,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing {partner}'s...</>:"▶ Listen to "+partner+"'s"}
+            </button>}
           </div>
         );})()}
       </div>
@@ -2536,7 +2546,7 @@ export default function App(){
   if(!user)return(<><style>{`
     .dc-shake{animation:shake 0.4s ease-in-out;}
     @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-  `}</style><Login onLogin={(u)=>setUser(u)}/></>);
+  `}</style><Login onLogin={(u)=>{setUser(u);setS('home');setTab('home');local.set('lastScreen','home');local.set('lastTab','home');}}/></>);
 
   return(<UserCtx.Provider value={{user,logout}}>
     <ErrorBoundary><DarkCtx.Provider value={dark}><Shell dark={dark}>
