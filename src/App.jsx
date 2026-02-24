@@ -6,34 +6,68 @@ const initSupabase = import("./supabase").then(m => { supabase = m.supabase; }).
 
 // Supabase sync helpers — write to both localStorage + Supabase
 const sync={
+  // Words
   async loadWords(){if(!supabase)return null;try{const{data}=await supabase.from('dc_words').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
   async addWord(text,from){if(!supabase)return;try{await supabase.from('dc_words').insert({text,from_name:from});}catch{}},
   async deleteWord(id){if(!supabase)return;try{await supabase.from('dc_words').delete().eq('id',id);}catch{}},
+  // Events
   async loadEvents(){if(!supabase)return null;try{const{data}=await supabase.from('dc_events').select('*').order('date',{ascending:true});return data;}catch{return null;}},
   async addEvent(evt){if(!supabase)return;try{await supabase.from('dc_events').insert(evt);}catch{}},
   async deleteEvent(id){if(!supabase)return;try{await supabase.from('dc_events').delete().eq('id',id);}catch{}},
+  // Notes/Ideas
   async loadNotes(){if(!supabase)return null;try{const{data}=await supabase.from('dc_notes').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
   async addNote(text,from){if(!supabase)return;try{await supabase.from('dc_notes').insert({text,from_name:from});}catch{}},
   async deleteNote(id){if(!supabase)return;try{await supabase.from('dc_notes').delete().eq('id',id);}catch{}},
+  // WOTD Recordings
   async loadRecs(dayIdx){if(!supabase)return null;try{const{data}=await supabase.from('dc_wotd_recs').select('*').eq('day_idx',dayIdx);return data;}catch{return null;}},
   async saveRec(dayIdx,langKey,userName,audioData){if(!supabase)return;try{await supabase.from('dc_wotd_recs').upsert({day_idx:dayIdx,lang_key:langKey,user_name:userName,audio_data:audioData},{onConflict:'day_idx,lang_key,user_name'});}catch{}},
   async deleteRec(dayIdx,langKey,userName){if(!supabase)return;try{await supabase.from('dc_wotd_recs').delete().eq('day_idx',dayIdx).eq('lang_key',langKey).eq('user_name',userName);}catch{}},
+  // Gym
   async loadGym(user){if(!supabase)return null;try{const{data}=await supabase.from('dc_gym').select('*').eq('user_name',user).order('date',{ascending:false});return data;}catch{return null;}},
-  async uploadAudio(file,epId){
+  async saveGymEntry(entry){if(!supabase)return;try{await supabase.from('dc_gym').upsert(entry,{onConflict:'user_name,date'});}catch{}},
+  // Storage upload
+  async uploadMedia(file,folder='general'){
     if(!supabase)return null;
     try{
-      const ext=file.name.split('.').pop()||'webm';
-      const path='tea/'+epId+'_'+Date.now()+'.'+ext;
+      const ext=file.name.split('.').pop()||'bin';
+      const path=folder+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+'.'+ext;
       const{error}=await supabase.storage.from('media').upload(path,file,{contentType:file.type,upsert:true});
       if(error)return null;
       const{data:{publicUrl}}=supabase.storage.from('media').getPublicUrl(path);
       return publicUrl;
     }catch{return null;}
   },
+  // Tea Sessions Episodes
   async loadEps(){if(!supabase)return null;try{const{data}=await supabase.from('dc_tea_eps').select('*').order('sort_order',{ascending:true});return data;}catch{return null;}},
   async saveEp(ep){if(!supabase)return;try{await supabase.from('dc_tea_eps').upsert(ep,{onConflict:'id'});}catch{}},
   async deleteEp(id){if(!supabase)return;try{await supabase.from('dc_tea_eps').delete().eq('id',id);}catch{}},
-  async saveGymEntry(entry){if(!supabase)return;try{await supabase.from('dc_gym').upsert(entry,{onConflict:'user_name,date'});}catch{}},
+  // Learn Progress
+  async loadLearn(user){if(!supabase)return null;try{const{data}=await supabase.from('dc_learn_progress').select('*').eq('user_name',user).single();return data;}catch{return null;}},
+  async loadAllLearn(){if(!supabase)return null;try{const{data}=await supabase.from('dc_learn_progress').select('*');return data;}catch{return null;}},
+  async saveLearn(user,xp,completed,streak,hearts){if(!supabase)return;try{await supabase.from('dc_learn_progress').upsert({user_name:user,xp,completed:JSON.stringify(completed),streak,hearts,updated_at:new Date().toISOString()},{onConflict:'user_name'});}catch{}},
+  // Browse — Videos
+  async loadBrowseVids(){if(!supabase)return null;try{const{data}=await supabase.from('dc_browse_vids').select('*').order('created_at',{ascending:true});return data;}catch{return null;}},
+  async addBrowseVid(item){if(!supabase)return;try{await supabase.from('dc_browse_vids').insert(item);}catch{}},
+  async deleteBrowseVid(id){if(!supabase)return;try{await supabase.from('dc_browse_vids').delete().eq('id',id);}catch{}},
+  async updateBrowseVid(id,updates){if(!supabase)return;try{await supabase.from('dc_browse_vids').update(updates).eq('id',id);}catch{}},
+  // Browse — Stories
+  async loadBrowseStories(){if(!supabase)return null;try{const{data}=await supabase.from('dc_browse_stories').select('*').order('created_at',{ascending:true});return data;}catch{return null;}},
+  async addBrowseStory(item){if(!supabase)return;try{await supabase.from('dc_browse_stories').insert(item);}catch{}},
+  async deleteBrowseStory(id){if(!supabase)return;try{await supabase.from('dc_browse_stories').delete().eq('id',id);}catch{}},
+  async updateBrowseStory(id,updates){if(!supabase)return;try{await supabase.from('dc_browse_stories').update(updates).eq('id',id);}catch{}},
+  // Browse — Q&A
+  async loadBrowseQA(){if(!supabase)return null;try{const{data}=await supabase.from('dc_browse_qa').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
+  async addBrowseQA(q,from){if(!supabase)return;try{await supabase.from('dc_browse_qa').insert({question:q,from_user:from});}catch{}},
+  async answerBrowseQA(id,answer){if(!supabase)return;try{await supabase.from('dc_browse_qa').update({answer}).eq('id',id);}catch{}},
+  // Goals
+  async loadGoals(){if(!supabase)return null;try{const{data}=await supabase.from('dc_goals').select('*').order('sort_order',{ascending:true});return data;}catch{return null;}},
+  async addGoal(t,order){if(!supabase)return;try{await supabase.from('dc_goals').insert({t,sort_order:order});}catch{}},
+  async toggleGoal(id,done){if(!supabase)return;try{await supabase.from('dc_goals').update({done}).eq('id',id);}catch{}},
+  async deleteGoal(id){if(!supabase)return;try{await supabase.from('dc_goals').delete().eq('id',id);}catch{}},
+  // Chat
+  async loadChat(){if(!supabase)return null;try{const{data}=await supabase.from('dc_chat').select('*').order('created_at',{ascending:true}).limit(200);return data;}catch{return null;}},
+  async sendChat(from,to,message){if(!supabase)return;try{await supabase.from('dc_chat').insert({from_user:from,to_user:to,message});}catch{}},
+  async markChatRead(user){if(!supabase)return;try{await supabase.from('dc_chat').update({read:true}).eq('to_user',user).eq('read',false);}catch{}},
 };
 
 // Dark mode context
@@ -1055,11 +1089,13 @@ function Cv({size=48,v="main",r=4,sh}){
 
 function Shell({children,dark}){return(<div className="dc-shell" style={{width:"100%",maxWidth:480,height:"100vh",margin:"0 auto",overflow:"hidden",position:"relative",background:dark?WD.bg:S.black,transition:"background 0.3s"}}><style>{CSS}</style>{children}</div>);}
 
-function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Tea",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
+function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Tea",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"chat",label:"Chat",d:"M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 12px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
 
 function Home({go}){
   const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';const partner=user==='shah'?'Dane':'Shah';
-  const xp=local.get(user+'_xp',0);const completed=local.get(user+'_completed',[]);const streak=local.get(user+'_streak',0);
+  const [xp,setXp]=useState(()=>local.get(user+'_xp',0));const [completed,setCompleted]=useState(()=>local.get(user+'_completed',[]));const streak=local.get(user+'_streak',0);
+  // Sync learn progress on home mount
+  useEffect(()=>{initSupabase.then(()=>{sync.loadLearn(user).then(d=>{if(d){const c=typeof d.completed==='string'?JSON.parse(d.completed):d.completed||[];if(d.xp>xp)setXp(d.xp);if(c.length>completed.length)setCompleted(c);}});});},[]);
   // Thinking of you — Supabase realtime with localStorage fallback
   const [vibes,setVibes]=useState(()=>local.get('dc_vibes',[]));
   const [vibesLoaded,setVibesLoaded]=useState(false);
@@ -1161,12 +1197,40 @@ function Home({go}){
   const td=R[dayNum-1]||R[0];
   const hr=new Date().getHours();
   const greeting=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
-  // Additional prayer times for Edmonton (approximate for late Feb - mid March 2026)
-  const prayers=[
+  // Real prayer times from aladhan.com API
+  const [prayers,setPrayers]=useState([
     {name:"Fajr",time:td.fajr,active:hr<6},{name:"Zuhr",time:"12:45",active:hr>=6&&hr<13},
     {name:"Asr",time:"3:45",active:hr>=13&&hr<16},{name:"Maghrib",time:td.mag,active:hr>=16&&hr<19},
     {name:"Isha",time:"8:45",active:hr>=19}
-  ];
+  ]);
+  useEffect(()=>{
+    const fetchPrayer=async()=>{
+      try{
+        const today=new Date();const dd=today.getDate();const mm=today.getMonth()+1;const yyyy=today.getFullYear();
+        // Edmonton: lat 53.5461, lon -113.4938, method 2 (ISNA)
+        const res=await fetch(`https://api.aladhan.com/v1/timings/${dd}-${mm}-${yyyy}?latitude=53.5461&longitude=-113.4938&method=2`);
+        const data=await res.json();
+        if(data?.data?.timings){
+          const t=data.data.timings;
+          const to12=s=>{const [h,m]=s.split(':').map(Number);return(h>12?h-12:h||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM');};
+          const toMin=s=>{const [h,m]=s.split(':').map(Number);return h*60+m;};
+          const nowMin=new Date().getHours()*60+new Date().getMinutes();
+          const pts=[
+            {name:"Fajr",time:to12(t.Fajr),rawMin:toMin(t.Fajr)},
+            {name:"Zuhr",time:to12(t.Dhuhr),rawMin:toMin(t.Dhuhr)},
+            {name:"Asr",time:to12(t.Asr),rawMin:toMin(t.Asr)},
+            {name:"Maghrib",time:to12(t.Maghrib),rawMin:toMin(t.Maghrib)},
+            {name:"Isha",time:to12(t.Isha),rawMin:toMin(t.Isha)}
+          ];
+          // Find next prayer
+          let nextIdx=pts.findIndex(p=>p.rawMin>nowMin);
+          if(nextIdx===-1)nextIdx=0;
+          setPrayers(pts.map((p,i)=>({...p,active:i===nextIdx})));
+        }
+      }catch{}
+    };
+    fetchPrayer();
+  },[]);
   const nextPrayer=prayers.find(p=>p.active)||prayers[0];
 
   // Words of the Day — one from each language
@@ -1502,43 +1566,60 @@ function Home({go}){
 
 function Browse({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
-  const [sel,setSel]=useState(null);const [askQ,setAskQ]=useState("");const [asked,setAsked]=useState(()=>local.get('browse_asked',[]));
+  const [sel,setSel]=useState(null);const [askQ,setAskQ]=useState("");
   const [editId,setEditId]=useState(null);const [editText,setEditText]=useState("");
   const [addingWord,setAddingWord]=useState(false);const [newWord,setNewWord]=useState("");
-  const [ms,setMs]=useState(()=>local.get('browse_ms',[]));
+  const [ms,setMs]=useState([]);
   const [addingM,setAddingM]=useState(false);const [newM,setNewM]=useState("");const [newD,setNewD]=useState("");const [playVid,setPlayVid]=useState(null);
-  // Editable Browse content — stored in localStorage
-  const [bVids,setBVids]=useState(()=>local.get('browse_vids',[]));
-  const [bStories,setBStories]=useState(()=>local.get('browse_stories',[]));
-  const [bRecipes,setBRecipes]=useState(()=>local.get('browse_recipes',[]));
-  const [bQA,setBQA]=useState(()=>local.get('browse_qa',[]));
-  const [bWords,setBWords]=useState(()=>local.get('browse_words',[]));
-  // Persist on change
-  useEffect(()=>{local.set('browse_vids',bVids);},[bVids]);
-  useEffect(()=>{local.set('browse_stories',bStories);},[bStories]);
-  useEffect(()=>{local.set('browse_recipes',bRecipes);},[bRecipes]);
-  useEffect(()=>{local.set('browse_qa',bQA);},[bQA]);
-  useEffect(()=>{local.set('browse_words',bWords);},[bWords]);
-  useEffect(()=>{local.set('browse_ms',ms);},[ms]);
-  useEffect(()=>{local.set('browse_asked',asked);},[asked]);
+  // Supabase-synced Browse content
+  const [bVids,setBVids]=useState([]);
+  const [bStories,setBStories]=useState([]);
+  const [bRecipes,setBRecipes]=useState([]);
+  const [bQA,setBQA]=useState([]);
+  const [bWords,setBWords]=useState([]);
+  const [loadingBrowse,setLoadingBrowse]=useState(true);
+  // Load from Supabase on mount
+  useEffect(()=>{
+    initSupabase.then(async()=>{
+      const [vids,stories,qa]=await Promise.all([
+        sync.loadBrowseVids(),sync.loadBrowseStories(),sync.loadBrowseQA()
+      ]);
+      if(vids)setBVids(vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id})));
+      if(stories)setBStories(stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id})));
+      if(qa)setBQA(qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id})));
+      // Migrate from localStorage if Supabase empty
+      if(!vids||!vids.length){const lv=local.get('browse_vids',[]);if(lv.length){setBVids(lv);lv.forEach(v=>sync.addBrowseVid({t:v.t,s:v.s||'',file_name:v.file,media_url:v.url,media_type:v.type,dur:v.dur}));}}
+      if(!stories||!stories.length){const ls=local.get('browse_stories',[]);if(ls.length){setBStories(ls);ls.forEach(s=>sync.addBrowseStory({t:s.t,s:s.s||'',file_name:s.file,media_url:s.url,media_type:s.media_type,dur:s.dur}));}}
+      if(!qa||!qa.length){const lq=local.get('browse_asked',[]);if(lq.length){setBQA(lq);lq.forEach(q=>sync.addBrowseQA(q.q,q.from||'dane'));}}
+      setLoadingBrowse(false);
+    });
+  },[]);
   // Helper: editable list with add/delete for Shah, view-only + comment for Dane
-  const EditList=({items,setItems,fields,emptyMsg,color="#0B6B48",mediaType})=>{
+  const EditList=({items,setItems,fields,emptyMsg,color="#0B6B48",mediaType,syncAdd,syncDelete})=>{
     const fileRef=React.useRef(null);
     const [addForm,setAddForm]=useState(null);const [formData,setFormData]=useState({});
-    const handleFile=(file)=>{
+    const [uploading,setUploading]=useState(false);
+    const handleFile=async(file)=>{
       if(!file)return;
-      const url=URL.createObjectURL(file);
-      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url,type:file.type};
+      setUploading(true);
+      const folder=mediaType==='video'?'browse_vids':'browse_stories';
+      const url=await sync.uploadMedia(file,folder);
+      const finalUrl=url||URL.createObjectURL(file);
+      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type};
       // Auto-detect duration
       if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
         const el=document.createElement(file.type.startsWith('video/')?'video':'audio');
-        el.src=url;el.onloadedmetadata=()=>{
+        el.crossOrigin='anonymous';el.src=finalUrl;el.onloadedmetadata=()=>{
           const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);
           item.dur=m+":"+String(s).padStart(2,'0');
-          setItems([...items,item]);setFormData({});setAddForm(null);
-        };
+          setItems(prev=>[...prev,item]);
+          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type,dur:item.dur});
+          setFormData({});setAddForm(null);setUploading(false);
+        };el.onerror=()=>{setItems(prev=>[...prev,item]);if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});setFormData({});setAddForm(null);setUploading(false);};
       }else{
-        setItems([...items,item]);setFormData({});setAddForm(null);
+        setItems(prev=>[...prev,item]);
+        if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});
+        setFormData({});setAddForm(null);setUploading(false);
       }
     };
     const [playItem,setPlayItem]=useState(null);
@@ -1621,7 +1702,7 @@ function Browse({go}){
             <input value={formData.c||""} onChange={e=>setFormData({c:e.target.value})} placeholder="Your reply..." autoFocus style={{flex:1,padding:"6px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
             <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
           </div>}
-          {isShah&&<button onClick={e=>{e.stopPropagation();setItems(items.filter((_,j)=>j!==i));}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
+          {isShah&&<button onClick={e=>{e.stopPropagation();const item=items[i];if(item.id&&syncDelete)syncDelete(item.id);setItems(items.filter((_,j)=>j!==i));}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
         </div>
       </div>))}
       {isShah&&<div style={{marginTop:12}}>
@@ -1633,10 +1714,11 @@ function Browse({go}){
               <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.4)"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
               Upload {mediaType}
             </button>}
-            {!mediaType&&<button onClick={()=>{if(formData.t){setItems([...items,{...formData}]);setFormData({});setAddForm(null);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:color,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button>}
+            {!mediaType&&<button onClick={()=>{if(formData.t){const item={...formData,id:Date.now()};setItems([...items,item]);if(syncAdd)syncAdd({t:item.t,s:item.s||''});setFormData({});setAddForm(null);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:color,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button>}
             <button onClick={()=>{setAddForm(null);setFormData({});}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Cancel</button>
           </div>
-          {mediaType&&<button onClick={()=>{if(formData.t){setItems([...items,{...formData}]);setFormData({});setAddForm(null);}}} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:10,border:"none",background:color,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add without file</button>}
+          {uploading&&<p style={{color:"rgba(255,255,255,0.4)",fontSize:12,marginTop:8,textAlign:"center"}}>Uploading...</p>}
+          {mediaType&&!uploading&&<button onClick={()=>{if(formData.t){const item={...formData,id:Date.now()};setItems([...items,item]);if(syncAdd)syncAdd({t:item.t,s:item.s||''});setFormData({});setAddForm(null);}}} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:10,border:"none",background:color,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add without file</button>}
         </div>
         :<button onClick={()=>setAddForm(fields[0]?.k)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.25)",fontSize:13,cursor:"pointer"}}>+ add</button>}
       </div>}
@@ -1653,13 +1735,13 @@ function Browse({go}){
   // First Steps — Shah's video guides
   if(sel==="steps")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
     {back}<div style={{padding:"0 16px"}}><h2 style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>First Steps</h2><p style={{color:S.muted,fontSize:13,margin:"0 0 16px"}}>Shah's video guides for Dane</p></div>
-    <EditList items={bVids} setItems={setBVids} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No videos yet — Shah will add them" color="#0B6B48" mediaType="video"/>
+    <EditList items={bVids} setItems={setBVids} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No videos yet — Shah will add them" color="#0B6B48" mediaType="video" syncAdd={item=>sync.addBrowseVid(item)} syncDelete={id=>sync.deleteBrowseVid(id)}/>
   </div>);
 
   // Storytime — Prophets' stories
   if(sel==="stories")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
     {back}<div style={{padding:"0 16px"}}><h2 style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>Storytime</h2><p style={{color:S.muted,fontSize:13,margin:"0 0 16px"}}>Stories of the Prophets</p></div>
-    <EditList items={bStories} setItems={setBStories} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No stories yet" color="#4A2068" mediaType="audio"/>
+    <EditList items={bStories} setItems={setBStories} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No stories yet" color="#4A2068" mediaType="audio" syncAdd={item=>sync.addBrowseStory(item)} syncDelete={id=>sync.deleteBrowseStory(id)}/>
   </div>);
 
   // Ask Anything — Q&A
@@ -1670,17 +1752,17 @@ function Browse({go}){
       {!isShah&&<div style={{marginBottom:16}}>
         <div style={{display:"flex",gap:8}}>
           <input value={askQ} onChange={e=>setAskQ(e.target.value)} placeholder="Ask Shah anything..." style={{flex:1,padding:"12px 16px",borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
-          <button onClick={()=>{if(askQ.trim()){setAsked([{q:askQ.trim(),a:"",from:"Dane",id:Date.now()},...asked]);setAskQ("");}}} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.green,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Ask</button>
+          <button onClick={()=>{if(askQ.trim()){const item={q:askQ.trim(),a:"",from:"Dane",id:Date.now()};setBQA([item,...bQA]);sync.addBrowseQA(askQ.trim(),'dane');setAskQ("");}}} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.green,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Ask</button>
         </div>
       </div>}
-      {asked.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:S.muted,fontSize:13}}>No questions yet</p></div>}
-      {asked.map((q,i)=>(<div key={q.id||i} style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,marginBottom:10,border:"1px solid rgba(255,255,255,0.04)"}}>
+      {bQA.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:S.muted,fontSize:13}}>No questions yet</p></div>}
+      {bQA.map((q,i)=>(<div key={q.id||i} style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,marginBottom:10,border:"1px solid rgba(255,255,255,0.04)"}}>
         <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 8px"}}>{q.q}</p>
         {q.a?<p style={{color:S.sub,fontSize:13,margin:0,lineHeight:1.5}}>{q.a}</p>
         :isShah?<div>
           {editId===q.id?<div style={{display:"flex",gap:8}}>
             <input value={editText} onChange={e=>setEditText(e.target.value)} placeholder="Your answer..." autoFocus style={{flex:1,padding:"8px 12px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
-            <button onClick={()=>{const n=[...asked];n[i]={...n[i],a:editText};setAsked(n);setEditId(null);setEditText("");}} style={{padding:"8px 14px",borderRadius:10,border:"none",background:S.green,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>Save</button>
+            <button onClick={()=>{const n=[...bQA];n[i]={...n[i],a:editText};setBQA(n);if(q.id)sync.answerBrowseQA(q.id,editText);setEditId(null);setEditText("");}} style={{padding:"8px 14px",borderRadius:10,border:"none",background:S.green,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>Save</button>
           </div>
           :<button onClick={()=>{setEditId(q.id);setEditText("");}} style={{padding:"6px 14px",borderRadius:10,border:"1px solid rgba(29,185,84,0.3)",background:"transparent",color:S.green,fontSize:12,cursor:"pointer"}}>Answer this</button>}
         </div>
@@ -1705,13 +1787,32 @@ function Learn(){
   const {user}=useUser()||{user:'shah'};
   const [lang,setLang]=useState(null);const [view,setView]=useState("home");const [lesson,setLesson]=useState(null);const [step,setStep]=useState(0);const [qIdx,setQIdx]=useState(0);const [sel,setSel]=useState(null);const [ok,setOk]=useState(null);const [xp,setXp]=useState(()=>local.get(user+'_xp',0));const [hearts,setHearts]=useState(()=>local.get(user+'_hearts',5));const [score,setScore]=useState(0);const [done,setDone]=useState(false);const [completed,setCompleted]=useState(()=>local.get(user+'_completed',[]));const [streak]=useState(()=>local.get(user+'_streak',0));const [wCat,setWCat]=useState(null);
   useEffect(()=>{local.set(user+'_xp',xp);},[xp]);useEffect(()=>{local.set(user+'_hearts',hearts);},[hearts]);useEffect(()=>{local.set(user+'_completed',completed);},[completed]);
+  // Sync learn progress to Supabase
+  const syncLearnRef=React.useRef(null);
+  useEffect(()=>{
+    initSupabase.then(()=>{
+      sync.loadLearn(user).then(data=>{
+        if(data){
+          const sbCompleted=typeof data.completed==='string'?JSON.parse(data.completed):data.completed||[];
+          // Merge: take whichever has more progress
+          if(data.xp>xp)setXp(data.xp);
+          if(sbCompleted.length>completed.length){setCompleted(sbCompleted);local.set(user+'_completed',sbCompleted);}
+          if(data.hearts!==undefined&&data.hearts!==hearts)setHearts(data.hearts);
+        }
+      });
+    });
+  },[]);
+  useEffect(()=>{
+    if(syncLearnRef.current)clearTimeout(syncLearnRef.current);
+    syncLearnRef.current=setTimeout(()=>{sync.saveLearn(user,xp,completed,streak,hearts);},2000);
+  },[xp,completed,hearts]);
   const [goalTab,setGoalTab]=useState("self");
 
   const isUnlocked=(ls)=>{if(!ls.unlockAfter)return true;return completed.includes(ls.unlockAfter);};
   const langProgress=(key)=>{const l=LANGS[key];const total=l.lessons.length;const done2=l.lessons.filter(ls=>completed.includes(ls.id)).length;return Math.round((done2/total)*100);};
 
   const answer=(idx)=>{if(sel!==null)return;setSel(idx);const c=idx===lesson.quiz[qIdx].ans;setOk(c);if(!c)setHearts(h=>Math.max(0,h-1));else setScore(s=>s+1);setTimeout(()=>{if(qIdx<lesson.quiz.length-1){setQIdx(qIdx+1);setSel(null);setOk(null);}else{
-    setDone(true);setXp(x=>x+(lesson.xp||15));
+    setDone(true);setXp(x=>x+(lesson.xp||15));local.set(user+'_lastLessonDate',new Date().toISOString().split('T')[0]);
     if(!completed.includes(lesson.id)){
       setCompleted([...completed,lesson.id]);
       // Send notification to partner about lesson completion
@@ -1925,10 +2026,12 @@ function Learn(){
   // Learn home — Sy messages
   const syMsgs=["Ready to learn?","Sy believes in you!","Let's get those XP!","Purrfect day to study!","You're doing amazing!"];
   const syMsg=syMsgs[Math.floor(Date.now()/86400000)%syMsgs.length];
-  // Leaderboard — both users' progress
+  // Leaderboard — both users' progress from Supabase
   const partnerUser=user==='shah'?'dane':'shah';
-  const myXp=xp;const partnerXp=local.get(partnerUser+'_xp',0);
-  const myLessons=completed.length;const partnerLessons=local.get(partnerUser+'_completed',[]).length;
+  const [partnerXp,setPartnerXp]=useState(0);const [partnerLessons,setPartnerLessons]=useState(0);
+  useEffect(()=>{initSupabase.then(()=>{sync.loadLearn(partnerUser).then(d=>{if(d){setPartnerXp(d.xp||0);const pc=typeof d.completed==='string'?JSON.parse(d.completed):d.completed||[];setPartnerLessons(pc.length);}});});},[]);
+  const myXp=xp;
+  const myLessons=completed.length;
   const myName=user==='shah'?'Shah':'Dane';const partnerName=user==='shah'?'Dane':'Shah';
   const iWin=myXp>=partnerXp;
 
@@ -1987,7 +2090,7 @@ function Learn(){
       <svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted} style={{flexShrink:0}}><path d="M9 18l6-6-6-6"/></svg>
     </button>);})}
 
-    {(xp>0||completed.length>0)&&<button onClick={()=>{setXp(0);setCompleted([]);setHearts(5);local.set(user+'_xp',0);local.set(user+'_completed',[]);local.set(user+'_hearts',5);}} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:12,border:"1px solid "+W.error+"15",background:"transparent",color:W.error,fontSize:12,cursor:"pointer",fontWeight:500}}>Reset all progress</button>}
+    {(xp>0||completed.length>0)&&<button onClick={()=>{setXp(0);setCompleted([]);setHearts(5);local.set(user+'_xp',0);local.set(user+'_completed',[]);local.set(user+'_hearts',5);sync.saveLearn(user,0,[],0,5);}} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:12,border:"1px solid "+W.error+"15",background:"transparent",color:W.error,fontSize:12,cursor:"pointer",fontWeight:500}}>Reset all progress</button>}
   </div></div>);
 }
 
@@ -2008,12 +2111,12 @@ function Us({onDark,isDark}){
   const [settings,setSettings]=useState({notif:true,alarms:true,sounds:false});
   const [notes,setNotes]=useState(()=>local.get('us_notes',[]));const [addNote,setAddNote]=useState(false);const [noteText,setNoteText]=useState("");
   const [addingWord,setAddingWord]=useState(false);const [newWord,setNewWord]=useState("");
-  const [goals,setGoals]=useState(()=>local.get('us_goals',[
-    {t:"Learn 100 words in each language",done:false,id:1},{t:"First Eid together",done:false,id:2},
-    {t:"Cook Nihari together",done:false,id:3},{t:"Visit a masjid together",done:false,id:4},
-    {t:"Meet each other's families",done:false,id:5}
-  ]));const [addGoal,setAddGoal]=useState(false);const [newGoalText,setNewGoalText]=useState("");
-  useEffect(()=>{local.set('us_goals',goals);},[goals]);
+  const [goals,setGoals]=useState([]);const [addGoal,setAddGoal]=useState(false);const [newGoalText,setNewGoalText]=useState("");
+  // Sync goals from Supabase
+  useEffect(()=>{initSupabase.then(()=>{sync.loadGoals().then(d=>{
+    if(d&&d.length)setGoals(d.map(g=>({t:g.t,done:g.done,id:g.id,sort_order:g.sort_order})));
+    else{const lg=local.get('us_goals',[]);if(lg.length){setGoals(lg);lg.forEach((g,i)=>sync.addGoal(g.t,i));}}
+  });});},[]);
   // Sync notes from Supabase on mount
   useEffect(()=>{initSupabase.then(()=>{sync.loadNotes().then(d=>{if(d&&d.length)setNotes(d.map(n=>({text:n.text,from:n.from_name,dt:new Date(n.created_at).toLocaleDateString(),id:n.id})));});});},[]);
   useEffect(()=>{local.set('us_notes',notes);},[notes]);
@@ -2203,7 +2306,7 @@ function Us({onDark,isDark}){
         {addGoal?<div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:12}}>
           <input value={newGoalText} onChange={e=>setNewGoalText(e.target.value)} placeholder="New goal..." autoFocus style={{width:"100%",padding:"8px 0",background:"transparent",border:"none",color:W.text,fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
           <div style={{display:"flex",gap:8,marginTop:8}}>
-            <button onClick={()=>{if(newGoalText.trim()){setGoals([...goals,{t:newGoalText.trim(),done:false,id:Date.now()}]);setNewGoalText("");setAddGoal(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button>
+            <button onClick={()=>{if(newGoalText.trim()){const g={t:newGoalText.trim(),done:false,id:Date.now()};setGoals([...goals,g]);sync.addGoal(g.t,goals.length);setNewGoalText("");setAddGoal(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button>
             <button onClick={()=>{setAddGoal(false);setNewGoalText("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>
@@ -2212,12 +2315,12 @@ function Us({onDark,isDark}){
         {goals.length>0&&<div style={{marginBottom:16}}>
           <div style={{height:6,background:W.border,borderRadius:3,overflow:"hidden"}}><div style={{width:Math.round((goals.filter(g=>g.done).length/goals.length)*100)+"%",height:"100%",background:W.success,borderRadius:3,transition:"width 0.4s"}}/></div>
         </div>}
-        {goals.map((g,i)=>(<div key={g.id} onClick={()=>{const n=[...goals];n[i]={...n[i],done:!n[i].done};setGoals(n);}} style={{display:"flex",gap:12,padding:"14px 0",borderBottom:i<goals.length-1?"1px solid "+W.border:"none",cursor:"pointer",alignItems:"center"}}>
+        {goals.map((g,i)=>(<div key={g.id} onClick={()=>{const n=[...goals];n[i]={...n[i],done:!n[i].done};setGoals(n);if(g.id)sync.toggleGoal(g.id,!g.done);}} style={{display:"flex",gap:12,padding:"14px 0",borderBottom:i<goals.length-1?"1px solid "+W.border:"none",cursor:"pointer",alignItems:"center"}}>
           <div style={{width:22,height:22,borderRadius:"50%",background:g.done?W.success:"transparent",border:g.done?"none":"2px solid "+W.border,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
             {g.done&&<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
           </div>
           <p style={{flex:1,color:g.done?W.success:W.text,fontSize:14,fontWeight:g.done?600:400,margin:0,textDecoration:g.done?"line-through":"none",transition:"all 0.2s"}}>{g.t}</p>
-          <button onClick={e=>{e.stopPropagation();setGoals(goals.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+          <button onClick={e=>{e.stopPropagation();if(g.id)sync.deleteGoal(g.id);setGoals(goals.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
         </div>))}
         {goals.length===0&&!addGoal&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:W.textMuted,fontSize:13}}>No goals yet — let's set some together</p></div>}
       </div>}
@@ -2571,7 +2674,7 @@ function Series({go}){
   useEffect(()=>{local.set('tea_eps',eps);},[eps]);
   useEffect(()=>{local.set('tea_comments',comments);},[comments]);
 
-  // Load from Supabase on mount
+  // Load from Supabase on mount — if empty, push local data up
   useEffect(()=>{
     initSupabase.then(()=>{
       sync.loadEps().then(data=>{
@@ -2587,17 +2690,41 @@ function Series({go}){
             sort_order:r.sort_order||0
           }));
           setEps(mapped);local.set('tea_eps',mapped);
+        }else{
+          // Supabase empty — push current localStorage episodes up
+          const localEps=local.get('tea_eps',null);
+          if(localEps&&localEps.length){
+            localEps.forEach((ep,i)=>{
+              const{v,...rest}=ep;
+              sync.saveEp({...rest,cover_variant:v||'main',sort_order:i+1});
+            });
+          }
         }
       });
+      // Sync comments to Supabase
+      if(supabase){
+        supabase.from('dc_tea_comments').select('*').then(({data})=>{
+          if(data&&data.length){
+            const merged={...comments};
+            data.forEach(r=>{merged[r.ep_id]=r.comment_text;});
+            setComments(merged);local.set('tea_comments',merged);
+          }else{
+            // Push local comments up
+            Object.entries(comments).forEach(([epId,text])=>{
+              if(text)supabase.from('dc_tea_comments').upsert({ep_id:Number(epId),comment_text:typeof text==='object'?JSON.stringify(text):text,user_name:'dane'},{onConflict:'ep_id'}).catch(()=>{});
+            });
+          }
+        }).catch(()=>{});
+      }
     });
   },[]);
 
   // Save eps to Supabase whenever they change
   const saveEpsToSupabase=(updatedEps)=>{
     setEps(updatedEps);
-    updatedEps.forEach(ep=>{
+    updatedEps.forEach((ep,i)=>{
       const{v,...rest}=ep;
-      sync.saveEp({...rest,cover_variant:v||'main'});
+      sync.saveEp({...rest,cover_variant:v||'main',sort_order:i+1});
     });
   };
 
@@ -2606,7 +2733,7 @@ function Series({go}){
     const mediaType=file.type.startsWith("video")?"video":"audio";
     setUploading(true);
     // Upload to Supabase Storage
-    const url=await sync.uploadAudio(file,epId);
+    const url=await sync.uploadMedia(file,'tea');
     if(url){
       // Get duration
       const el=document.createElement(mediaType);
@@ -2694,7 +2821,7 @@ function Series({go}){
           setUploading(true);
           const mt=newEp.file.type.startsWith("video")?"video":"audio";
           ep.mediaType=mt;ep.fileName=newEp.file.name;
-          const url=await sync.uploadAudio(newEp.file,ep.id);
+          const url=await sync.uploadMedia(newEp.file,'tea');
           if(url){
             ep.mediaUrl=url;
             // Try get duration
@@ -2756,7 +2883,7 @@ function Series({go}){
       </div>}
       {/* Dane's comment */}
       {comments[ep.id]&&<div style={{marginLeft:54,padding:"8px 12px",background:"rgba(232,17,91,0.06)",borderRadius:10,marginBottom:6}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {comments[ep.id]}</p></div>}
-      {!isShah&&ep.s!=="locked"&&(reflectId===ep.id?<div style={{display:"flex",gap:4,marginLeft:54,marginBottom:6}}><input value={reflectText} onChange={e=>setReflectText(e.target.value)} autoFocus placeholder="Your thoughts..." style={{flex:1,padding:"8px 12px",borderRadius:10,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(232,17,91,0.12)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/><button onClick={()=>{if(reflectText.trim()){setComments({...comments,[ep.id]:reflectText.trim()});setReflectId(null);setReflectText("");}}} style={{padding:"8px 12px",borderRadius:10,border:"none",background:"#E8115B",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Save</button></div>:<button onClick={()=>{setReflectId(ep.id);setReflectText(comments[ep.id]||"");}} style={{marginLeft:54,padding:"6px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>{comments[ep.id]?"Edit reflection":"Reflect"}</button>)}
+      {!isShah&&ep.s!=="locked"&&(reflectId===ep.id?<div style={{display:"flex",gap:4,marginLeft:54,marginBottom:6}}><input value={reflectText} onChange={e=>setReflectText(e.target.value)} autoFocus placeholder="Your thoughts..." style={{flex:1,padding:"8px 12px",borderRadius:10,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(232,17,91,0.12)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/><button onClick={()=>{if(reflectText.trim()){const updated={...comments,[ep.id]:reflectText.trim()};setComments(updated);setReflectId(null);setReflectText("");if(supabase)supabase.from('dc_tea_comments').upsert({ep_id:ep.id,comment_text:reflectText.trim(),user_name:'dane'},{onConflict:'ep_id'}).catch(()=>{});}}} style={{padding:"8px 12px",borderRadius:10,border:"none",background:"#E8115B",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Save</button></div>:<button onClick={()=>{setReflectId(ep.id);setReflectText(comments[ep.id]||"");}} style={{marginLeft:54,padding:"6px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>{comments[ep.id]?"Edit reflection":"Reflect"}</button>)}
     </div>))}
     {/* Shah: add episode */}
     {isShah&&<div style={{marginTop:16}}>
@@ -2785,16 +2912,92 @@ class ErrorBoundary extends React.Component{
   }
 }
 
+// ── Chat Component ──
+function Chat(){
+  const {user}=useUser()||{user:'shah'};const other=user==='shah'?'dane':'shah';
+  const [msgs,setMsgs]=useState([]);const [text,setText]=useState("");const [loading,setLoading]=useState(true);
+  const scrollRef=React.useRef(null);const inputRef=React.useRef(null);
+  // Load messages
+  useEffect(()=>{
+    initSupabase.then(async()=>{
+      const data=await sync.loadChat();
+      if(data)setMsgs(data);
+      setLoading(false);
+      // Mark as read
+      sync.markChatRead(user);
+      // Realtime subscription
+      if(supabase){
+        const ch=supabase.channel('chat-rt-'+Date.now()).on('postgres_changes',{event:'INSERT',schema:'public',table:'dc_chat'},payload=>{
+          setMsgs(prev=>[...prev,payload.new]);
+          if(payload.new.to_user===user){
+            notif.notify(payload.new.from_user==='shah'?'Shah':'Dane',payload.new.message);
+            sync.markChatRead(user);
+          }
+        }).subscribe();
+        return()=>supabase.removeChannel(ch);
+      }
+    });
+  },[]);
+  // Auto-scroll to bottom
+  useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs]);
+  const send=()=>{
+    if(!text.trim())return;
+    sync.sendChat(user,other,text.trim());
+    setText("");
+    inputRef.current?.focus();
+  };
+  const formatTime=(ts)=>{const d=new Date(ts);return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
+  const formatDate=(ts)=>{const d=new Date(ts);const today=new Date();if(d.toDateString()===today.toDateString())return"Today";const y=new Date(today-86400000);if(d.toDateString()===y.toDateString())return"Yesterday";return d.toLocaleDateString([],{month:'short',day:'numeric'});};
+  // Group messages by date
+  const grouped=[];let lastDate="";
+  msgs.forEach(m=>{const d=formatDate(m.created_at);if(d!==lastDate){grouped.push({type:'date',label:d});lastDate=d;}grouped.push({type:'msg',...m});});
+
+  return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:S.black}}>
+    {/* Header */}
+    <div style={{padding:"max(14px, env(safe-area-inset-top)) 20px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+      <h1 style={{color:S.white,fontSize:22,fontWeight:800,margin:0,letterSpacing:-0.5}}>Chat</h1>
+      <p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>{user==='shah'?'Shah & Dane':'Dane & Shah'}</p>
+    </div>
+    {/* Messages */}
+    <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"12px 16px",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",gap:4}}>
+      {loading&&<div style={{textAlign:"center",padding:40}}><p style={{color:S.muted,fontSize:13}}>Loading...</p></div>}
+      {!loading&&msgs.length===0&&<div style={{textAlign:"center",padding:40,flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:56,height:56,borderRadius:28,background:"linear-gradient(135deg,#0B6B48,#0A3D2C)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.6)"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+        </div>
+        <p style={{color:S.muted,fontSize:13}}>Send {other==='dane'?'Dane':'Shah'} a message ☕</p>
+      </div>}
+      {grouped.map((item,i)=>{
+        if(item.type==='date')return <div key={'d'+i} style={{textAlign:"center",padding:"8px 0"}}><span style={{color:S.muted,fontSize:11,fontWeight:600,background:"rgba(255,255,255,0.04)",padding:"4px 12px",borderRadius:12}}>{item.label}</span></div>;
+        const mine=item.from_user===user;
+        return <div key={item.id||i} style={{display:"flex",justifyContent:mine?"flex-end":"flex-start",marginBottom:2}}>
+          <div style={{maxWidth:"78%",padding:"10px 14px",borderRadius:mine?"18px 18px 4px 18px":"18px 18px 18px 4px",background:mine?"#0B6B48":"rgba(255,255,255,0.08)",color:mine?"#fff":S.white}}>
+            <p style={{fontSize:14,margin:0,lineHeight:1.45,wordBreak:"break-word"}}>{item.message}</p>
+            <p style={{fontSize:10,margin:"4px 0 0",color:mine?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.3)",textAlign:"right"}}>{formatTime(item.created_at)}</p>
+          </div>
+        </div>;
+      })}
+    </div>
+    {/* Input */}
+    <div style={{padding:"8px 12px max(12px, env(safe-area-inset-bottom))",borderTop:"1px solid rgba(255,255,255,0.06)",display:"flex",gap:8,alignItems:"flex-end",background:S.black}}>
+      <input ref={inputRef} value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} placeholder={"Message "+(other==='dane'?'Dane':'Shah')+"..."} style={{flex:1,padding:"12px 16px",borderRadius:24,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:14,outline:"none",fontFamily:"inherit",resize:"none"}}/>
+      <button onClick={send} disabled={!text.trim()} style={{width:42,height:42,borderRadius:21,border:"none",background:text.trim()?"#0B6B48":"rgba(255,255,255,0.06)",cursor:text.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s"}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={text.trim()?"#fff":"rgba(255,255,255,0.2)"}><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>);
+}
+
 export default function App(){
   const[user,setUser]=useState(()=>local.get('user',null));
-  const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","series","np","hw"].includes(saved)?saved:'home';});
-  const[tab,setTab]=useState(()=>{const saved=local.get('lastTab','home');return["home","browse","learn","us"].includes(saved)?saved:'home';});
+  const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","chat","series","np","hw"].includes(saved)?saved:'home';});
+  const[tab,setTab]=useState(()=>{const saved=local.get('lastTab','home');return["home","browse","learn","us","chat"].includes(saved)?saved:'home';});
   const[dark,setDark]=useState(()=>local.get('dark',false));
   const[notifStatus,setNotifStatus]=useState(()=>notif.supported?Notification.permission:'unsupported');
-  const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us"].includes(t)){setTab(t);local.set('lastTab',t);}};
+  const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us","chat"].includes(t)){setTab(t);local.set('lastTab',t);}};
   const setDarkMode=(v)=>{setDark(v);local.set('dark',v);};
   const logout=()=>{setUser(null);local.set('user',null);setS('home');setTab('home');};
-  const nav=["home","browse","learn","us","series"].includes(s);
+  const nav=["home","browse","learn","us","chat","series"].includes(s);
 
   // Don't auto-prompt for notifications — let user enable in settings
 
@@ -2817,9 +3020,25 @@ export default function App(){
     const dayNum=Math.max(1,Math.min(30,Math.floor((new Date()-ramStart)/(1000*60*60*24))+1));
     const td=R[dayNum-1];
     const check=()=>{if(td)notif.checkRamadan(td.fajr,td.mag,dayNum);};
-    check(); // Check immediately
-    const interval=setInterval(check,5*60*1000); // Re-check every 5 min while app is open
-    return()=>clearInterval(interval);
+    check();
+    const interval=setInterval(check,5*60*1000);
+    // Daily streak reminder — at 7 PM if no lesson done today
+    const streakCheck=()=>{
+      const today=new Date().toISOString().split('T')[0];
+      const sentKey='streakRemind_'+today;
+      if(local.get(sentKey,false))return;
+      const hr=new Date().getHours();
+      if(hr>=19){
+        const lastLesson=local.get(user+'_lastLessonDate','');
+        if(lastLesson!==today){
+          notif.send('Keep your streak alive! 🔥','Complete a lesson today to maintain your learning streak');
+          local.set(sentKey,true);
+        }
+      }
+    };
+    streakCheck();
+    const streakInterval=setInterval(streakCheck,15*60*1000);
+    return()=>{clearInterval(interval);clearInterval(streakInterval);};
   },[user]);
 
   // In-app toast notifications
@@ -2841,6 +3060,7 @@ export default function App(){
     <ErrorBoundary><DarkCtx.Provider value={dark}><Shell dark={dark}>
       {s==="home"&&<Home go={go}/>}
       {s==="browse"&&<Browse go={go}/>}
+      {s==="chat"&&<Chat/>}
       {s==="learn"&&<Learn/>}
       {s==="us"&&<Us onDark={setDarkMode} isDark={dark}/>}
       {s==="np"&&<NP go={go}/>}
