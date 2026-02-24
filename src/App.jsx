@@ -2576,7 +2576,17 @@ function Series({go}){
     initSupabase.then(()=>{
       sync.loadEps().then(data=>{
         if(data&&data.length){
-          setEps(data);local.set('tea_eps',data);
+          // Map Supabase column names back to app format
+          const mapped=data.map(r=>({
+            id:r.id,t:r.t,s:r.s,desc:r.desc||'',
+            v:r.cover_variant||r.v||'main',
+            mediaUrl:r.mediaUrl||r.media_url||null,
+            mediaType:r.mediaType||r.media_type||null,
+            duration:r.duration||null,
+            fileName:r.fileName||r.file_name||null,
+            sort_order:r.sort_order||0
+          }));
+          setEps(mapped);local.set('tea_eps',mapped);
         }
       });
     });
@@ -2710,10 +2720,10 @@ function Series({go}){
     <div style={{padding:"0 20px"}}>{eps.map((ep,i)=>(<div key={ep.id} style={{marginBottom:4}}>
       <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",opacity:ep.s==="locked"?0.35:1}}>
         {/* Play button or art */}
-        {ep.mediaUrl?<button onClick={e=>{e.stopPropagation();local.set('tea_np_id',ep.id);go("np");}} style={{width:42,height:42,borderRadius:ep.mediaType==="video"?4:21,background:"rgba(255,255,255,0.08)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={S.white}><path d="M8 5v14l11-7z"/></svg>
+        {ep.s!=="locked"?<button onClick={e=>{e.stopPropagation();local.set('tea_np_id',ep.id);go("np");}} style={{width:42,height:42,borderRadius:21,background:ep.mediaUrl?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={ep.mediaUrl?S.white:"rgba(255,255,255,0.3)"}><path d="M8 5v14l11-7z"/></svg>
         </button>:<Cv size={42} r={4} v={ep.v||"main"}/>}
-        <div style={{flex:1,minWidth:0}} onClick={ep.s!=="locked"&&ep.mediaUrl?()=>{local.set('tea_np_id',ep.id);go("np");}:undefined}>
+        <div style={{flex:1,minWidth:0}} onClick={ep.s!=="locked"?()=>{local.set('tea_np_id',ep.id);go("np");}:undefined}>
           <p style={{color:ep.s==="available"?S.green:S.white,fontSize:15,fontWeight:500,margin:0}}>{ep.t}</p>
           <p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>
             Episode {i+1}{ep.duration?" · "+ep.duration:""}{ep.mediaType==="video"?" · Video":ep.mediaType==="audio"?" · Audio":""}
