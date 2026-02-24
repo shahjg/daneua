@@ -15,6 +15,9 @@ const sync={
   async loadNotes(){if(!supabase)return null;try{const{data}=await supabase.from('dc_notes').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
   async addNote(text,from){if(!supabase)return;try{await supabase.from('dc_notes').insert({text,from_name:from});}catch{}},
   async deleteNote(id){if(!supabase)return;try{await supabase.from('dc_notes').delete().eq('id',id);}catch{}},
+  async loadRecs(dayIdx){if(!supabase)return null;try{const{data}=await supabase.from('dc_wotd_recs').select('*').eq('day_idx',dayIdx);return data;}catch{return null;}},
+  async saveRec(dayIdx,langKey,userName,audioData){if(!supabase)return;try{await supabase.from('dc_wotd_recs').upsert({day_idx:dayIdx,lang_key:langKey,user_name:userName,audio_data:audioData},{onConflict:'day_idx,lang_key,user_name'});}catch{}},
+  async deleteRec(dayIdx,langKey,userName){if(!supabase)return;try{await supabase.from('dc_wotd_recs').delete().eq('day_idx',dayIdx).eq('lang_key',langKey).eq('user_name',userName);}catch{}},
   async loadGym(user){if(!supabase)return null;try{const{data}=await supabase.from('dc_gym').select('*').eq('user_name',user).order('date',{ascending:false});return data;}catch{return null;}},
   async saveGymEntry(entry){if(!supabase)return;try{await supabase.from('dc_gym').upsert(entry,{onConflict:'user_name,date'});}catch{}},
 };
@@ -33,16 +36,14 @@ const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JS
 // Push notifications
 const notif={
   supported:typeof window!=='undefined'&&'Notification' in window,
-  _toastCb:null, // in-app toast callback
+  _toastCb:null,
   async requestPermission(){
     if(!this.supported)return false;
     const perm=await Notification.requestPermission();
     return perm==='granted';
   },
   send(title,body,options={}){
-    // Always show in-app toast
-    this.show(title,body);
-    // Also try native notification
+    // Native notification (works even when app is backgrounded on mobile)
     if(!this.supported||Notification.permission!=='granted')return;
     try{
       if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
@@ -52,10 +53,16 @@ const notif={
       }else{
         new Notification(title,{body,icon:'/icon-192.png',...options});
       }
-    }catch(e){console.log('Notif error:',e);}
+    }catch(e){}
   },
   show(title,body){
-    if(this._toastCb)this._toastCb({title,body,id:Date.now()});
+    // In-app toast only
+    if(this._toastCb)try{this._toastCb({title,body,id:Date.now()});}catch(e){}
+  },
+  notify(title,body,options={}){
+    // Both native + in-app
+    this.show(title,body);
+    this.send(title,body,options);
   },
   // Schedule a notification at a specific time today using setTimeout
   scheduleAt(hour,minute,title,body,tag){
@@ -1050,8 +1057,8 @@ function Home({go}){
           .on('postgres_changes',{event:'INSERT',schema:'public',table:'dc_vibes'},payload=>{
             const nv=payload.new;
             setVibes(prev=>[nv,...prev]);
-            if(nv.to_user===user&&notif.supported&&Notification.permission==='granted'){
-              notif.send(nv.from_user==='shah'?'Shah':'Dane',nv.emoji+' '+nv.label,{tag:'vibe-'+nv.id});
+            if(nv.to_user===user){
+              notif.notify(nv.from_user==='shah'?'Shah':'Dane',nv.emoji+' '+nv.label,{tag:'vibe-'+nv.id});
             }
           })
           .on('postgres_changes',{event:'UPDATE',schema:'public',table:'dc_vibes'},payload=>{
@@ -1162,10 +1169,13 @@ function Home({go}){
   const wotdA=ARABIC_W[todayIdx%ARABIC_W.length];
   const todayWords=[{...wotdU,lang:"Urdu",color:"#1DB954"},{...wotdT,lang:"Tagalog",color:"#E8115B"},{...wotdA,lang:"Arabic",color:"#C9A84C"}];
   const [wotdRecs,setWotdRecs]=useState(()=>({u:local.get('wotd_'+todayIdx+'_u_'+user,null),t:local.get('wotd_'+todayIdx+'_t_'+user,null),a:local.get('wotd_'+todayIdx+'_a_'+user,null)}));
+  const [partnerRecs,setPartnerRecs]=useState({u:null,t:null,a:null});
   const [recording,setRecording]=useState(null);
   const [playing,setPlaying]=useState(null);
   const [wotdSlide,setWotdSlide]=useState(0);
   const [duaOpen,setDuaOpen]=useState(true);
+  const pName=user==='shah'?'dane':'shah';
+  useEffect(()=>{initSupabase.then(()=>{sync.loadRecs(todayIdx).then(data=>{if(!data)return;const pr={};data.forEach(r=>{if(r.user_name!==user)pr[r.lang_key]=r.audio_data;});if(pr.u||pr.t||pr.a)setPartnerRecs(p=>({...p,...pr}));});});},[]);
 
   // Dua of the Day
   const DUAS=[
@@ -1194,9 +1204,9 @@ function Home({go}){
         const blob=new Blob(chunks,{type:'audio/webm'});
         const reader=new FileReader();
         reader.onload=()=>{
-          local.set(recKey,reader.result);setWotdRecs(p=>({...p,[langKey]:reader.result}));setRecording(null);
-          const langNames={u:"Urdu",t:"Tagalog",a:"Arabic"};
-          notif.show((user==='shah'?'Shah':'Dane')+" recorded a word",langNames[langKey]+" · "+todayWords[["u","t","a"].indexOf(langKey)].w);
+          const ad=reader.result;
+          local.set(recKey,ad);setWotdRecs(p=>({...p,[langKey]:ad}));setRecording(null);
+          sync.saveRec(todayIdx,langKey,user,ad);
         };
         reader.readAsDataURL(blob);
       };
@@ -1204,12 +1214,15 @@ function Home({go}){
     }catch(e){setRecording(null);}
   };
   const deleteRecording=(langKey)=>{
-    const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
-    local.set(recKey,null);
+    local.set('wotd_'+todayIdx+'_'+langKey+'_'+user,null);
     setWotdRecs(p=>({...p,[langKey]:null}));
+    sync.deleteRec(todayIdx,langKey,user);
   };
-  const playPartnerWord=(langKey)=>{const pk='wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah');const r=local.get(pk,null);if(r){try{setPlaying('p_'+langKey);const a=new Audio(r);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}}};
-  const hasPartnerWord=(langKey)=>!!local.get('wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah'),null);
+  const playPartnerWord=(langKey)=>{
+    const audio=partnerRecs[langKey];
+    if(audio){try{setPlaying('p_'+langKey);const a=new Audio(audio);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}}
+  };
+  const hasPartnerWord=(langKey)=>!!partnerRecs[langKey];
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
     <div style={{background:"linear-gradient(180deg,#072E22 0%,#121212 75%)",padding:"max(12px, env(safe-area-inset-top)) 16px 0"}}>
@@ -1466,7 +1479,7 @@ function Browse({go}){
           {!isShah&&<button onClick={e=>{e.stopPropagation();setAddForm("comment_"+i);}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(232,17,91,0.2)",background:"transparent",color:"#E8115B",fontSize:11,cursor:"pointer"}}>Reply</button>}
           {addForm==="comment_"+i&&<div style={{display:"flex",gap:4,flex:1}}>
             <input value={formData.c||""} onChange={e=>setFormData({c:e.target.value})} placeholder="Your reply..." autoFocus style={{flex:1,padding:"6px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
-            <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);notif.show("Dane left a reply","\""+formData.c+"\"");}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
+            <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
           </div>}
           {isShah&&<button onClick={e=>{e.stopPropagation();setItems(items.filter((_,j)=>j!==i));}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
         </div>
@@ -1517,7 +1530,7 @@ function Browse({go}){
       {!isShah&&<div style={{marginBottom:16}}>
         <div style={{display:"flex",gap:8}}>
           <input value={askQ} onChange={e=>setAskQ(e.target.value)} placeholder="Ask Shah anything..." style={{flex:1,padding:"12px 16px",borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
-          <button onClick={()=>{if(askQ.trim()){setAsked([{q:askQ.trim(),a:"",from:"Dane",id:Date.now()},...asked]);notif.show("Dane asked a question",askQ.trim());setAskQ("");}}} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.green,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Ask</button>
+          <button onClick={()=>{if(askQ.trim()){setAsked([{q:askQ.trim(),a:"",from:"Dane",id:Date.now()},...asked]);setAskQ("");}}} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.green,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Ask</button>
         </div>
       </div>}
       {asked.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:S.muted,fontSize:13}}>No questions yet</p></div>}
@@ -1566,7 +1579,6 @@ function Learn(){
       const partnerUser=user==='shah'?'dane':'shah';
       const displayName=user==='shah'?'Shah':'Dane';
       const vibeMsg=displayName+" just completed a "+langName+" lesson: "+lesson.t+" 🎉";
-      notif.show(displayName+" completed a lesson!",lesson.t+" ("+langName+")");
       if(supabase){
         supabase.from('dc_vibes').insert({from_user:user,to_user:partnerUser,emoji:"📚",label:vibeMsg,read:false}).then(()=>{}).catch(()=>{});
       }
