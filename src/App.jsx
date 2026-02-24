@@ -11,6 +11,78 @@ const useUser = () => useContext(UserCtx);
 // localStorage helpers
 const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JSON.parse(v):f;}catch{return f;}},set(k,v){try{localStorage.setItem('dc_'+k,JSON.stringify(v));}catch{}}};
 
+// Push notifications
+const notif={
+  supported:typeof window!=='undefined'&&'Notification' in window,
+  async requestPermission(){
+    if(!this.supported)return false;
+    const perm=await Notification.requestPermission();
+    return perm==='granted';
+  },
+  send(title,body,options={}){
+    if(!this.supported||Notification.permission!=='granted')return;
+    try{
+      if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
+        navigator.serviceWorker.ready.then(reg=>{
+          reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',vibrate:[200,100,200],tag:options.tag||'dc-notif',renotify:true,...options});
+        });
+      }else{
+        new Notification(title,{body,icon:'/icon-192.png',...options});
+      }
+    }catch(e){console.log('Notif error:',e);}
+  },
+  // Schedule a notification at a specific time today using setTimeout
+  scheduleAt(hour,minute,title,body,tag){
+    if(!this.supported||Notification.permission!=='granted')return;
+    const now=new Date();
+    const target=new Date();target.setHours(hour,minute,0,0);
+    const ms=target-now;
+    if(ms>0&&ms<24*60*60*1000){
+      setTimeout(()=>this.send(title,body,{tag}),ms);
+      return true;
+    }
+    return false;
+  },
+  // Check and fire Fajr/Iftar notifications
+  checkRamadan(fajrTime,magTime,dayNum){
+    if(!this.supported||Notification.permission!=='granted')return;
+    const today=new Date().toISOString().split('T')[0];
+
+    // Fajr — 30 min before suhoor ends
+    const fajrSent=local.get('fajrNotif_'+today,false);
+    if(!fajrSent){
+      const [fh,fm]=fajrTime.split(':').map(Number);
+      const now=new Date();const fajr=new Date();fajr.setHours(fh,fm,0,0);
+      const minsBefore=(fajr-now)/(1000*60);
+      // Send if within 30 min before fajr or up to 5 min after
+      if(minsBefore>=-5&&minsBefore<=30){
+        this.send('Suhoor Ends Soon ☽',`Ramadan Day ${dayNum} — Fajr at ${fajrTime}. Eat & drink before then!`,{tag:'fajr'});
+        local.set('fajrNotif_'+today,true);
+      }
+      // Schedule if fajr is later today
+      if(minsBefore>30){
+        const warnH=fm>=30?fh:fh-1;const warnM=fm>=30?fm-30:fm+30;
+        this.scheduleAt(warnH,warnM,'Suhoor Ends in 30min ☽',`Ramadan Day ${dayNum} — Fajr at ${fajrTime}`,'fajr');
+      }
+    }
+
+    // Iftar — notify at maghrib time
+    const iftarSent=local.get('iftarNotif_'+today,false);
+    if(!iftarSent&&magTime){
+      const [mh,mm]=magTime.split(':').map(Number);
+      const now=new Date();const mag=new Date();mag.setHours(mh,mm,0,0);
+      const minsTil=(mag-now)/(1000*60);
+      if(minsTil>=-2&&minsTil<=5){
+        this.send('Iftar Time! 🌙',`Ramadan Day ${dayNum} — Maghrib at ${magTime}. Bismillah!`,{tag:'iftar'});
+        local.set('iftarNotif_'+today,true);
+      }
+      if(minsTil>5){
+        this.scheduleAt(mh,mm,'Iftar Time! 🌙',`Ramadan Day ${dayNum} — Maghrib at ${magTime}. Bismillah!`,'iftar');
+      }
+    }
+  }
+};
+
 // PIN Login Screen
 function Login({onLogin}){
   const [who,setWho]=useState(null);const [pin,setPin]=useState("");const [error,setError]=useState(false);const [shake,setShake]=useState(false);const [splash,setSplash]=useState(true);
@@ -1468,59 +1540,58 @@ function Us({onDark,isDark}){
   useEffect(()=>{local.set('us_notes',notes);},[notes]);
 
   // Gym tracker
-  const [gym,setGym]=useState(()=>local.get(user+'_gym',[])); // array of {date,exercises:[{name,sets:[{reps,weight}]}],cardio:{type,duration,distance}}
+  const [gym,setGym]=useState(()=>local.get(user+'_gym',[]));
   useEffect(()=>{local.set(user+'_gym',gym);},[gym]);
-  const [gymView,setGymView]=useState("log"); // log | add | history
+  const [routines,setRoutines]=useState(()=>local.get(user+'_routines',[]));
+  useEffect(()=>{local.set(user+'_routines',routines);},[routines]);
+  const [gymView,setGymView]=useState("home"); // home | log | newRoutine | editRoutine | history
   const [gymDate,setGymDate]=useState(new Date().toISOString().split('T')[0]);
-  const [gymExercises,setGymExercises]=useState([]);
-  const [gymCardio,setGymCardio]=useState({type:"",duration:"",distance:""});
-  const [selExercise,setSelExercise]=useState("");const [quickMode,setQuickMode]=useState(true);const [quickReps,setQuickReps]=useState("8");const [quickSets,setQuickSets]=useState("3");
-  const [manualSets,setManualSets]=useState([{reps:"",weight:""}]);
+  const [activeRoutine,setActiveRoutine]=useState(null);
+  const [logWeights,setLogWeights]=useState({});
+  const [logCardio,setLogCardio]=useState({type:"",duration:"",incline:"",speed:"",distance:""});
+  const [buildExercises,setBuildExercises]=useState([]);
+  const [buildName,setBuildName]=useState("");
+  const [buildCardio,setBuildCardio]=useState(null);
+  const [exCat,setExCat]=useState("Push");
+  const [selDay,setSelDay]=useState(null); // selected calendar day
   const EXERCISES={
-    "Push":[
-      "Bench Press","Incline Bench Press","Dumbbell Press","Dumbbell Flyes","Overhead Press","Lateral Raises","Tricep Pushdown","Tricep Dips","Cable Crossover","Push Ups"
-    ],
-    "Pull":[
-      "Deadlift","Barbell Row","Dumbbell Row","Lat Pulldown","Pull Ups","Chin Ups","Face Pulls","Bicep Curls","Hammer Curls","Cable Row"
-    ],
-    "Legs":[
-      "Squat","Leg Press","Romanian Deadlift","Lunges","Leg Extension","Leg Curl","Calf Raises","Hip Thrust","Bulgarian Split Squat","Goblet Squat"
-    ],
-    "Core":[
-      "Plank","Crunches","Leg Raises","Russian Twists","Ab Rollout","Cable Woodchops","Dead Bug","Mountain Climbers"
-    ],
-    "Cardio":[
-      "Treadmill","Stairmaster","Elliptical","Bike","Rowing","Jump Rope","Walking","Running"
-    ]
+    "Push":["Bench Press","Incline Bench Press","Dumbbell Press","Dumbbell Flyes","Overhead Press","Lateral Raises","Tricep Pushdown","Tricep Dips","Cable Crossover","Push Ups","Close Grip Bench","Skull Crushers"],
+    "Pull":["Deadlift","Barbell Row","Dumbbell Row","Lat Pulldown","Pull Ups","Chin Ups","Face Pulls","Bicep Curls","Hammer Curls","Cable Row","Shrugs","Reverse Flyes"],
+    "Legs":["Squat","Leg Press","Romanian Deadlift","Lunges","Leg Extension","Leg Curl","Calf Raises","Hip Thrust","Bulgarian Split Squat","Goblet Squat","Hack Squat","Glute Kickback"],
+    "Core":["Plank","Crunches","Leg Raises","Russian Twists","Ab Rollout","Cable Woodchops","Dead Bug","Mountain Climbers","Hanging Knee Raises","Pallof Press"]
   };
+  const CARDIO_TYPES=["Treadmill","Stairmaster","Elliptical","Bike","Rowing","Jump Rope","Walking","Running","Incline Walk"];
   const todayStr=new Date().toISOString().split('T')[0];
   const todayWorkout=gym.find(g=>g.date===todayStr);
-  const hasGymDay=(day)=>{if(!day)return false;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");return gym.some(g=>g.date===ds);};
-
-  const addExerciseToWorkout=()=>{
-    if(!selExercise)return;
-    let sets=[];
-    if(quickMode){
-      const r=parseInt(quickReps)||8;const s=parseInt(quickSets)||3;
-      for(let i=0;i<s;i++)sets.push({reps:r,weight:""});
-    }else{
-      sets=manualSets.filter(s=>s.reps).map(s=>({reps:parseInt(s.reps)||0,weight:s.weight}));
-    }
-    if(sets.length===0)return;
-    setGymExercises([...gymExercises,{name:selExercise,sets}]);
-    setSelExercise("");setManualSets([{reps:"",weight:""}]);
+  const weekCount=gym.filter(g=>{const d=new Date(g.date);const n=new Date();return d>=new Date(n.getFullYear(),n.getMonth(),n.getDate()-7);}).length;
+  const fmtSets=(sets)=>{
+    if(!sets||!sets.length)return"";
+    const allSame=sets.every(s=>s.reps===sets[0].reps&&s.weight===sets[0].weight);
+    if(allSame){const s=sets[0];const n=sets.length;return(s.weight?s.weight+"lb — ":"")+n+(n===1?" set":" sets")+" of "+s.reps+" reps";}
+    return sets.map((s,i)=>"S"+(i+1)+": "+(s.weight?s.weight+"lb×":"" )+s.reps).join(", ");
   };
-
-  const saveWorkout=()=>{
-    if(gymExercises.length===0&&!gymCardio.type)return;
+  const saveLog=()=>{
+    if(!activeRoutine)return;
+    const exercises=activeRoutine.exercises.map((ex,i)=>{
+      const w=logWeights[i]||"";
+      const sets=[];for(let s=0;s<ex.sets;s++)sets.push({reps:ex.reps,weight:w});
+      return{name:ex.name,sets};
+    });
+    const cardio=logCardio.type?logCardio:activeRoutine.cardio||null;
     const existing=gym.findIndex(g=>g.date===gymDate);
-    const entry={date:gymDate,exercises:gymExercises,cardio:gymCardio.type?gymCardio:null,user};
+    const entry={date:gymDate,exercises,cardio,user,routine:activeRoutine.name};
     if(existing>=0){const n=[...gym];n[existing]=entry;setGym(n);}
     else setGym([...gym,entry]);
-    setGymExercises([]);setGymCardio({type:"",duration:"",distance:""});setGymView("log");
+    setActiveRoutine(null);setLogWeights({});setLogCardio({type:"",duration:"",incline:"",speed:"",distance:""});setGymView("home");
+  };
+  const saveRoutine=()=>{
+    if(!buildName.trim()||buildExercises.length===0)return;
+    const r={name:buildName.trim(),exercises:buildExercises,cardio:buildCardio};
+    setRoutines([...routines,r]);
+    setBuildName("");setBuildExercises([]);setBuildCardio(null);setGymView("home");
   };
 
-  const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
   const dim=new Date(calYear,calMonth+1,0).getDate();const fd=new Date(calYear,calMonth,1).getDay();const calDays=[];for(let i=0;i<fd;i++)calDays.push(null);for(let i=1;i<=dim;i++)calDays.push(i);
   const today=new Date();const isToday=(day)=>day&&calMonth===today.getMonth()&&calYear===today.getFullYear()&&day===today.getDate();
   const hasEvent=(day)=>{if(!day)return null;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");return events.find(e=>e.d===ds);};
@@ -1530,7 +1601,16 @@ function Us({onDark,isDark}){
   if(addEvt)return(<div className="dc-slide-up" style={{height:"100%",background:W.bg,padding:"14px 16px"}}><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><button onClick={()=>setAddEvt(false)} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.forest} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:W.forest,fontSize:21,fontWeight:700,margin:0}}>New event</h1></div>{[{l:"Title",k:"t",ph:"Iftar at mom's...",ty:"text"},{l:"Date",k:"d",ph:"",ty:"date"},{l:"Time",k:"tm",ph:"",ty:"time"}].map(f=>(<div key={f.k} style={{marginBottom:16}}><p style={{color:W.textMuted,fontSize:12,fontWeight:600,margin:"0 0 6px"}}>{f.l}</p><input type={f.ty} value={ne[f.k]} onChange={e=>setNe({...ne,[f.k]:e.target.value})} placeholder={f.ph} style={{width:"100%",padding:"14px",borderRadius:12,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/></div>))}<div style={{display:"flex",gap:8,marginBottom:16}}>{["#D4A84B","#E8115B","#1DB954","#8D67AB","#4B9CD3"].map(c=>(<button key={c} onClick={()=>setNe({...ne,c})} style={{width:32,height:32,borderRadius:"50%",background:c,border:ne.c===c?"3px solid "+W.text:"3px solid transparent",cursor:"pointer"}}/>))}</div><button onClick={()=>{if(ne.t){setEvents([...events,{id:Date.now(),t:ne.t,d:ne.d||"",tm:ne.tm||"",c:ne.c||"#D4A84B"}]);setNe({t:"",d:"",tm:""});setAddEvt(false);}}} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:ne.t?W.forest:W.border,color:ne.t?(dark?"#000":WL.cream):W.textMuted,fontSize:16,fontWeight:700,cursor:ne.t?"pointer":"not-allowed"}}>Save</button></div>);
 
   // Settings
-  if(tab==="settings")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:W.bg}}><div style={{background:dark?WD.cardAlt:WL.forest,padding:"12px 16px 20px",borderRadius:"0 0 24px 24px"}}><div style={{display:"flex",alignItems:"center",gap:12}}><button onClick={()=>setTab("cal")} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dark?"#E8E8E8":WL.cream} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:dark?"#E8E8E8":WL.cream,fontSize:21,fontWeight:700,margin:0}}>Settings</h1></div></div><div style={{padding:"16px"}}>{[{k:"notif",l:"Push Notifications",desc:"Get notified for events"},{k:"alarms",l:"Event Alarms",desc:"Reminders before events"},{k:"sounds",l:"Sounds",desc:"Notification sounds"},{k:"dark",l:"Dark Mode",desc:"Switch theme"}].map(s=>{const on=s.k==="dark"?isDark:settings[s.k];return(<div key={s.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0",borderBottom:"1px solid "+W.border}}><div style={{flex:1}}><p style={{color:W.forest,fontSize:15,fontWeight:600,margin:0}}>{s.l}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{s.desc}</p></div><button onClick={()=>s.k==="dark"?onDark(!isDark):setSettings({...settings,[s.k]:!on})} style={{width:48,height:28,borderRadius:14,background:on?W.forest:W.border,border:"none",padding:2,cursor:"pointer",transition:"background 0.2s",display:"flex",alignItems:on?"flex-end":"flex-start",justifyContent:on?"flex-end":"flex-start"}}><div style={{width:24,height:24,borderRadius:12,background:S.white,boxShadow:"0 1px 3px rgba(0,0,0,0.15)",transition:"all 0.2s"}}/></button></div>);})}<LogoutBtn/></div></div>);
+  if(tab==="settings")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:W.bg}}><div style={{background:dark?WD.cardAlt:WL.forest,padding:"12px 16px 20px",borderRadius:"0 0 24px 24px"}}><div style={{display:"flex",alignItems:"center",gap:12}}><button onClick={()=>setTab("cal")} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dark?"#E8E8E8":WL.cream} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 style={{color:dark?"#E8E8E8":WL.cream,fontSize:21,fontWeight:700,margin:0}}>Settings</h1></div></div><div style={{padding:"16px"}}>
+    {/* Push notifications - real */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0",borderBottom:"1px solid "+W.border}}>
+      <div style={{flex:1}}><p style={{color:W.forest,fontSize:15,fontWeight:600,margin:0}}>Push Notifications</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{!notif.supported?"Not supported on this browser":Notification.permission==="granted"?"Enabled — you'll get Fajr reminders":Notification.permission==="denied"?"Blocked — enable in browser settings":"Tap to enable"}</p></div>
+      <button onClick={async()=>{if(notif.supported&&Notification.permission!=='granted'){const ok=await notif.requestPermission();if(ok){notif.send("Dane's Chai","Notifications are on! You'll get Fajr reminders during Ramadan.",{tag:"test"});}}}} style={{width:48,height:28,borderRadius:14,background:Notification.permission==="granted"?W.forest:W.border,border:"none",padding:2,cursor:"pointer",transition:"background 0.2s",display:"flex",alignItems:Notification.permission==="granted"?"flex-end":"flex-start",justifyContent:Notification.permission==="granted"?"flex-end":"flex-start"}}><div style={{width:24,height:24,borderRadius:12,background:S.white,boxShadow:"0 1px 3px rgba(0,0,0,0.15)",transition:"all 0.2s"}}/></button>
+    </div>
+    {/* Test notification button */}
+    {notif.supported&&Notification.permission==="granted"&&<button onClick={()=>notif.send("Test from Dane's Chai","If you see this, notifications are working!",{tag:"test"})} style={{width:"100%",marginTop:12,padding:"12px",borderRadius:12,border:"1px solid "+W.border,background:"transparent",color:W.forest,fontSize:13,fontWeight:600,cursor:"pointer"}}>Send Test Notification</button>}
+    {[{k:"dark",l:"Dark Mode",desc:"Switch theme"}].map(s=>{const on=isDark;return(<div key={s.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0",borderBottom:"1px solid "+W.border}}><div style={{flex:1}}><p style={{color:W.forest,fontSize:15,fontWeight:600,margin:0}}>{s.l}</p><p style={{color:W.textMuted,fontSize:12,margin:"2px 0 0"}}>{s.desc}</p></div><button onClick={()=>onDark(!isDark)} style={{width:48,height:28,borderRadius:14,background:on?W.forest:W.border,border:"none",padding:2,cursor:"pointer",transition:"background 0.2s",display:"flex",alignItems:on?"flex-end":"flex-start",justifyContent:on?"flex-end":"flex-start"}}><div style={{width:24,height:24,borderRadius:12,background:S.white,boxShadow:"0 1px 3px rgba(0,0,0,0.15)",transition:"all 0.2s"}}/></button></div>);})}
+    <LogoutBtn/></div></div>);
 
   return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg}}>
     {/* Header */}
@@ -1602,126 +1682,204 @@ function Us({onDark,isDark}){
       </div>}
 
       {/* GYM TAB */}
-      {tab==="gym"&&<div style={{padding:"16px"}}>
-        {/* Quick stats */}
-        <div style={{display:"flex",gap:10,marginBottom:16}}>
-          {[{v:gym.length,l:"Workouts",c:S.green},{v:gym.filter(g=>{const d=new Date(g.date);const n=new Date();return d>=new Date(n.getFullYear(),n.getMonth(),n.getDate()-7);}).length,l:"This week",c:S.gold},{v:todayWorkout?"✓":"—",l:"Today",c:todayWorkout?S.green:S.muted}].map((s,i)=>(<div key={i} style={{flex:1,background:W.card,borderRadius:12,padding:"12px 10px",textAlign:"center",border:"1px solid "+W.border}}>
-            <p style={{color:s.c,fontSize:20,fontWeight:700,margin:"0 0 2px"}}>{s.v}</p>
-            <p style={{color:W.textMuted,fontSize:10,margin:0}}>{s.l}</p>
-          </div>))}
-        </div>
+      {tab==="gym"&&<div style={{padding:"16px 16px 20px"}}>
 
-        {/* Gym month view — dots for workout days */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:16}}>
-          {Array.from({length:new Date(calYear,calMonth+1,0).getDate()}).map((_,i)=>{
-            const day=i+1;const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
-            const worked=gym.some(g=>g.date===ds);const isT=isToday(day);
-            return(<div key={day} style={{textAlign:"center",padding:"4px 0"}}>
-              <div style={{width:28,height:28,borderRadius:"50%",background:worked?S.green+"20":isT?W.forest+"15":"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto"}}>
-                <span style={{color:worked?S.green:isT?W.forest:W.textMuted,fontSize:11,fontWeight:worked||isT?700:400}}>{day}</span>
-              </div>
-              {worked&&<div style={{width:4,height:4,borderRadius:2,background:S.green,margin:"2px auto 0"}}/>}
-            </div>);
-          })}
-        </div>
-
-        {gymView==="log"&&<div>
-          {/* Today's workout summary */}
-          {todayWorkout&&<div style={{background:W.card,borderRadius:14,padding:14,marginBottom:12,border:"1px solid "+W.border}}>
-            <p style={{color:W.forest,fontSize:14,fontWeight:700,margin:"0 0 8px"}}>Today's Workout</p>
-            {todayWorkout.exercises.map((ex,i)=>(<div key={i} style={{marginBottom:6}}>
-              <p style={{color:W.text,fontSize:13,fontWeight:600,margin:"0 0 2px"}}>{ex.name}</p>
-              <p style={{color:W.textMuted,fontSize:11,margin:0}}>{ex.sets.map((s,j)=>(s.weight?s.reps+"×"+s.weight+"lb":s.reps+" reps")).join(" · ")}</p>
+        {/* HOME VIEW */}
+        {gymView==="home"&&<>
+          {/* Stats row */}
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            {[{v:gym.length,l:"Total",c:W.forest},{v:weekCount,l:"This week",c:S.gold},{v:todayWorkout?"✓":"—",l:"Today",c:todayWorkout?S.green:W.textMuted}].map((s,i)=>(<div key={i} style={{flex:1,background:W.card,borderRadius:14,padding:"14px 8px",textAlign:"center",border:"1px solid "+W.border}}>
+              <p style={{color:s.c,fontSize:22,fontWeight:800,margin:"0 0 2px"}}>{s.v}</p>
+              <p style={{color:W.textMuted,fontSize:10,fontWeight:600,letterSpacing:0.5,margin:0}}>{s.l}</p>
             </div>))}
-            {todayWorkout.cardio&&<div style={{marginTop:6,padding:"8px 10px",background:S.rose+"10",borderRadius:8}}>
-              <p style={{color:S.rose,fontSize:12,fontWeight:600,margin:0}}>{todayWorkout.cardio.type} — {todayWorkout.cardio.duration} min{todayWorkout.cardio.distance?" · "+todayWorkout.cardio.distance+" km":""}</p>
-            </div>}
-          </div>}
-          <button onClick={()=>setGymView("add")} style={{width:"100%",padding:"14px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44,marginBottom:12}}>+ Log Workout</button>
+          </div>
 
-          {/* History */}
-          {gym.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map((g,i)=>(<div key={i} style={{background:W.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+W.border}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <p style={{color:W.forest,fontSize:13,fontWeight:700,margin:0}}>{new Date(g.date+"T12:00:00").toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</p>
-              <div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span style={{color:W.textMuted,fontSize:11}}>{g.exercises.length} exercises</span>
-                <button onClick={()=>setGym(gym.filter((_,j)=>j!==gym.indexOf(g)))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-              </div>
+          {/* Calendar mini — tap a day to see/log */}
+          <div style={{background:W.card,borderRadius:16,padding:"14px",border:"1px solid "+W.border,marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <button onClick={()=>{let m=calMonth-1,y=calYear;if(m<0){m=11;y--;}setCalMonth(m);setCalYear(y);}} style={{background:"none",border:"none",cursor:"pointer",color:W.textMuted,fontSize:18,padding:"4px 8px"}}>‹</button>
+              <p style={{color:W.text,fontSize:14,fontWeight:700,margin:0}}>{months[calMonth]} {calYear}</p>
+              <button onClick={()=>{let m=calMonth+1,y=calYear;if(m>11){m=0;y++;}setCalMonth(m);setCalYear(y);}} style={{background:"none",border:"none",cursor:"pointer",color:W.textMuted,fontSize:18,padding:"4px 8px"}}>›</button>
             </div>
-            {g.exercises.map((ex,j)=>(<p key={j} style={{color:W.textMuted,fontSize:12,margin:"2px 0"}}>{ex.name} — {ex.sets.length} sets</p>))}
-            {g.cardio&&<p style={{color:S.rose,fontSize:11,margin:"4px 0 0"}}>{g.cardio.type} {g.cardio.duration}min</p>}
-          </div>))}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+              {["S","M","T","W","T","F","S"].map((d,i)=>(<div key={i} style={{textAlign:"center",padding:"2px 0"}}><span style={{color:W.textMuted,fontSize:9,fontWeight:600}}>{d}</span></div>))}
+              {calDays.map((day,i)=>{
+                if(!day)return <div key={i}/>;
+                const ds=calYear+"-"+String(calMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+                const workout=gym.find(g=>g.date===ds);
+                const isSel=selDay===ds;const isT=isToday(day);
+                return(<div key={i} onClick={()=>{setSelDay(isSel?null:ds);setGymDate(ds);}} style={{textAlign:"center",padding:"3px 0",cursor:"pointer"}}>
+                  <div style={{width:30,height:30,borderRadius:15,background:isSel?W.forest:workout?W.forest+"18":isT?"rgba(255,255,255,0.06)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all 0.15s"}}>
+                    <span style={{color:isSel?(dark?"#000":"#fff"):workout?W.forest:isT?W.text:W.textMuted,fontSize:12,fontWeight:workout||isT||isSel?700:400}}>{day}</span>
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>
+
+          {/* Selected day detail */}
+          {selDay&&<div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <p style={{color:W.forest,fontSize:14,fontWeight:700,margin:0}}>{new Date(selDay+"T12:00:00").toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</p>
+              <button onClick={()=>{setGymDate(selDay);setGymView("log");}} style={{padding:"6px 14px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Log</button>
+            </div>
+            {(()=>{const w=gym.find(g=>g.date===selDay);if(!w)return <p style={{color:W.textMuted,fontSize:12,margin:0}}>Rest day</p>;return(<div>
+              {w.routine&&<p style={{color:W.forest,fontSize:11,fontWeight:600,margin:"0 0 6px",opacity:0.7}}>{w.routine}</p>}
+              {w.exercises.map((ex,j)=>(<p key={j} style={{color:W.text,fontSize:13,margin:"3px 0"}}>{ex.name} <span style={{color:W.textMuted,fontSize:11}}>— {fmtSets(ex.sets)}</span></p>))}
+              {w.cardio&&<p style={{color:S.rose,fontSize:12,margin:"6px 0 0"}}>{w.cardio.type} — {w.cardio.duration}min{w.cardio.incline?" · "+w.cardio.incline+"% incline":""}{w.cardio.speed?" · "+w.cardio.speed+"mph":""}{w.cardio.distance?" · "+w.cardio.distance+"km":""}</p>}
+              <button onClick={()=>setGym(gym.filter(g=>g.date!==selDay))} style={{marginTop:8,padding:"4px 12px",borderRadius:8,border:"1px solid rgba(229,57,53,0.2)",background:"transparent",color:"#E53935",fontSize:11,cursor:"pointer"}}>Delete</button>
+            </div>);})()}
+          </div>}
+
+          {/* My Routines */}
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <p style={{color:W.text,fontSize:16,fontWeight:700,margin:0}}>My Routines</p>
+              <button onClick={()=>setGymView("newRoutine")} style={{padding:"6px 14px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.forest,fontSize:12,fontWeight:600,cursor:"pointer"}}>+ New</button>
+            </div>
+            {routines.length===0&&<p style={{color:W.textMuted,fontSize:13,margin:0}}>Create your first routine to get started</p>}
+            {routines.map((r,ri)=>(<div key={ri} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <p style={{color:W.text,fontSize:15,fontWeight:700,margin:"0 0 4px"}}>{r.name}</p>
+                  <p style={{color:W.textMuted,fontSize:11,margin:0}}>{r.exercises.length} exercises{r.cardio?" + cardio":""}</p>
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  <button onClick={()=>{setActiveRoutine(r);setLogWeights({});setLogCardio(r.cardio||{type:"",duration:"",incline:"",speed:"",distance:""});setGymView("log");}} style={{padding:"8px 16px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:12,fontWeight:700,cursor:"pointer"}}>Start</button>
+                  <button onClick={()=>setRoutines(routines.filter((_,j)=>j!==ri))} style={{padding:"8px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center"}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+                </div>
+              </div>
+              <div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{r.exercises.map((ex,i)=>(<span key={i} style={{padding:"3px 8px",borderRadius:6,background:W.forest+"12",color:W.forest,fontSize:10,fontWeight:600}}>{ex.name}</span>))}</div>
+            </div>))}
+          </div>
+
+          {/* Recent workouts */}
+          {gym.length>0&&<div>
+            <p style={{color:W.text,fontSize:16,fontWeight:700,margin:"0 0 10px"}}>Recent</p>
+            {gym.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5).map((g,i)=>(<div key={i} style={{background:W.card,borderRadius:12,padding:"12px 14px",marginBottom:6,border:"1px solid "+W.border}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <p style={{color:W.text,fontSize:13,fontWeight:600,margin:0}}>{new Date(g.date+"T12:00:00").toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</p>
+                  {g.routine&&<p style={{color:W.forest,fontSize:10,fontWeight:600,margin:"2px 0 0"}}>{g.routine}</p>}
+                </div>
+                <span style={{color:W.textMuted,fontSize:11}}>{g.exercises.length} exercises</span>
+              </div>
+            </div>))}
+          </div>}
+        </>}
+
+        {/* LOG VIEW — fill in weights for a routine */}
+        {gymView==="log"&&<div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <button onClick={()=>{setGymView("home");setActiveRoutine(null);}} style={{background:"none",border:"none",cursor:"pointer",minWidth:36,minHeight:36,display:"flex",alignItems:"center"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={W.forest} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <h3 style={{color:W.text,fontSize:18,fontWeight:700,margin:0}}>{activeRoutine?activeRoutine.name:"Log Workout"}</h3>
+          </div>
+
+          {/* Date quick pick */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+            {[0,-1,-2,-3].map(offset=>{
+              const d=new Date();d.setDate(d.getDate()+offset);const ds=d.toISOString().split('T')[0];
+              const label=offset===0?"Today":offset===-1?"Yesterday":d.toLocaleDateString('en-US',{weekday:'short',day:'numeric'});
+              return(<button key={offset} onClick={()=>setGymDate(ds)} style={{padding:"7px 14px",borderRadius:10,border:gymDate===ds?"2px solid "+W.forest:"1px solid "+W.border,background:gymDate===ds?W.forest+"12":"transparent",color:gymDate===ds?W.forest:W.textMuted,fontSize:12,fontWeight:gymDate===ds?700:500,cursor:"pointer"}}>{label}</button>);
+            })}
+            <input type="date" value={gymDate} onChange={e=>setGymDate(e.target.value)} style={{padding:"7px 10px",borderRadius:10,background:"transparent",border:"1px solid "+W.border,color:W.textMuted,fontSize:11,fontFamily:"inherit"}}/>
+          </div>
+
+          {activeRoutine?<>
+            {/* Exercises from routine */}
+            {activeRoutine.exercises.map((ex,i)=>(<div key={i} style={{background:W.card,borderRadius:14,padding:"14px",marginBottom:8,border:"1px solid "+W.border}}>
+              <p style={{color:W.text,fontSize:14,fontWeight:700,margin:"0 0 2px"}}>{ex.name}</p>
+              <p style={{color:W.textMuted,fontSize:11,margin:"0 0 10px"}}>{ex.sets} sets × {ex.reps} reps</p>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{color:W.textMuted,fontSize:12,fontWeight:600}}>Weight:</span>
+                <input value={logWeights[i]||""} onChange={e=>setLogWeights({...logWeights,[i]:e.target.value})} placeholder="lbs" type="number" style={{width:80,padding:"10px 12px",borderRadius:10,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:700,textAlign:"center",fontFamily:"inherit"}}/>
+                <span style={{color:W.textMuted,fontSize:12}}>lb</span>
+              </div>
+            </div>))}
+
+            {/* Cardio section */}
+            {activeRoutine.cardio?<div style={{background:W.card,borderRadius:14,padding:14,marginBottom:8,border:"1px solid "+S.rose+"25"}}>
+              <p style={{color:S.rose,fontSize:14,fontWeight:700,margin:"0 0 10px"}}>{activeRoutine.cardio.type}</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>MINUTES</p><input value={logCardio.duration||activeRoutine.cardio.duration||""} onChange={e=>setLogCardio({...logCardio,type:activeRoutine.cardio.type,duration:e.target.value})} type="number" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>INCLINE %</p><input value={logCardio.incline||""} onChange={e=>setLogCardio({...logCardio,incline:e.target.value})} type="number" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>SPEED (mph)</p><input value={logCardio.speed||""} onChange={e=>setLogCardio({...logCardio,speed:e.target.value})} type="number" step="0.1" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>DISTANCE (km)</p><input value={logCardio.distance||""} onChange={e=>setLogCardio({...logCardio,distance:e.target.value})} type="number" step="0.1" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+              </div>
+            </div>:null}
+
+            <button onClick={saveLog} style={{width:"100%",padding:"15px",background:W.forest,border:"none",borderRadius:50,color:dark?"#000":WL.cream,fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44,marginTop:8}}>Save Workout</button>
+          </>:
+          /* No routine — standalone cardio log */
+          <div>
+            <p style={{color:W.text,fontSize:15,fontWeight:700,margin:"0 0 12px"}}>Quick Cardio Log</p>
+            <div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                {CARDIO_TYPES.map(ct=>(<button key={ct} onClick={()=>setLogCardio({...logCardio,type:ct})} style={{padding:"6px 12px",borderRadius:8,border:logCardio.type===ct?"2px solid "+S.rose:"1px solid "+W.border,background:logCardio.type===ct?S.rose+"12":"transparent",color:logCardio.type===ct?S.rose:W.textMuted,fontSize:11,fontWeight:logCardio.type===ct?700:500,cursor:"pointer"}}>{ct}</button>))}
+              </div>
+              {logCardio.type&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>MINUTES</p><input value={logCardio.duration} onChange={e=>setLogCardio({...logCardio,duration:e.target.value})} type="number" placeholder="30" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>INCLINE %</p><input value={logCardio.incline} onChange={e=>setLogCardio({...logCardio,incline:e.target.value})} type="number" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>SPEED (mph)</p><input value={logCardio.speed} onChange={e=>setLogCardio({...logCardio,speed:e.target.value})} type="number" step="0.1" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+                <div><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>DISTANCE (km)</p><input value={logCardio.distance} onChange={e=>setLogCardio({...logCardio,distance:e.target.value})} type="number" step="0.1" placeholder="—" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
+              </div>}
+            </div>
+            {logCardio.type&&logCardio.duration&&<button onClick={()=>{
+              const existing=gym.findIndex(g=>g.date===gymDate);
+              const entry={date:gymDate,exercises:[],cardio:logCardio,user};
+              if(existing>=0){const n=[...gym];n[existing]={...n[existing],cardio:logCardio};setGym(n);}
+              else setGym([...gym,entry]);
+              setLogCardio({type:"",duration:"",incline:"",speed:"",distance:""});setGymView("home");
+            }} style={{width:"100%",padding:"15px",background:S.rose,border:"none",borderRadius:50,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44,marginTop:12}}>Save Cardio</button>}
+          </div>}
         </div>}
 
-        {gymView==="add"&&<div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-            <h3 style={{color:W.forest,fontSize:17,fontWeight:700,margin:0}}>Log Workout</h3>
-            <button onClick={()=>setGymView("log")} style={{padding:"6px 14px",borderRadius:12,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:12,cursor:"pointer"}}>Cancel</button>
+        {/* NEW ROUTINE BUILDER */}
+        {gymView==="newRoutine"&&<div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <button onClick={()=>{setGymView("home");setBuildExercises([]);setBuildName("");setBuildCardio(null);}} style={{background:"none",border:"none",cursor:"pointer",minWidth:36,minHeight:36,display:"flex",alignItems:"center"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={W.forest} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <h3 style={{color:W.text,fontSize:18,fontWeight:700,margin:0}}>New Routine</h3>
           </div>
 
-          <input type="date" value={gymDate} onChange={e=>setGymDate(e.target.value)} style={{width:"100%",padding:"10px 14px",borderRadius:10,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:14,marginBottom:14,boxSizing:"border-box",fontFamily:"inherit"}}/>
+          <input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Routine name (e.g. Push Day)" style={{width:"100%",padding:"14px 16px",borderRadius:14,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:600,marginBottom:16,boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
 
           {/* Added exercises */}
-          {gymExercises.map((ex,i)=>(<div key={i} style={{background:W.card,borderRadius:10,padding:"10px 12px",marginBottom:6,border:"1px solid "+W.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div><p style={{color:W.text,fontSize:13,fontWeight:600,margin:0}}>{ex.name}</p><p style={{color:W.textMuted,fontSize:11,margin:0}}>{ex.sets.map(s=>(s.weight?s.reps+"×"+s.weight:s.reps)).join(", ")}</p></div>
-            <button onClick={()=>setGymExercises(gymExercises.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-          </div>))}
+          {buildExercises.length>0&&<div style={{marginBottom:14}}>
+            <p style={{color:W.textMuted,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>EXERCISES ({buildExercises.length})</p>
+            {buildExercises.map((ex,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:W.card,borderRadius:10,marginBottom:4,border:"1px solid "+W.border}}>
+              <span style={{color:W.textMuted,fontSize:11,fontWeight:700,width:18}}>{i+1}</span>
+              <p style={{color:W.text,fontSize:13,fontWeight:600,margin:0,flex:1}}>{ex.name}</p>
+              <span style={{color:W.textMuted,fontSize:11}}>{ex.sets}×{ex.reps}</span>
+              <button onClick={()=>setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>))}
+          </div>}
 
-          {/* Exercise selector */}
-          <div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:12}}>
-            <p style={{color:W.forest,fontSize:13,fontWeight:700,margin:"0 0 8px"}}>Add Exercise</p>
-            {/* Category buttons */}
-            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
-              {Object.keys(EXERCISES).map(cat=>(<button key={cat} onClick={()=>setSelExercise("")} style={{padding:"5px 12px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.text,fontSize:11,fontWeight:600,cursor:"pointer"}}>{cat}</button>))}
+          {/* Exercise picker */}
+          <div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:14}}>
+            <p style={{color:W.text,fontSize:13,fontWeight:700,margin:"0 0 8px"}}>Add Exercise</p>
+            <div style={{display:"flex",gap:4,marginBottom:10}}>
+              {Object.keys(EXERCISES).map(cat=>(<button key={cat} onClick={()=>setExCat(cat)} style={{padding:"6px 12px",borderRadius:8,border:"none",background:exCat===cat?W.forest:"transparent",color:exCat===cat?(dark?"#000":WL.cream):W.textMuted,fontSize:11,fontWeight:600,cursor:"pointer"}}>{cat}</button>))}
             </div>
-            {/* Exercise dropdown */}
-            <select value={selExercise} onChange={e=>setSelExercise(e.target.value)} style={{width:"100%",padding:"10px",borderRadius:10,background:W.card,border:"1px solid "+W.border,color:W.text,fontSize:14,marginBottom:10,fontFamily:"inherit"}}>
-              <option value="">Select exercise...</option>
-              {Object.entries(EXERCISES).map(([cat,exs])=>(<optgroup key={cat} label={cat}>{exs.map(ex=>(<option key={ex} value={ex}>{ex}</option>))}</optgroup>))}
-            </select>
-
-            {selExercise&&<div>
-              {/* Quick vs Manual toggle */}
-              <div style={{display:"flex",gap:6,marginBottom:10}}>
-                <button onClick={()=>setQuickMode(true)} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:quickMode?W.forest:"transparent",color:quickMode?(dark?"#000":WL.cream):W.textMuted,fontSize:12,fontWeight:600,cursor:"pointer"}}>{selExercise.includes("Treadmill")||selExercise.includes("Stairmaster")||selExercise.includes("Elliptical")||selExercise.includes("Bike")||selExercise.includes("Rowing")||selExercise.includes("Jump Rope")||selExercise.includes("Walking")||selExercise.includes("Running")?"Cardio":"Same reps"}</button>
-                <button onClick={()=>setQuickMode(false)} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:!quickMode?W.forest:"transparent",color:!quickMode?(dark?"#000":WL.cream):W.textMuted,fontSize:12,fontWeight:600,cursor:"pointer"}}>Per set</button>
-              </div>
-
-              {EXERCISES["Cardio"].includes(selExercise)?
-                /* Cardio entry */
-                <div style={{display:"flex",gap:8}}>
-                  <input value={gymCardio.duration} onChange={e=>setGymCardio({...gymCardio,type:selExercise,duration:e.target.value})} placeholder="Minutes" type="number" style={{flex:1,padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontFamily:"inherit"}}/>
-                  <input value={gymCardio.distance} onChange={e=>setGymCardio({...gymCardio,distance:e.target.value})} placeholder="km (optional)" type="number" step="0.1" style={{flex:1,padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,fontFamily:"inherit"}}/>
-                </div>
-              :quickMode?
-                /* Quick mode: same reps × sets */
-                <div style={{display:"flex",gap:8}}>
-                  <div style={{flex:1}}><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>REPS</p><input value={quickReps} onChange={e=>setQuickReps(e.target.value)} type="number" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
-                  <div style={{display:"flex",alignItems:"flex-end",paddingBottom:10,color:W.textMuted,fontSize:14,fontWeight:700}}>×</div>
-                  <div style={{flex:1}}><p style={{color:W.textMuted,fontSize:10,fontWeight:600,margin:"0 0 4px"}}>SETS</p><input value={quickSets} onChange={e=>setQuickSets(e.target.value)} type="number" style={{width:"100%",padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:16,fontWeight:700,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/></div>
-                </div>
-              :
-                /* Manual mode: per-set entry */
-                <div>
-                  {manualSets.map((s,i)=>(<div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-                    <span style={{color:W.textMuted,fontSize:11,width:20}}>S{i+1}</span>
-                    <input value={s.reps} onChange={e=>{const n=[...manualSets];n[i]={...n[i],reps:e.target.value};setManualSets(n);}} placeholder="Reps" type="number" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontFamily:"inherit"}}/>
-                    <input value={s.weight} onChange={e=>{const n=[...manualSets];n[i]={...n[i],weight:e.target.value};setManualSets(n);}} placeholder="lbs" type="number" style={{flex:1,padding:"8px",borderRadius:6,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:13,fontFamily:"inherit"}}/>
-                    {manualSets.length>1&&<button onClick={()=>setManualSets(manualSets.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="14" height="14" viewBox="0 0 24 24" fill={W.textMuted}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>}
-                  </div>))}
-                  <button onClick={()=>setManualSets([...manualSets,{reps:"",weight:""}])} style={{width:"100%",padding:"6px",borderRadius:6,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:11,cursor:"pointer"}}>+ Add set</button>
-                </div>
-              }
-              <button onClick={()=>{if(EXERCISES["Cardio"].includes(selExercise)){if(gymCardio.duration)setGymView("log");}else addExerciseToWorkout();}} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Add {selExercise}</button>
-            </div>}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+              {EXERCISES[exCat].map(ex=>(<button key={ex} onClick={()=>{const s=parseInt(prompt("How many sets?","3"))||3;const r=parseInt(prompt("How many reps?","8"))||8;setBuildExercises([...buildExercises,{name:ex,sets:s,reps:r}]);}} style={{padding:"10px 8px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.text,fontSize:12,fontWeight:500,cursor:"pointer",textAlign:"left"}}>{ex}</button>))}
+            </div>
           </div>
 
-          {(gymExercises.length>0||gymCardio.type)&&<button onClick={saveWorkout} style={{width:"100%",padding:"14px",background:S.green,border:"none",borderRadius:50,color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",minHeight:44}}>Save Workout</button>}
+          {/* Cardio option */}
+          <div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:16}}>
+            <p style={{color:S.rose,fontSize:13,fontWeight:700,margin:"0 0 8px"}}>Add Cardio</p>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {CARDIO_TYPES.map(ct=>(<button key={ct} onClick={()=>setBuildCardio(buildCardio?.type===ct?null:{type:ct,duration:"20"})} style={{padding:"6px 12px",borderRadius:8,border:buildCardio?.type===ct?"2px solid "+S.rose:"1px solid "+W.border,background:buildCardio?.type===ct?S.rose+"12":"transparent",color:buildCardio?.type===ct?S.rose:W.textMuted,fontSize:11,fontWeight:buildCardio?.type===ct?700:500,cursor:"pointer"}}>{ct}</button>))}
+            </div>
+            {buildCardio&&<input value={buildCardio.duration} onChange={e=>setBuildCardio({...buildCardio,duration:e.target.value})} placeholder="Default minutes" type="number" style={{width:"100%",marginTop:8,padding:"10px",borderRadius:8,background:W.bg,border:"1px solid "+W.border,color:W.text,fontSize:14,textAlign:"center",fontFamily:"inherit",boxSizing:"border-box"}}/>}
+          </div>
+
+          <button onClick={saveRoutine} disabled={!buildName.trim()||buildExercises.length===0} style={{width:"100%",padding:"15px",background:buildName.trim()&&buildExercises.length>0?W.forest:W.border,border:"none",borderRadius:50,color:buildName.trim()&&buildExercises.length>0?(dark?"#000":WL.cream):W.textMuted,fontSize:15,fontWeight:700,cursor:buildName.trim()&&buildExercises.length>0?"pointer":"not-allowed",minHeight:44}}>Save Routine</button>
         </div>}
       </div>}
     </div>
   </div>);
-}{const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/804)*100);if(n>=804){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v="ep1" sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>So... What Is Ramadan?</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode 1</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>13:24</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(804,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
+}
 
 function NP({go}){const[p,setP]=useState(false);const[pr,setPr]=useState(0);const[t,setT]=useState(0);const r=useRef(null);useEffect(()=>{if(p){r.current=setInterval(()=>{setT(v=>{const n=v+1;setPr((n/804)*100);if(n>=804){clearInterval(r.current);setP(false);setTimeout(()=>go("hw"),400);}return n;});},40);}else if(r.current)clearInterval(r.current);return()=>{if(r.current)clearInterval(r.current);};},[p]);const f=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div><div style={{width:38}}/></div><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 32px"}}><div style={{width:"70%",maxWidth:320,aspectRatio:"1"}}><Cv size={999} r={8} v="ep1" sh/></div></div><div style={{padding:"0 24px 40px"}}><h2 style={{color:S.white,fontSize:21,fontWeight:700,margin:"0 0 3px"}}>So... What Is Ramadan?</h2><p style={{color:S.sub,fontSize:13,margin:"0 0 20px"}}>Episode 1</p><div style={{marginBottom:8}}><div style={{height:4,background:S.bar,borderRadius:2}}><div style={{width:Math.max(pr,0.5)+"%",height:"100%",background:S.white,borderRadius:2,position:"relative"}}><div style={{position:"absolute",right:-6,top:-4,width:12,height:12,borderRadius:"50%",background:S.white}}/></div></div><div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{color:S.sub,fontSize:11}}>{f(t)}</span><span style={{color:S.sub,fontSize:11}}>13:24</span></div></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28}}><button onClick={()=>setT(v=>Math.max(0,v-15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button><button onClick={()=>setP(!p)} style={{width:64,height:64,borderRadius:"50%",border:"none",cursor:"pointer",background:S.white,display:"flex",alignItems:"center",justifyContent:"center"}}>{p?<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>:<svg width="26" height="26" viewBox="0 0 24 24" fill={S.black}><path d="M8 5v14l11-7z"/></svg>}</button><button onClick={()=>setT(v=>Math.min(804,v+15))} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="26" height="26" viewBox="0 0 24 24" fill={S.white}><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button></div><button onClick={()=>go("hw")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:20,color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",minHeight:44}}>Skip to reflection</button></div></div>);}
 
@@ -1730,40 +1888,133 @@ function HW({go}){const[a,setA]=useState({});const[d,setD]=useState(false);const
 function Series({go}){
   const {user}=useUser()||{user:'shah'};const isShah=user==='shah';
   const [eps,setEps]=useState(()=>local.get('tea_eps',[
-    {id:1,t:"So... What Is Ramadan?",s:"available",v:"ep1"},
-    {id:2,t:"Why You Already Feel It",s:"locked",v:"ep2"},
-    {id:3,t:"Who Is Allah?",s:"locked",v:"ep3"},
-    {id:4,t:"The Quran Explained",s:"locked",v:"main"},
+    {id:1,t:"So... What Is Ramadan?",s:"available",desc:"An intro to what Ramadan actually is, why Muslims fast, and what it means to Shah.",v:"ep1"},
+    {id:2,t:"Why You Already Feel It",s:"locked",desc:"",v:"ep2"},
+    {id:3,t:"Who Is Allah?",s:"locked",desc:"",v:"ep3"},
+    {id:4,t:"The Quran Explained",s:"locked",desc:"",v:"main"},
   ]));
-  const [addEp,setAddEp]=useState(false);const [newEp,setNewEp]=useState("");
+  const [addEp,setAddEp]=useState(false);const [newEp,setNewEp]=useState({t:"",desc:""});
   const [comments,setComments]=useState(()=>local.get('tea_comments',{}));
+  const [editId,setEditId]=useState(null);
+  const [playingId,setPlayingId]=useState(null);
+  const audioRef=useRef(null);
   useEffect(()=>{local.set('tea_eps',eps);},[eps]);
   useEffect(()=>{local.set('tea_comments',comments);},[comments]);
+
+  const handleFile=(epId,file)=>{
+    if(!file)return;
+    const url=URL.createObjectURL(file);
+    const mediaType=file.type.startsWith("video")?"video":file.type.startsWith("audio")?"audio":"file";
+    // Get duration
+    if(mediaType==="audio"||mediaType==="video"){
+      const el=document.createElement(mediaType);
+      el.src=url;el.onloadedmetadata=()=>{
+        const dur=Math.floor(el.duration);const m=Math.floor(dur/60);const s=dur%60;
+        setEps(prev=>prev.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,duration:m+":"+String(s).padStart(2,"0"),fileName:file.name}:ep));
+      };
+    }else{
+      setEps(prev=>prev.map(ep=>ep.id===epId?{...ep,mediaUrl:url,mediaType,fileName:file.name}:ep));
+    }
+  };
+
+  const togglePlay=(epId)=>{
+    const ep=eps.find(e=>e.id===epId);
+    if(!ep?.mediaUrl)return;
+    if(playingId===epId){
+      if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
+      setPlayingId(null);
+    }else{
+      if(audioRef.current)audioRef.current.pause();
+      const el=new Audio(ep.mediaUrl);
+      el.play();el.onended=()=>setPlayingId(null);
+      audioRef.current=el;setPlayingId(epId);
+    }
+  };
+
+  // Add episode form
+  if(addEp)return(<div className="dc-slide-up" style={{height:"100%",overflowY:"auto",background:"linear-gradient(180deg,#1E3264 0%,#0D0D0D 25%)",padding:"max(12px,env(safe-area-inset-top)) 20px 40px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+      <button onClick={()=>{setAddEp(false);setNewEp({t:"",desc:""});}} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <h1 style={{color:S.white,fontSize:21,fontWeight:700,margin:0}}>New Episode</h1>
+    </div>
+    <div style={{marginBottom:16}}>
+      <p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:"0 0 6px"}}>TITLE</p>
+      <input value={newEp.t} onChange={e=>setNewEp({...newEp,t:e.target.value})} placeholder="Episode title..." style={{width:"100%",padding:"14px",borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
+    </div>
+    <div style={{marginBottom:16}}>
+      <p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:"0 0 6px"}}>DESCRIPTION</p>
+      <textarea value={newEp.desc} onChange={e=>setNewEp({...newEp,desc:e.target.value})} placeholder="What's this episode about..." style={{width:"100%",minHeight:80,padding:14,borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:14,lineHeight:1.5,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+    </div>
+    <div style={{marginBottom:20}}>
+      <p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:"0 0 6px"}}>UPLOAD AUDIO OR VIDEO</p>
+      <p style={{color:S.muted,fontSize:11,margin:"0 0 8px"}}>Record on your phone, then upload the file here</p>
+      <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"14px",borderRadius:12,border:"1px dashed rgba(255,255,255,0.12)",background:"rgba(255,255,255,0.02)",cursor:"pointer"}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={S.muted}><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+        <span style={{color:S.muted,fontSize:13}}>{newEp.file?newEp.file.name:"Choose file..."}</span>
+        <input type="file" accept="audio/*,video/*" onChange={e=>{if(e.target.files[0])setNewEp({...newEp,file:e.target.files[0]});}} style={{display:"none"}}/>
+      </label>
+    </div>
+    <button onClick={()=>{
+      if(newEp.t.trim()){
+        const ep={id:Date.now(),t:newEp.t.trim(),desc:newEp.desc.trim(),s:"locked",v:"main"};
+        if(newEp.file){
+          const url=URL.createObjectURL(newEp.file);
+          const mt=newEp.file.type.startsWith("video")?"video":"audio";
+          ep.mediaUrl=url;ep.mediaType=mt;ep.fileName=newEp.file.name;
+        }
+        setEps([...eps,ep]);setNewEp({t:"",desc:""});setAddEp(false);
+      }
+    }} style={{width:"100%",padding:"15px",borderRadius:50,border:"none",background:newEp.t.trim()?"#E13300":"rgba(255,255,255,0.06)",color:newEp.t.trim()?"#fff":S.muted,fontSize:16,fontWeight:700,cursor:newEp.t.trim()?"pointer":"not-allowed",minHeight:44}}>Add Episode</button>
+  </div>);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:"linear-gradient(180deg,#1E3264 0%,#121212 35%)",WebkitOverflowScrolling:"touch"}}>
     <div style={{padding:"max(8px, env(safe-area-inset-top)) 16px 0"}}><button onClick={()=>go("home")} style={{background:"none",border:"none",cursor:"pointer",padding:"8px 0",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
     <div style={{display:"flex",gap:16,padding:"4px 20px 18px"}}><Cv size={125} r={6} v="ep1" sh/><div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1,margin:0}}>SERIES</p><h1 style={{color:S.white,fontSize:22,fontWeight:700,margin:"4px 0 0",lineHeight:1.1}}>Tea Sessions</h1><p style={{color:S.sub,fontSize:13,margin:"6px 0 0"}}>{eps.length} episodes</p></div></div>
-    <div style={{padding:"0 20px"}}>{eps.map((ep,i)=>(<div key={ep.id} style={{marginBottom:2}}>
-      <div onClick={ep.s!=="locked"?()=>go("np"):undefined} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",cursor:ep.s!=="locked"?"pointer":"default",opacity:ep.s==="locked"?0.3:1}}>
-        <Cv size={42} r={4} v={ep.v||"main"}/>
-        <div style={{flex:1,minWidth:0}}><p style={{color:ep.s==="available"?S.green:S.white,fontSize:15,fontWeight:500,margin:0}}>{ep.t}</p><p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>Episode {i+1}</p></div>
-        {ep.s==="locked"&&<svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted}><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>}
-        {isShah&&<button onClick={e=>{e.stopPropagation();setEps(eps.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>}
+    <div style={{padding:"0 20px"}}>{eps.map((ep,i)=>(<div key={ep.id} style={{marginBottom:4}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",opacity:ep.s==="locked"?0.35:1}}>
+        {/* Play button or art */}
+        {ep.mediaUrl?<button onClick={e=>{e.stopPropagation();togglePlay(ep.id);}} style={{width:42,height:42,borderRadius:ep.mediaType==="video"?4:21,background:playingId===ep.id?S.green+"30":"rgba(255,255,255,0.08)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+          {playingId===ep.id?<div style={{display:"flex",gap:2,alignItems:"center"}}><div style={{width:3,height:14,background:S.green,borderRadius:1}}/><div style={{width:3,height:14,background:S.green,borderRadius:1}}/></div>
+          :<svg width="16" height="16" viewBox="0 0 24 24" fill={S.white}><path d="M8 5v14l11-7z"/></svg>}
+        </button>:<Cv size={42} r={4} v={ep.v||"main"}/>}
+        <div style={{flex:1,minWidth:0}} onClick={ep.s!=="locked"&&ep.mediaUrl?()=>togglePlay(ep.id):undefined}>
+          <p style={{color:ep.s==="available"?S.green:S.white,fontSize:15,fontWeight:500,margin:0}}>{ep.t}</p>
+          <p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>
+            Episode {i+1}{ep.duration?" · "+ep.duration:""}{ep.mediaType==="video"?" · Video":ep.mediaType==="audio"?" · Audio":""}
+          </p>
+        </div>
+        {ep.s==="locked"&&!isShah&&<svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted}><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>}
+        {/* Shah controls */}
+        {isShah&&<div style={{display:"flex",gap:2}}>
+          <button onClick={e=>{e.stopPropagation();setEps(eps.map((x,j)=>j===i?{...x,s:x.s==="locked"?"available":"locked"}:x));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}} title={ep.s==="locked"?"Unlock":"Lock"}>
+            {ep.s==="locked"?<svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)"><path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z"/></svg>
+            :<svg width="14" height="14" viewBox="0 0 24 24" fill={S.green}><path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-9h-1V6A5 5 0 007 6h2a3 3 0 016 0v2H6a2 2 0 00-2 2v10c0 1.1.9 2 2 2h12a2 2 0 002-2V10a2 2 0 00-2-2z"/></svg>}
+          </button>
+          <button onClick={e=>{e.stopPropagation();setEps(eps.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.15)"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+        </div>}
       </div>
-      {/* Dane's comment/reflection */}
+      {/* Description */}
+      {ep.desc&&ep.s!=="locked"&&<p style={{color:S.muted,fontSize:12,margin:"4px 0 4px 54px",lineHeight:1.4}}>{ep.desc}</p>}
+      {/* Shah: upload file to existing episode */}
+      {isShah&&!ep.mediaUrl&&<label style={{display:"flex",alignItems:"center",gap:6,marginLeft:54,padding:"6px 12px",borderRadius:10,border:"1px dashed rgba(255,255,255,0.1)",cursor:"pointer",marginBottom:6,width:"fit-content"}}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+        <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>Upload audio/video</span>
+        <input type="file" accept="audio/*,video/*" onChange={e=>{if(e.target.files[0])handleFile(ep.id,e.target.files[0]);}} style={{display:"none"}}/>
+      </label>}
+      {/* Video player */}
+      {ep.mediaType==="video"&&ep.mediaUrl&&ep.s!=="locked"&&<div style={{marginLeft:54,marginBottom:8}}>
+        <video src={ep.mediaUrl} controls style={{width:"100%",borderRadius:8,maxHeight:200}} playsInline/>
+      </div>}
+      {/* Dane's comment */}
       {comments[ep.id]&&<div style={{marginLeft:54,padding:"8px 12px",background:"rgba(232,17,91,0.06)",borderRadius:10,marginBottom:6}}><p style={{color:"#E8115B",fontSize:12,margin:0}}><span style={{fontWeight:600}}>Dane:</span> {comments[ep.id]}</p></div>}
-      {!isShah&&ep.s!=="locked"&&<button onClick={()=>{const c=prompt("Your thoughts on this episode:");if(c)setComments({...comments,[ep.id]:c});}} style={{marginLeft:54,padding:"4px 12px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>Reflect</button>}
+      {!isShah&&ep.s!=="locked"&&<button onClick={()=>{const c=prompt("Your thoughts on this episode:");if(c)setComments({...comments,[ep.id]:c});}} style={{marginLeft:54,padding:"6px 14px",borderRadius:12,border:"1px solid rgba(232,17,91,0.15)",background:"transparent",color:"rgba(232,17,91,0.5)",fontSize:11,cursor:"pointer",marginBottom:6}}>Reflect</button>}
     </div>))}
     {/* Shah: add episode */}
-    {isShah&&<div style={{marginTop:12}}>
-      {addEp?<div style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.06)"}}>
-        <input value={newEp} onChange={e=>setNewEp(e.target.value)} placeholder="Episode title" style={{width:"100%",padding:"10px 0",background:"transparent",border:"none",borderBottom:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:12}}/>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>{if(newEp.trim()){setEps([...eps,{id:Date.now(),t:newEp.trim(),s:"locked",v:"main"}]);setNewEp("");setAddEp(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:"#E13300",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add Episode</button>
-          <button onClick={()=>{setAddEp(false);setNewEp("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Cancel</button>
-        </div>
-      </div>
-      :<button onClick={()=>setAddEp(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.25)",fontSize:13,cursor:"pointer"}}>+ add episode</button>}
+    {isShah&&<div style={{marginTop:16}}>
+      <button onClick={()=>setAddEp(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"rgba(255,255,255,0.4)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.4)"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Add Episode
+      </button>
     </div>}
     </div>
   </div>);
@@ -1774,10 +2025,43 @@ export default function App(){
   const[s,setS]=useState(()=>local.get('lastScreen','home'));
   const[tab,setTab]=useState(()=>local.get('lastTab','home'));
   const[dark,setDark]=useState(()=>local.get('dark',false));
+  const[notifStatus,setNotifStatus]=useState(()=>notif.supported?Notification.permission:'unsupported');
   const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us"].includes(t)){setTab(t);local.set('lastTab',t);}};
   const setDarkMode=(v)=>{setDark(v);local.set('dark',v);};
   const logout=()=>{setUser(null);local.set('user',null);setS('home');setTab('home');};
   const nav=["home","browse","learn","us","series"].includes(s);
+
+  // Request notification permission on first load
+  useEffect(()=>{
+    if(user&&notif.supported&&Notification.permission==='default'){
+      const t=setTimeout(()=>notif.requestPermission().then(ok=>setNotifStatus(ok?'granted':'denied')),2000);
+      return()=>clearTimeout(t);
+    }
+  },[user]);
+
+  // Ramadan notifications — check on load + every 5 minutes
+  useEffect(()=>{
+    if(!user)return;
+    const R=[
+      {d:1,fajr:"5:49",mag:"5:53"},{d:2,fajr:"5:47",mag:"5:55"},{d:3,fajr:"5:45",mag:"5:57"},
+      {d:4,fajr:"5:43",mag:"5:59"},{d:5,fajr:"5:41",mag:"6:01"},{d:6,fajr:"5:39",mag:"6:03"},
+      {d:7,fajr:"5:37",mag:"6:05"},{d:8,fajr:"5:35",mag:"6:07"},{d:9,fajr:"5:33",mag:"6:09"},
+      {d:10,fajr:"5:30",mag:"6:11"},{d:11,fajr:"5:28",mag:"6:13"},{d:12,fajr:"5:26",mag:"6:15"},
+      {d:13,fajr:"5:24",mag:"6:17"},{d:14,fajr:"5:21",mag:"6:18"},{d:15,fajr:"5:19",mag:"6:20"},
+      {d:16,fajr:"5:17",mag:"6:22"},{d:17,fajr:"5:14",mag:"6:24"},{d:18,fajr:"5:12",mag:"6:26"},
+      {d:19,fajr:"6:09",mag:"7:28"},{d:20,fajr:"6:07",mag:"7:30"},{d:21,fajr:"6:04",mag:"7:32"},
+      {d:22,fajr:"6:02",mag:"7:34"},{d:23,fajr:"5:59",mag:"7:35"},{d:24,fajr:"5:56",mag:"7:37"},
+      {d:25,fajr:"5:54",mag:"7:39"},{d:26,fajr:"5:51",mag:"7:41"},{d:27,fajr:"5:48",mag:"7:43"},
+      {d:28,fajr:"5:46",mag:"7:45"},{d:29,fajr:"5:43",mag:"7:47"},{d:30,fajr:"5:40",mag:"7:48"},
+    ];
+    const ramStart=new Date(2026,1,18);
+    const dayNum=Math.max(1,Math.min(30,Math.floor((new Date()-ramStart)/(1000*60*60*24))+1));
+    const td=R[dayNum-1];
+    const check=()=>{if(td)notif.checkRamadan(td.fajr,td.mag,dayNum);};
+    check(); // Check immediately
+    const interval=setInterval(check,5*60*1000); // Re-check every 5 min while app is open
+    return()=>clearInterval(interval);
+  },[user]);
 
   if(!user)return(<><style>{`
     .dc-shake{animation:shake 0.4s ease-in-out;}
