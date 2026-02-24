@@ -51,7 +51,7 @@ const notif={
       if('serviceWorker' in navigator){
         navigator.serviceWorker.ready.then(reg=>{
           if(reg&&reg.showNotification){
-            reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',vibrate:[200,100,200],tag:options.tag||'dc-notif',renotify:true,...options});
+            reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/badge-96.png',vibrate:[200,100,200],tag:options.tag||'dc-notif',renotify:true,...options});
           }
         }).catch(()=>{
           // Fallback to basic Notification
@@ -2551,8 +2551,12 @@ export default function App(){
       {/* In-app toast notifications */}
       <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,zIndex:9999,padding:"max(env(safe-area-inset-top),8px) 16px 0",pointerEvents:"none"}}>
         {toasts.map((t,i)=>(<div key={t.id} style={{background:"rgba(24,24,24,0.95)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderRadius:16,padding:"12px 16px",marginBottom:8,border:"1px solid rgba(255,255,255,0.08)",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",gap:12,animation:"dcSlideDown 0.3s cubic-bezier(.16,1,.3,1)",pointerEvents:"auto"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#1DB954,#169C46)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#072E22,#0A3D2C)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M3 6h15l-1 12c-.1 1.1-1 2-2.1 2H6.1c-1.1 0-2-.9-2.1-2L3 6z" fill="#D4A84B" opacity="0.9"/>
+              <path d="M18 8c2 0 3.5 1.5 3.5 3.5S20 15 18 15" stroke="#D4A84B" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              <path d="M7 4c0.3-1.3 0.8-2 1.2-2.5M10.5 4c0.3-1 0.6-1.8 1-2.2M14 4c0.2-0.8 0.5-1.5 0.8-2" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
           </div>
           <div style={{flex:1,minWidth:0}}>
             <p style={{color:"#fff",fontSize:13,fontWeight:700,margin:"0 0 1px",letterSpacing:-0.2}}>{t.title}</p>
