@@ -1,8 +1,48 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#0A5C40"/>
-  <text x="22" y="68" font-family="Georgia,serif" font-size="58" font-weight="700" fill="rgba(255,255,255,0.9)">D</text>
-  <g transform="translate(58,42) scale(0.35)">
-    <path d="M0 0 L5 70 Q7 90 30 92 L80 92 Q103 90 105 70 L110 0 Z" fill="#D4A84B" opacity="0.9"/>
-    <path d="M110 15 Q145 15 145 45 Q145 75 110 75" fill="none" stroke="#D4A84B" stroke-width="9" stroke-linecap="round" opacity="0.9"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#082B1F"/>
+      <stop offset="100%" stop-color="#0A3D2C"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4A84B"/>
+      <stop offset="100%" stop-color="#B8923A"/>
+    </linearGradient>
+    <linearGradient id="steam" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#bg)"/>
+  <!-- Subtle inner border -->
+  <rect x="2" y="2" width="96" height="96" rx="20" fill="none" stroke="rgba(212,168,75,0.08)" stroke-width="0.5"/>
+  <!-- D letter -->
+  <text x="18" y="70" font-family="Georgia,'Times New Roman',serif" font-size="58" font-weight="700" fill="rgba(255,255,255,0.92)" filter="url(#glow)">D</text>
+  <!-- Chai cup - refined -->
+  <g transform="translate(56,38) scale(0.38)">
+    <!-- Cup body - tapered -->
+    <path d="M8 5 L12 75 Q15 90 35 92 L75 92 Q95 90 98 75 L102 5 Z" fill="url(#gold)" opacity="0.95"/>
+    <!-- Cup rim highlight -->
+    <path d="M8 5 L102 5" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+    <!-- Cup handle -->
+    <path d="M102 20 Q135 20 135 48 Q135 72 102 72" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" opacity="0.9"/>
+    <!-- Chai liquid -->
+    <ellipse cx="55" cy="18" rx="42" ry="8" fill="#8B5E3C" opacity="0.4"/>
+    <!-- Steam wisps -->
+    <path d="M35 0 Q30 -20 38 -35 Q42 -45 36 -55" fill="none" stroke="url(#steam)" stroke-width="3" stroke-linecap="round">
+      <animate attributeName="d" dur="3s" repeatCount="indefinite" values="M35 0 Q30 -20 38 -35 Q42 -45 36 -55;M35 0 Q40 -20 32 -35 Q28 -45 34 -55;M35 0 Q30 -20 38 -35 Q42 -45 36 -55"/>
+    </path>
+    <path d="M55 -2 Q50 -25 58 -40 Q62 -50 56 -60" fill="none" stroke="url(#steam)" stroke-width="2.5" stroke-linecap="round" opacity="0.7">
+      <animate attributeName="d" dur="3.5s" repeatCount="indefinite" values="M55 -2 Q50 -25 58 -40 Q62 -50 56 -60;M55 -2 Q60 -25 52 -40 Q48 -50 54 -60;M55 -2 Q50 -25 58 -40 Q62 -50 56 -60"/>
+    </path>
+    <path d="M75 0 Q70 -18 76 -32 Q80 -42 74 -50" fill="none" stroke="url(#steam)" stroke-width="2" stroke-linecap="round" opacity="0.5">
+      <animate attributeName="d" dur="4s" repeatCount="indefinite" values="M75 0 Q70 -18 76 -32 Q80 -42 74 -50;M75 0 Q80 -18 72 -32 Q68 -42 74 -50;M75 0 Q70 -18 76 -32 Q80 -42 74 -50"/>
+    </path>
   </g>
+  <!-- Subtle gold corner accent -->
+  <path d="M78 98 Q92 98 98 84" fill="none" stroke="rgba(212,168,75,0.12)" stroke-width="0.8"/>
 </svg>

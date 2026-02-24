@@ -33,12 +33,16 @@ const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JS
 // Push notifications
 const notif={
   supported:typeof window!=='undefined'&&'Notification' in window,
+  _toastCb:null, // in-app toast callback
   async requestPermission(){
     if(!this.supported)return false;
     const perm=await Notification.requestPermission();
     return perm==='granted';
   },
   send(title,body,options={}){
+    // Always show in-app toast
+    this.show(title,body);
+    // Also try native notification
     if(!this.supported||Notification.permission!=='granted')return;
     try{
       if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
@@ -49,6 +53,9 @@ const notif={
         new Notification(title,{body,icon:'/icon-192.png',...options});
       }
     }catch(e){console.log('Notif error:',e);}
+  },
+  show(title,body){
+    if(this._toastCb)this._toastCb({title,body,id:Date.now()});
   },
   // Schedule a notification at a specific time today using setTimeout
   scheduleAt(hour,minute,title,body,tag){
@@ -132,7 +139,7 @@ function Login({onLogin}){
   }));
 
   // Splash screen
-  if(splash)return(<div onClick={()=>{setFadeOut(true);setTimeout(()=>{setSplash(false);setFadeOut(false);},500);}} className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",overflow:"hidden"}}>
+  if(splash)return(<div onClick={()=>{setFadeOut(true);setTimeout(()=>{setSplash(false);setFadeOut(false);},500);}} className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#072E22 0%,#041A12 50%,#03120D 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",overflow:"hidden"}}>
     <style>{heartCSS}</style>
     {/* Floating hearts */}
     {hearts.map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
@@ -155,7 +162,7 @@ function Login({onLogin}){
   </div>);
 
   // Who's drinking?
-  if(!who)return(<div style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
+  if(!who)return(<div style={{height:"100%",background:"linear-gradient(160deg,#072E22 0%,#041A12 50%,#03120D 100%)",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
     <style>{heartCSS}</style>
     {hearts.slice(0,6).map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
       <svg width={h.size*0.7} height={h.size*0.7} viewBox="0 0 24 24" fill={h.color}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
@@ -176,7 +183,7 @@ function Login({onLogin}){
   </div>);
 
   // PIN entry
-  return(<div className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#0B3D2E 0%,#061F17 50%,#071A14 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,position:"relative",overflow:"hidden"}}>
+  return(<div className={fadeOut?"dc-splash-exit":""} style={{height:"100%",background:"linear-gradient(160deg,#072E22 0%,#041A12 50%,#03120D 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,position:"relative",overflow:"hidden"}}>
     <style>{heartCSS}</style>
     {hearts.slice(0,4).map((h,i)=>(<div key={i} className="dc-heart" style={{left:h.left+"%",animationDuration:h.dur+"s",animationDelay:h.delay+"s"}}>
       <svg width={h.size*0.5} height={h.size*0.5} viewBox="0 0 24 24" fill={h.color}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
@@ -287,7 +294,7 @@ const WL={bg:"#FDFAF5",card:"#FFFFFF",cardAlt:"#F5F0E8",forest:"#1A3D34",accent:
 const WD={bg:"#121212",card:"#181818",cardAlt:"#1E1E1E",forest:"#A8D5BA",accent:"#C9A067",text:"#E5E5E5",textMuted:"#707070",border:"#222",cream:"#1A3D34",error:"#D94F4F",success:"#3D9B5A"};
 const useW=()=>{const d=useDark();return d?WD:WL;};
 
-const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`;
+const CSS=`*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em}input,textarea,button{font-family:inherit;letter-spacing:inherit}::-webkit-scrollbar{width:0;display:none}*{scrollbar-width:none}@supports(height:100dvh){.dc-shell{height:100dvh!important}}.dc-fade-in{animation:dcFadeIn .3s cubic-bezier(.16,1,.3,1)}.dc-slide-up{animation:dcSlideUp .35s cubic-bezier(.16,1,.3,1)}@keyframes dcFadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}@keyframes dcSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes dcSlideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}`;
 
 const LANGS={
 urdu:{color:"#E67E22",label:"Urdu",char:"\u0627",sub:"Shah's language",
@@ -1020,7 +1027,7 @@ function Cv({size=48,v="main",r=4,sh}){
 
 function Shell({children,dark}){return(<div className="dc-shell" style={{width:"100%",maxWidth:480,height:"100vh",margin:"0 auto",overflow:"hidden",position:"relative",background:dark?WD.bg:S.black,transition:"background 0.3s"}}><style>{CSS}</style>{children}</div>);}
 
-function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Browse",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
+function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Tea",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
 
 function Home({go}){
   const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';const partner=user==='shah'?'Dane':'Shah';
@@ -1156,6 +1163,9 @@ function Home({go}){
   const todayWords=[{...wotdU,lang:"Urdu",color:"#1DB954"},{...wotdT,lang:"Tagalog",color:"#E8115B"},{...wotdA,lang:"Arabic",color:"#C9A84C"}];
   const [wotdRecs,setWotdRecs]=useState(()=>({u:local.get('wotd_'+todayIdx+'_u_'+user,null),t:local.get('wotd_'+todayIdx+'_t_'+user,null),a:local.get('wotd_'+todayIdx+'_a_'+user,null)}));
   const [recording,setRecording]=useState(null);
+  const [playing,setPlaying]=useState(null);
+  const [wotdSlide,setWotdSlide]=useState(0);
+  const [duaOpen,setDuaOpen]=useState(true);
 
   // Dua of the Day
   const DUAS=[
@@ -1173,7 +1183,7 @@ function Home({go}){
   const recordWord=async(langKey)=>{
     const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
     const existing=wotdRecs[langKey];
-    if(existing){try{new Audio(existing).play();}catch(e){}return;}
+    if(existing){try{setPlaying(langKey);const a=new Audio(existing);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}return;}
     try{
       setRecording(langKey);
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -1183,100 +1193,123 @@ function Home({go}){
         stream.getTracks().forEach(t=>t.stop());
         const blob=new Blob(chunks,{type:'audio/webm'});
         const reader=new FileReader();
-        reader.onload=()=>{local.set(recKey,reader.result);setWotdRecs(p=>({...p,[langKey]:reader.result}));setRecording(null);};
+        reader.onload=()=>{
+          local.set(recKey,reader.result);setWotdRecs(p=>({...p,[langKey]:reader.result}));setRecording(null);
+          const langNames={u:"Urdu",t:"Tagalog",a:"Arabic"};
+          notif.show((user==='shah'?'Shah':'Dane')+" recorded a word",langNames[langKey]+" · "+todayWords[["u","t","a"].indexOf(langKey)].w);
+        };
         reader.readAsDataURL(blob);
       };
       mr.start();setTimeout(()=>mr.stop(),4000);
     }catch(e){setRecording(null);}
   };
-  const playPartnerWord=(langKey)=>{const pk='wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah');const r=local.get(pk,null);if(r){try{new Audio(r).play();}catch(e){}}};
+  const deleteRecording=(langKey)=>{
+    const recKey='wotd_'+todayIdx+'_'+langKey+'_'+user;
+    local.set(recKey,null);
+    setWotdRecs(p=>({...p,[langKey]:null}));
+  };
+  const playPartnerWord=(langKey)=>{const pk='wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah');const r=local.get(pk,null);if(r){try{setPlaying('p_'+langKey);const a=new Audio(r);a.onended=()=>setPlaying(null);a.onerror=()=>setPlaying(null);a.play();}catch(e){setPlaying(null);}}};
   const hasPartnerWord=(langKey)=>!!local.get('wotd_'+todayIdx+'_'+langKey+'_'+(user==='shah'?'dane':'shah'),null);
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
-    <div style={{background:"linear-gradient(180deg,#0B3D2E 0%,#121212 80%)",padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:"50%",background:user==='shah'?"linear-gradient(135deg,#1DB954,#169C46)":"linear-gradient(135deg,#E8115B,#C70F4E)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:14,fontWeight:800}}>{name[0]}</span></div>
-          <p style={{color:S.white,fontSize:21,fontWeight:700,margin:0,letterSpacing:-0.5}}>{greeting}, {name}</p>
+    <div style={{background:"linear-gradient(180deg,#072E22 0%,#121212 75%)",padding:"max(12px, env(safe-area-inset-top)) 16px 0"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:"50%",background:user==='shah'?"linear-gradient(135deg,#1DB954,#169C46)":"linear-gradient(135deg,#E8115B,#C70F4E)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:13,fontWeight:800}}>{name[0]}</span></div>
+          <p style={{color:S.white,fontSize:20,fontWeight:700,margin:0,letterSpacing:-0.4}}>{greeting}, {name}</p>
         </div>
-        <Sy mood="happy" size={30}/>
+        <Sy mood="happy" size={28}/>
       </div>
 
       {/* Ramadan + Prayer Schedule */}
-      <div style={{background:"linear-gradient(135deg,#152A45,#0C1A30)",borderRadius:20,padding:"20px",marginBottom:14,position:"relative",overflow:"hidden",border:"1px solid rgba(201,168,76,0.06)"}}>
-        <div style={{position:"absolute",top:-30,right:-30,width:100,height:100,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,0.05),transparent)"}}/>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-          <div>
-            <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 4px",textTransform:"uppercase"}}>Ramadan 1447</p>
-            <p style={{color:S.white,fontSize:32,fontWeight:300,margin:"0 0 2px",letterSpacing:-1,lineHeight:1}}>Day {dayNum}</p>
-            <p style={{color:"rgba(255,255,255,0.25)",fontSize:11,margin:0}}>{td.dt}, 2026</p>
+      <div style={{background:"linear-gradient(135deg,#152A45,#0C1A30)",borderRadius:18,padding:"16px",marginBottom:12,position:"relative",overflow:"hidden",border:"1px solid rgba(201,168,76,0.06)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+            <p style={{color:S.white,fontSize:28,fontWeight:300,margin:0,letterSpacing:-0.5,lineHeight:1}}>Day {dayNum}</p>
+            <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:1.5,margin:0}}>RAMADAN</p>
           </div>
-          <div style={{textAlign:"right"}}>
-            <p style={{color:nextPrayer.name==="Fajr"||nextPrayer.name==="Maghrib"?S.gold:"rgba(255,255,255,0.6)",fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 3px"}}>NEXT</p>
-            <p style={{color:S.white,fontSize:22,fontWeight:300,margin:0,letterSpacing:-0.5}}>{nextPrayer.name}</p>
-            <p style={{color:S.gold,fontSize:16,fontWeight:500,margin:"2px 0 0"}}>{nextPrayer.time}</p>
+          <div style={{textAlign:"right",display:"flex",alignItems:"baseline",gap:6}}>
+            <p style={{color:"rgba(255,255,255,0.4)",fontSize:11,fontWeight:600,margin:0}}>{nextPrayer.name}</p>
+            <p style={{color:S.gold,fontSize:17,fontWeight:600,margin:0}}>{nextPrayer.time}</p>
           </div>
         </div>
         {/* 5 prayer times row */}
         <div style={{display:"flex",justifyContent:"space-between",gap:4}}>
           {prayers.map(p=>{const isNext=p.name===nextPrayer.name;const isPast=prayers.indexOf(p)<prayers.indexOf(nextPrayer);return(
-            <div key={p.name} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRadius:10,background:isNext?"rgba(201,168,76,0.12)":"transparent",border:isNext?"1px solid rgba(201,168,76,0.15)":"1px solid transparent"}}>
-              <p style={{color:isNext?S.gold:isPast?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.5)",fontSize:9,fontWeight:700,letterSpacing:0.5,margin:"0 0 2px"}}>{p.name}</p>
-              <p style={{color:isNext?S.white:isPast?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.4)",fontSize:12,fontWeight:isNext?700:500,margin:0}}>{p.time}</p>
+            <div key={p.name} style={{flex:1,textAlign:"center",padding:"6px 2px",borderRadius:10,background:isNext?"rgba(201,168,76,0.12)":"transparent"}}>
+              <p style={{color:isNext?S.gold:isPast?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.45)",fontSize:9,fontWeight:700,letterSpacing:0.5,margin:"0 0 2px"}}>{p.name}</p>
+              <p style={{color:isNext?S.white:isPast?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.35)",fontSize:12,fontWeight:isNext?700:500,margin:0}}>{p.time}</p>
             </div>
           );})}
         </div>
       </div>
     </div>
 
-    <div style={{padding:"16px 16px 0"}}>
+    <div style={{padding:"12px 16px 0"}}>
 
-      {/* Words of the Day — one from each language */}
-      <div style={{background:S.card,borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(255,255,255,0.04)"}}>
-        <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 14px"}}>WORDS OF THE DAY</p>
-        {todayWords.map((tw,wi)=>{const lk=["u","t","a"][wi];const hasRec=!!wotdRecs[lk];const isRec=recording===lk;const hasPart=hasPartnerWord(lk);return(
-          <div key={wi} style={{marginBottom:wi<2?14:0,paddingBottom:wi<2?14:0,borderBottom:wi<2?"1px solid rgba(255,255,255,0.04)":"none"}}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{flex:1}}>
-                <p style={{color:tw.color,fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 4px"}}>{tw.lang.toUpperCase()}</p>
-                <p style={{color:S.white,fontSize:20,fontWeight:800,margin:"0 0 3px",letterSpacing:-0.3}}>{tw.w}</p>
-                <p style={{color:S.sub,fontSize:12,margin:"0 0 2px"}}>{tw.m}</p>
-                <p style={{color:S.muted,fontSize:11,margin:0}}>{tw.r}</p>
-              </div>
+      {/* Word of the Day — carousel */}
+      <div style={{background:S.card,borderRadius:18,padding:"16px",marginBottom:12,border:"1px solid rgba(255,255,255,0.04)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <p style={{color:S.muted,fontSize:9,fontWeight:700,letterSpacing:2,margin:0}}>WORDS OF THE DAY</p>
+          <div style={{display:"flex",gap:5}}>{todayWords.map((tw,i)=>(<div key={i} onClick={()=>setWotdSlide(i)} style={{width:7,height:7,borderRadius:4,background:wotdSlide===i?tw.color:"rgba(255,255,255,0.12)",cursor:"pointer",transition:"background 0.2s"}}/>))}</div>
+        </div>
+        {(()=>{const tw=todayWords[wotdSlide];const lk=["u","t","a"][wotdSlide];const hasRec=!!wotdRecs[lk];const isRec=recording===lk;const isPlay=playing===lk;const hasPart=hasPartnerWord(lk);const isPlayPart=playing==='p_'+lk;return(
+          <div style={{display:"flex",gap:14,alignItems:"center"}}>
+            <div style={{flex:1,minWidth:0}} onClick={()=>setWotdSlide((wotdSlide+1)%3)}>
+              <p style={{color:tw.color,fontSize:10,fontWeight:700,letterSpacing:1,margin:"0 0 4px"}}>{tw.lang.toUpperCase()}</p>
+              <p style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>{tw.w}</p>
+              <p style={{color:S.sub,fontSize:13,margin:"0 0 2px"}}>{tw.m}</p>
+              <p style={{color:S.muted,fontSize:11,margin:0}}>{tw.r}</p>
             </div>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>recordWord(lk)} style={{flex:1,padding:"8px",borderRadius:10,border:"none",background:isRec?S.rose+"20":hasRec?tw.color+"12":"rgba(255,255,255,0.03)",color:isRec?S.rose:hasRec?tw.color:S.muted,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                {isRec?<><span style={{width:6,height:6,borderRadius:"50%",background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Rec...</>
-                :hasRec?<><svg width="12" height="12" viewBox="0 0 24 24" fill={tw.color}><path d="M8 5v14l11-7z"/></svg>Yours</>
-                :<><svg width="12" height="12" viewBox="0 0 24 24" fill={S.muted}><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>Record</>}
-              </button>
-              {hasPart&&<button onClick={()=>playPartnerWord(lk)} style={{padding:"8px 12px",borderRadius:10,border:"none",background:S.rose+"10",color:S.rose,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill={S.rose}><path d="M8 5v14l11-7z"/></svg>{partner}
+            <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+              {hasRec?<div style={{display:"flex",gap:4}}>
+                <button onClick={()=>recordWord(lk)} style={{padding:"8px 12px",borderRadius:10,border:"none",background:isPlay?tw.color+"20":tw.color+"12",color:tw.color,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                  {isPlay?<><span style={{width:6,height:6,borderRadius:3,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>▶</>:<>▶ Play</>}
+                </button>
+                <button onClick={()=>deleteRecording(lk)} style={{padding:"8px",borderRadius:10,border:"none",background:"rgba(217,79,79,0.1)",color:"#D94F4F",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+              </div>
+              :<button onClick={()=>recordWord(lk)} style={{padding:"8px 14px",borderRadius:10,border:"none",background:isRec?S.rose+"20":"rgba(255,255,255,0.04)",color:isRec?S.rose:S.muted,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                {isRec?<><span style={{width:6,height:6,borderRadius:3,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Rec</>:<>🎙 Record</>}
+              </button>}
+              {hasPart&&<button onClick={()=>playPartnerWord(lk)} style={{padding:"8px 14px",borderRadius:10,border:"none",background:S.rose+"10",color:S.rose,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                {isPlayPart?"▶ Playing":"▶ "+partner}
               </button>}
             </div>
           </div>
-        );})}
+        );})()}
       </div>
 
-      {/* Dua of the Day */}
-      <div style={{background:"linear-gradient(135deg,rgba(201,168,76,0.06),rgba(201,168,76,0.02))",borderRadius:20,padding:"20px",marginBottom:16,border:"1px solid rgba(201,168,76,0.08)"}}>
-        <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 10px"}}>DUA OF THE DAY</p>
-        <p style={{color:S.white,fontSize:17,fontWeight:400,margin:"0 0 10px",lineHeight:1.6,direction:"rtl",textAlign:"right",fontFamily:"serif"}}>{dua.ar}</p>
-        <p style={{color:S.gold,fontSize:12,margin:"0 0 8px",lineHeight:1.5,fontStyle:"italic",opacity:0.7}}>{dua.pr}</p>
-        <p style={{color:S.sub,fontSize:13,margin:"0 0 4px",lineHeight:1.5}}>{dua.en}</p>
-        <p style={{color:S.muted,fontSize:11,margin:0}}>Quran {dua.ref}</p>
+      {/* Dua of the Day — tap to expand */}
+      <div onClick={()=>setDuaOpen(!duaOpen)} style={{background:"linear-gradient(135deg,rgba(201,168,76,0.06),rgba(201,168,76,0.02))",borderRadius:16,padding:"14px 16px",marginBottom:12,border:"1px solid rgba(201,168,76,0.08)",cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+            <p style={{color:S.gold,fontSize:9,fontWeight:700,letterSpacing:2,margin:0,flexShrink:0}}>DUA</p>
+            <p style={{color:S.sub,fontSize:13,margin:0,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:duaOpen?"normal":"nowrap"}}>{dua.en}</p>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={S.muted} style={{transform:duaOpen?"rotate(180deg)":"none",transition:"transform 0.2s",flexShrink:0,marginLeft:8}}><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        {duaOpen&&<div style={{marginTop:10}}>
+          <p style={{color:S.white,fontSize:16,fontWeight:400,margin:"0 0 8px",lineHeight:1.6,direction:"rtl",textAlign:"right",fontFamily:"serif"}}>{dua.ar}</p>
+          <p style={{color:S.gold,fontSize:12,margin:"0 0 6px",lineHeight:1.4,fontStyle:"italic",opacity:0.7}}>{dua.pr}</p>
+          <p style={{color:S.muted,fontSize:11,margin:0}}>Quran {dua.ref}</p>
+        </div>}
       </div>
 
       {/* Thinking of You */}
-      <div style={{marginBottom:16}}>
-        {lastVibe&&<div onClick={markRead} style={{background:"linear-gradient(135deg,rgba(232,17,91,0.08),rgba(141,103,171,0.08))",borderRadius:20,padding:"20px",marginBottom:12,border:"1px solid rgba(232,17,91,0.08)",cursor:"pointer",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:-24,right:-16,fontSize:64,opacity:0.04}}>{lastVibe.emoji}</div>
-          <p style={{color:S.rose,fontSize:9,fontWeight:700,letterSpacing:2,margin:"0 0 8px"}}>FROM {(lastVibe.from_user||"").toUpperCase()}</p>
-          <p style={{color:S.white,fontSize:17,fontWeight:600,margin:"0 0 6px",lineHeight:1.4}}>{lastVibe.emoji} {lastVibe.label}</p>
-          <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,margin:0}}>{new Date(lastVibe.created_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · tap to dismiss</p>
+      <div style={{marginBottom:12}}>
+        {lastVibe&&<div onClick={markRead} style={{background:"linear-gradient(135deg,rgba(232,17,91,0.08),rgba(141,103,171,0.08))",borderRadius:16,padding:"14px 16px",marginBottom:10,border:"1px solid rgba(232,17,91,0.08)",cursor:"pointer"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:24}}>{lastVibe.emoji}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 2px"}}>{lastVibe.label}</p>
+              <p style={{color:"rgba(255,255,255,0.25)",fontSize:11,margin:0}}>from {lastVibe.from_user} · tap to dismiss</p>
+            </div>
+          </div>
         </div>}
 
-        {!showSend?<button onClick={()=>setShowSend(true)} style={{width:"100%",padding:"16px",background:S.card,borderRadius:16,border:"1px solid rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer"}}>
+        {!showSend?<button onClick={()=>setShowSend(true)} style={{width:"100%",padding:"14px",background:S.card,borderRadius:16,border:"1px solid rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer"}}>
           <span style={{fontSize:16}}>💛</span>
           <span style={{color:S.sub,fontSize:14,fontWeight:500,letterSpacing:-0.2}}>Send {partner} something</span>
         </button>
@@ -1299,23 +1332,15 @@ function Home({go}){
         </div>}
       </div>
 
-      {/* Progress — compact */}
-      {(xp>0||completed.length>0)&&<div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[{v:xp,l:"XP",c:S.green},{v:completed.length+"/45",l:"Lessons",c:S.gold},{v:streak||"—",l:"Streak",c:S.rose}].map((s,i)=>(<div key={i} style={{flex:1,background:S.card,borderRadius:14,padding:"14px 10px",textAlign:"center",border:"1px solid rgba(255,255,255,0.03)"}}>
-          <p style={{color:s.c,fontSize:20,fontWeight:800,margin:"0 0 2px",letterSpacing:-0.5}}>{s.v}</p>
-          <p style={{color:S.muted,fontSize:10,margin:0,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{s.l}</p>
+      {/* Progress */}
+      {(xp>0||completed.length>0)&&<div style={{display:"flex",gap:8,marginBottom:10}}>
+        {[{v:xp,l:"XP",c:S.green},{v:completed.length+"/45",l:"Lessons",c:S.gold},{v:streak||"—",l:"Streak",c:S.rose}].map((s,i)=>(<div key={i} style={{flex:1,background:S.card,borderRadius:14,padding:"12px 8px",textAlign:"center",border:"1px solid rgba(255,255,255,0.03)"}}>
+          <p style={{color:s.c,fontSize:18,fontWeight:800,margin:"0 0 2px",letterSpacing:-0.5}}>{s.v}</p>
+          <p style={{color:S.muted,fontSize:9,margin:0,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{s.l}</p>
         </div>))}
       </div>}
 
-      {/* Tea Sessions */}
-      <button onClick={()=>go("series")} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:"linear-gradient(135deg,#1E3264,#0D1B3E)",borderRadius:16,border:"none",cursor:"pointer",marginBottom:16}}>
-        <div style={{width:48,height:48,borderRadius:12,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:20}}>☕</span></div>
-        <div style={{flex:1,textAlign:"left"}}>
-          <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 2px",letterSpacing:-0.2}}>Tea Sessions</p>
-          <p style={{color:"rgba(255,255,255,0.3)",fontSize:12,margin:0}}>Listen together · Share reflections</p>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.2)"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
+
     </div>
   </div>);
 }
@@ -1441,7 +1466,7 @@ function Browse({go}){
           {!isShah&&<button onClick={e=>{e.stopPropagation();setAddForm("comment_"+i);}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(232,17,91,0.2)",background:"transparent",color:"#E8115B",fontSize:11,cursor:"pointer"}}>Reply</button>}
           {addForm==="comment_"+i&&<div style={{display:"flex",gap:4,flex:1}}>
             <input value={formData.c||""} onChange={e=>setFormData({c:e.target.value})} placeholder="Your reply..." autoFocus style={{flex:1,padding:"6px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#fff",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
-            <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
+            <button onClick={()=>{if(formData.c){const n=[...items];n[i]={...n[i],comment:formData.c};setItems(n);setFormData({});setAddForm(null);notif.show("Dane left a reply","\""+formData.c+"\"");}}} style={{padding:"6px 10px",borderRadius:8,border:"none",background:color,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
           </div>}
           {isShah&&<button onClick={e=>{e.stopPropagation();setItems(items.filter((_,j)=>j!==i));}} style={{padding:"4px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"rgba(255,255,255,0.2)",fontSize:11,cursor:"pointer"}}>Remove</button>}
         </div>
@@ -1472,11 +1497,50 @@ function Browse({go}){
   ];
   const back=<div style={{padding:"max(12px,env(safe-area-inset-top)) 16px 6px"}}><button onClick={()=>setSel(null)} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44,display:"flex",alignItems:"center",gap:6}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg><span style={{color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:500}}>Back</span></button></div>;
 
+  // First Steps — Shah's video guides
+  if(sel==="steps")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
+    {back}<div style={{padding:"0 16px"}}><h2 style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>First Steps</h2><p style={{color:S.muted,fontSize:13,margin:"0 0 16px"}}>Shah's video guides for Dane</p></div>
+    <EditList items={bVids} setItems={setBVids} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No videos yet — Shah will add them" color="#0B6B48" mediaType="video"/>
+  </div>);
+
+  // Storytime — Prophets' stories
+  if(sel==="stories")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
+    {back}<div style={{padding:"0 16px"}}><h2 style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>Storytime</h2><p style={{color:S.muted,fontSize:13,margin:"0 0 16px"}}>Stories of the Prophets</p></div>
+    <EditList items={bStories} setItems={setBStories} fields={[{k:"t",ph:"Title"},{k:"s",ph:"Description (optional)"}]} emptyMsg="No stories yet" color="#4A2068" mediaType="audio"/>
+  </div>);
+
+  // Ask Anything — Q&A
+  if(sel==="ask")return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}>
+    {back}<div style={{padding:"0 16px"}}><h2 style={{color:S.white,fontSize:22,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.3}}>Ask Anything</h2><p style={{color:S.muted,fontSize:13,margin:"0 0 16px"}}>Dane asks, Shah answers</p></div>
+    <div style={{padding:"0 24px"}}>
+      {/* Ask input for Dane */}
+      {!isShah&&<div style={{marginBottom:16}}>
+        <div style={{display:"flex",gap:8}}>
+          <input value={askQ} onChange={e=>setAskQ(e.target.value)} placeholder="Ask Shah anything..." style={{flex:1,padding:"12px 16px",borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",color:S.white,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+          <button onClick={()=>{if(askQ.trim()){setAsked([{q:askQ.trim(),a:"",from:"Dane",id:Date.now()},...asked]);notif.show("Dane asked a question",askQ.trim());setAskQ("");}}} style={{padding:"12px 16px",borderRadius:14,border:"none",background:S.green,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Ask</button>
+        </div>
+      </div>}
+      {asked.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:S.muted,fontSize:13}}>No questions yet</p></div>}
+      {asked.map((q,i)=>(<div key={q.id||i} style={{background:"rgba(255,255,255,0.03)",borderRadius:14,padding:16,marginBottom:10,border:"1px solid rgba(255,255,255,0.04)"}}>
+        <p style={{color:S.white,fontSize:15,fontWeight:600,margin:"0 0 8px"}}>{q.q}</p>
+        {q.a?<p style={{color:S.sub,fontSize:13,margin:0,lineHeight:1.5}}>{q.a}</p>
+        :isShah?<div>
+          {editId===q.id?<div style={{display:"flex",gap:8}}>
+            <input value={editText} onChange={e=>setEditText(e.target.value)} placeholder="Your answer..." autoFocus style={{flex:1,padding:"8px 12px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={()=>{const n=[...asked];n[i]={...n[i],a:editText};setAsked(n);setEditId(null);setEditText("");}} style={{padding:"8px 14px",borderRadius:10,border:"none",background:S.green,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>Save</button>
+          </div>
+          :<button onClick={()=>{setEditId(q.id);setEditText("");}} style={{padding:"6px 14px",borderRadius:10,border:"1px solid rgba(29,185,84,0.3)",background:"transparent",color:S.green,fontSize:12,cursor:"pointer"}}>Answer this</button>}
+        </div>
+        :<p style={{color:S.muted,fontSize:12,fontStyle:"italic",margin:0}}>Waiting for Shah's answer...</p>}
+      </div>))}
+    </div>
+  </div>);
+
   // Fallback
   if(sel)return(<div className="dc-fade-in" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:S.black}}><Sy mood="thinking" size={80} msg="Coming soon!"/></div>);
 
   // ── Browse grid ──
-  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Browse</h1><p style={{color:S.muted,fontSize:13,margin:"0 0 20px",fontWeight:400}}>Everything in one place</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:180,borderRadius:20,padding:"22px",background:`linear-gradient(155deg,${c.c},${c.c}80)`,position:"relative",overflow:"hidden",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+  return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:S.black,WebkitOverflowScrolling:"touch"}}><div style={{padding:"max(14px, env(safe-area-inset-top)) 16px 0"}}><h1 style={{color:S.white,fontSize:24,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Tea</h1><p style={{color:S.muted,fontSize:13,margin:"0 0 20px",fontWeight:400}}>Learn, listen, explore</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{cats.map(c=>(<div key={c.id} onClick={c.act?()=>go(c.act):()=>setSel(c.id)} style={{height:180,borderRadius:20,padding:"22px",background:`linear-gradient(155deg,${c.c},${c.c}80)`,position:"relative",overflow:"hidden",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
     <div style={{position:"absolute",right:-10,bottom:-10,width:64,height:64,borderRadius:32,background:"rgba(255,255,255,0.04)"}}/>
     <p style={{color:"#fff",fontSize:18,fontWeight:800,margin:0,lineHeight:1.2,whiteSpace:"pre-line",position:"relative",zIndex:1,letterSpacing:-0.3}}>{c.t}</p>
     <p style={{color:"rgba(255,255,255,0.4)",fontSize:11,margin:"6px 0 0",position:"relative",zIndex:1,fontWeight:500}}>{c.sub}</p>
@@ -1502,6 +1566,7 @@ function Learn(){
       const partnerUser=user==='shah'?'dane':'shah';
       const displayName=user==='shah'?'Shah':'Dane';
       const vibeMsg=displayName+" just completed a "+langName+" lesson: "+lesson.t+" 🎉";
+      notif.show(displayName+" completed a lesson!",lesson.t+" ("+langName+")");
       if(supabase){
         supabase.from('dc_vibes').insert({from_user:user,to_user:partnerUser,emoji:"📚",label:vibeMsg,read:false}).then(()=>{}).catch(()=>{});
       }
@@ -1716,7 +1781,7 @@ function Learn(){
   const iWin=myXp>=partnerXp;
 
   return(<div className="dc-fade-in" style={{height:"100%",overflowY:"auto",paddingBottom:92,background:W.bg,WebkitOverflowScrolling:"touch"}}>
-    <div style={{background:dark?WD.cardAlt:`linear-gradient(155deg,${WL.forest},#0A5C40)`,padding:"max(14px,env(safe-area-inset-top)) 20px 28px",borderRadius:"0 0 28px 28px"}}>
+    <div style={{background:dark?WD.cardAlt:`linear-gradient(155deg,#0F3329,#072E22)`,padding:"max(14px,env(safe-area-inset-top)) 20px 28px",borderRadius:"0 0 28px 28px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
         <h1 style={{color:dark?"#E5E5E5":"#F2EDE4",fontSize:24,fontWeight:800,margin:0,letterSpacing:-0.5}}>Learn</h1>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1791,7 +1856,12 @@ function Us({onDark,isDark}){
   const [settings,setSettings]=useState({notif:true,alarms:true,sounds:false});
   const [notes,setNotes]=useState(()=>local.get('us_notes',[]));const [addNote,setAddNote]=useState(false);const [noteText,setNoteText]=useState("");
   const [addingWord,setAddingWord]=useState(false);const [newWord,setNewWord]=useState("");
-  useEffect(()=>{local.set('us_notes',notes);},[notes]);
+  const [goals,setGoals]=useState(()=>local.get('us_goals',[
+    {t:"Learn 100 words in each language",done:false,id:1},{t:"First Eid together",done:false,id:2},
+    {t:"Cook Nihari together",done:false,id:3},{t:"Visit a masjid together",done:false,id:4},
+    {t:"Meet each other's families",done:false,id:5}
+  ]));const [addGoal,setAddGoal]=useState(false);const [newGoalText,setNewGoalText]=useState("");
+  useEffect(()=>{local.set('us_goals',goals);},[goals]);
   // Sync notes from Supabase on mount
   useEffect(()=>{initSupabase.then(()=>{sync.loadNotes().then(d=>{if(d&&d.length)setNotes(d.map(n=>({text:n.text,from:n.from_name,dt:new Date(n.created_at).toLocaleDateString(),id:n.id})));});});},[]);
   useEffect(()=>{local.set('us_notes',notes);},[notes]);
@@ -1879,7 +1949,7 @@ function Us({onDark,isDark}){
         <button onClick={()=>setTab("settings")} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.12)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><svg width="16" height="16" viewBox="0 0 24 24" fill={dark?"#E8E8E8":WL.cream}><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg></button>
       </div>
       {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>{[{k:"cal",l:"Calendar"},{k:"ourwords",l:"Our Words"},{k:"gym",l:"Gym"},{k:"notes",l:"Notes"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 16px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E5E5E5":WL.cream,fontSize:12,fontWeight:tab===t.k?700:500,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>))}</div>
+      <div style={{display:"flex",gap:6,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>{[{k:"cal",l:"Calendar"},{k:"ourwords",l:"Our Words"},{k:"goals",l:"Goals"},{k:"gym",l:"Gym"},{k:"ideas",l:"Ideas"}].map(t=>(<button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"8px 16px",borderRadius:20,border:"none",background:tab===t.k?"rgba(255,255,255,0.2)":"transparent",color:dark?"#E5E5E5":WL.cream,fontSize:12,fontWeight:tab===t.k?700:500,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>))}</div>
     </div>
 
     <div style={{flex:1,overflowY:"auto",paddingBottom:92,WebkitOverflowScrolling:"touch"}}>
@@ -1944,17 +2014,17 @@ function Us({onDark,isDark}){
         })()}
       </div>}
 
-      {/* NOTES TAB */}
-      {tab==="notes"&&<div style={{padding:"16px"}}>
+      {/* IDEAS TAB */}
+      {tab==="ideas"&&<div style={{padding:"16px"}}>
         {addNote?<div style={{background:W.card,borderRadius:14,padding:16,border:"1px solid "+W.border,marginBottom:12}}>
-          <textarea value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Write something..." autoFocus style={{width:"100%",minHeight:100,padding:0,background:"transparent",border:"none",color:W.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          <textarea value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="What's the idea..." autoFocus style={{width:"100%",minHeight:100,padding:0,background:"transparent",border:"none",color:W.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
           <div style={{display:"flex",gap:8,marginTop:8}}>
             <button onClick={()=>{if(noteText.trim()){const n={text:noteText.trim(),from:user==='shah'?'Shah':'Dane',dt:new Date().toLocaleDateString(),id:Date.now()};setNotes([n,...notes]);sync.addNote(n.text,n.from);setNoteText("");setAddNote(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Save</button>
             <button onClick={()=>{setAddNote(false);setNoteText("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>
-        :<button onClick={()=>setAddNote(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid "+W.border,background:W.card,color:W.textMuted,fontSize:14,cursor:"pointer",marginBottom:12,textAlign:"left"}}>+ Write a note...</button>}
-        {notes.length===0&&!addNote&&<div style={{textAlign:"center",padding:"30px 0"}}><p style={{color:W.textMuted,fontSize:13}}>No notes yet — leave each other little messages</p></div>}
+        :<button onClick={()=>setAddNote(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid "+W.border,background:W.card,color:W.textMuted,fontSize:14,cursor:"pointer",marginBottom:12,textAlign:"left"}}>+ Drop an idea...</button>}
+        {notes.length===0&&!addNote&&<div style={{textAlign:"center",padding:"30px 0"}}><p style={{color:W.textMuted,fontSize:13}}>No ideas yet — drop something here</p></div>}
         {notes.map((n,i)=>(<div key={n.id} style={{background:W.card,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+W.border}}>
           <p style={{color:W.text,fontSize:14,margin:"0 0 8px",lineHeight:1.5}}>{n.text}</p>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -1965,6 +2035,39 @@ function Us({onDark,isDark}){
             <button onClick={()=>{const n=notes[i];sync.deleteNote(n.id);setNotes(notes.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
           </div>
         </div>))}
+      </div>}
+
+      {/* GOALS TAB */}
+      {tab==="goals"&&<div style={{padding:"16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <p style={{color:W.forest,fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Goals</p>
+            <p style={{color:W.textMuted,fontSize:12,margin:0}}>Things we're working toward together</p>
+          </div>
+          <div style={{background:W.success+"12",borderRadius:12,padding:"4px 12px"}}>
+            <span style={{color:W.success,fontSize:12,fontWeight:600}}>{goals.filter(g=>g.done).length}/{goals.length}</span>
+          </div>
+        </div>
+        {addGoal?<div style={{background:W.card,borderRadius:14,padding:14,border:"1px solid "+W.border,marginBottom:12}}>
+          <input value={newGoalText} onChange={e=>setNewGoalText(e.target.value)} placeholder="New goal..." autoFocus style={{width:"100%",padding:"8px 0",background:"transparent",border:"none",color:W.text,fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <button onClick={()=>{if(newGoalText.trim()){setGoals([...goals,{t:newGoalText.trim(),done:false,id:Date.now()}]);setNewGoalText("");setAddGoal(false);}}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:W.forest,color:dark?"#000":WL.cream,fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button>
+            <button onClick={()=>{setAddGoal(false);setNewGoalText("");}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid "+W.border,background:"transparent",color:W.textMuted,fontSize:13,cursor:"pointer"}}>Cancel</button>
+          </div>
+        </div>
+        :<button onClick={()=>setAddGoal(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid "+W.border,background:W.card,color:W.textMuted,fontSize:14,cursor:"pointer",marginBottom:12,textAlign:"left"}}>+ Add a goal</button>}
+        {/* Progress bar */}
+        {goals.length>0&&<div style={{marginBottom:16}}>
+          <div style={{height:6,background:W.border,borderRadius:3,overflow:"hidden"}}><div style={{width:Math.round((goals.filter(g=>g.done).length/goals.length)*100)+"%",height:"100%",background:W.success,borderRadius:3,transition:"width 0.4s"}}/></div>
+        </div>}
+        {goals.map((g,i)=>(<div key={g.id} onClick={()=>{const n=[...goals];n[i]={...n[i],done:!n[i].done};setGoals(n);}} style={{display:"flex",gap:12,padding:"14px 0",borderBottom:i<goals.length-1?"1px solid "+W.border:"none",cursor:"pointer",alignItems:"center"}}>
+          <div style={{width:22,height:22,borderRadius:"50%",background:g.done?W.success:"transparent",border:g.done?"none":"2px solid "+W.border,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
+            {g.done&&<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
+          </div>
+          <p style={{flex:1,color:g.done?W.success:W.text,fontSize:14,fontWeight:g.done?600:400,margin:0,textDecoration:g.done?"line-through":"none",transition:"all 0.2s"}}>{g.t}</p>
+          <button onClick={e=>{e.stopPropagation();setGoals(goals.filter((_,j)=>j!==i));}} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}><svg width="12" height="12" viewBox="0 0 24 24" fill={W.textMuted}><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+        </div>))}
+        {goals.length===0&&!addGoal&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:W.textMuted,fontSize:13}}>No goals yet — let's set some together</p></div>}
       </div>}
 
       {/* GYM TAB */}
@@ -2385,6 +2488,16 @@ export default function App(){
     return()=>clearInterval(interval);
   },[user]);
 
+  // In-app toast notifications
+  const [toasts,setToasts]=useState([]);
+  useEffect(()=>{
+    notif._toastCb=(t)=>setToasts(prev=>[...prev,t]);
+    return()=>{notif._toastCb=null;};
+  },[]);
+  useEffect(()=>{
+    if(toasts.length>0){const timer=setTimeout(()=>setToasts(prev=>prev.slice(1)),3500);return()=>clearTimeout(timer);}
+  },[toasts]);
+
   if(!user)return(<><style>{`
     .dc-shake{animation:shake 0.4s ease-in-out;}
     @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
@@ -2400,6 +2513,21 @@ export default function App(){
       {s==="hw"&&<HW go={go}/>}
       {s==="series"&&<Series go={go}/>}
       {nav&&<NavBar active={tab} go={go}/>}
+      {/* In-app toast notifications */}
+      <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,zIndex:9999,padding:"max(env(safe-area-inset-top),8px) 16px 0",pointerEvents:"none"}}>
+        {toasts.map((t,i)=>(<div key={t.id} style={{background:"rgba(24,24,24,0.95)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderRadius:16,padding:"12px 16px",marginBottom:8,border:"1px solid rgba(255,255,255,0.08)",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",gap:12,animation:"dcSlideDown 0.3s cubic-bezier(.16,1,.3,1)",pointerEvents:"auto"}}>
+          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#1DB954,#169C46)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{color:"#fff",fontSize:13,fontWeight:700,margin:"0 0 1px",letterSpacing:-0.2}}>{t.title}</p>
+            {t.body&&<p style={{color:"rgba(255,255,255,0.5)",fontSize:12,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.body}</p>}
+          </div>
+          <button onClick={()=>setToasts(prev=>prev.filter(x=>x.id!==t.id))} style={{background:"none",border:"none",padding:4,cursor:"pointer",flexShrink:0,pointerEvents:"auto"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>))}
+      </div>
     </Shell></DarkCtx.Provider></ErrorBoundary>
   </UserCtx.Provider>);
 }
