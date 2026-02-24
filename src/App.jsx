@@ -43,12 +43,19 @@ const notif={
     return perm==='granted';
   },
   send(title,body,options={}){
-    // Native notification (works even when app is backgrounded on mobile)
-    if(!this.supported||Notification.permission!=='granted')return;
+    // Native notification
     try{
-      if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
+      if(!this.supported)return;
+      if(typeof Notification!=='undefined'&&Notification.permission!=='granted')return;
+      // Try service worker first (works when backgrounded)
+      if('serviceWorker' in navigator){
         navigator.serviceWorker.ready.then(reg=>{
-          reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',vibrate:[200,100,200],tag:options.tag||'dc-notif',renotify:true,...options});
+          if(reg&&reg.showNotification){
+            reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',vibrate:[200,100,200],tag:options.tag||'dc-notif',renotify:true,...options});
+          }
+        }).catch(()=>{
+          // Fallback to basic Notification
+          try{new Notification(title,{body,icon:'/icon-192.png',...options});}catch(e){}
         });
       }else{
         new Notification(title,{body,icon:'/icon-192.png',...options});
@@ -1044,16 +1051,12 @@ function Home({go}){
   const [vibesLoaded,setVibesLoaded]=useState(false);
 
   useEffect(()=>{
-    let channel;
-    initSupabase.then(()=>{
-      if(!supabase){setVibesLoaded(true);return;}
-      // Load from Supabase
-      supabase.from('dc_vibes').select('*').order('created_at',{ascending:false}).limit(20)
-        .then(({data})=>{if(data&&data.length)setVibes(data);setVibesLoaded(true);})
-        .catch(()=>setVibesLoaded(true));
-      // Realtime
+    let channel;let retryTimer;
+    const setupRealtime=()=>{
+      if(!supabase)return;
       try{
-        channel=supabase.channel('vibes-realtime')
+        if(channel)try{supabase.removeChannel(channel);}catch(e){}
+        channel=supabase.channel('vibes-realtime-'+Date.now())
           .on('postgres_changes',{event:'INSERT',schema:'public',table:'dc_vibes'},payload=>{
             const nv=payload.new;
             setVibes(prev=>[nv,...prev]);
@@ -1064,10 +1067,30 @@ function Home({go}){
           .on('postgres_changes',{event:'UPDATE',schema:'public',table:'dc_vibes'},payload=>{
             setVibes(prev=>prev.map(v=>v.id===payload.new.id?payload.new:v));
           })
-          .subscribe();
-      }catch(e){}
+          .subscribe((status)=>{
+            if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+              retryTimer=setTimeout(setupRealtime,5000);
+            }
+          });
+      }catch(e){retryTimer=setTimeout(setupRealtime,5000);}
+    };
+    initSupabase.then(()=>{
+      if(!supabase){setVibesLoaded(true);return;}
+      // Load from Supabase
+      supabase.from('dc_vibes').select('*').order('created_at',{ascending:false}).limit(20)
+        .then(({data})=>{if(data&&data.length)setVibes(data);setVibesLoaded(true);})
+        .catch(()=>setVibesLoaded(true));
+      // Realtime with auto-reconnect
+      setupRealtime();
     });
-    return()=>{if(channel)try{supabase.removeChannel(channel);}catch(e){}};
+    // Re-subscribe when app comes back to foreground
+    const onVisibility=()=>{if(document.visibilityState==='visible')initSupabase.then(setupRealtime);};
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{
+      document.removeEventListener('visibilitychange',onVisibility);
+      if(retryTimer)clearTimeout(retryTimer);
+      if(channel)try{supabase.removeChannel(channel);}catch(e){}
+    };
   },[user]);
 
   const lastVibe=vibes.find(v=>v.to_user===user&&!v.read);
