@@ -1213,15 +1213,31 @@ function Home({go}){
   ];
   const dua=DUAS[dayNum%DUAS.length];
 
-  const recordWord=async(langKey)=>{
+  const mediaRecRef=React.useRef(null);
+  const recStreamRef=React.useRef(null);
+  const audioRef=React.useRef(null);
+  const playingRef=React.useRef(null);
+
+  const stopEverything=()=>{
+    if(audioRef.current){try{audioRef.current.pause();audioRef.current.onended=null;audioRef.current.onerror=null;}catch(e){}}
+    audioRef.current=null;playingRef.current=null;setPlaying(null);
+  };
+
+  const startRecording=async(langKey)=>{
+    stopEverything();
     try{
       setRecording(langKey);
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      const mr=new MediaRecorder(stream);const chunks=[];
-      mr.ondataavailable=e=>chunks.push(e.data);
+      recStreamRef.current=stream;
+      const mr=new MediaRecorder(stream);
+      mediaRecRef.current=mr;
+      const chunks=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       mr.onstop=()=>{
+        recStreamRef.current=null;mediaRecRef.current=null;
         stream.getTracks().forEach(t=>t.stop());
-        const blob=new Blob(chunks,{type:'audio/webm'});
+        if(chunks.length===0){setRecording(null);return;}
+        const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'});
         const reader=new FileReader();
         reader.onload=()=>{
           const ad=reader.result;
@@ -1229,26 +1245,42 @@ function Home({go}){
           local.set(recKey,ad);setWotdRecs(p=>({...p,[langKey]:ad}));setRecording(null);
           sync.saveRec(todayIdx,langKey,user,ad);
         };
+        reader.onerror=()=>setRecording(null);
         reader.readAsDataURL(blob);
       };
-      mr.start();setTimeout(()=>mr.stop(),4000);
+      mr.start();
+      // Auto-stop after 4 seconds
+      setTimeout(()=>{if(mr.state==='recording')try{mr.stop();}catch(e){}},4000);
     }catch(e){setRecording(null);}
   };
-  const audioRef=React.useRef(null);
-  const playAudio=(src,key)=>{
-    // Stop any currently playing audio
-    if(audioRef.current){try{audioRef.current.pause();audioRef.current.src="";}catch(e){}}
-    if(playing===key){setPlaying(null);return;}
-    const a=new Audio(src);
-    audioRef.current=a;
-    a.onended=()=>{setPlaying(null);audioRef.current=null;};
-    a.onerror=()=>{setPlaying(null);audioRef.current=null;};
-    setPlaying(key);
-    a.play().catch(()=>{setPlaying(null);audioRef.current=null;});
+
+  const stopRecording=()=>{
+    if(mediaRecRef.current&&mediaRecRef.current.state==='recording'){
+      try{mediaRecRef.current.stop();}catch(e){}
+    }
+    if(recStreamRef.current){
+      try{recStreamRef.current.getTracks().forEach(t=>t.stop());}catch(e){}
+    }
   };
+
+  const playAudio=(src,key)=>{
+    // If same key is playing, stop it
+    if(playingRef.current===key){stopEverything();return;}
+    // Stop anything else first
+    stopEverything();
+    // Create and play new audio
+    const a=new Audio();
+    a.onended=()=>{audioRef.current=null;playingRef.current=null;setPlaying(null);};
+    a.onerror=()=>{audioRef.current=null;playingRef.current=null;setPlaying(null);};
+    audioRef.current=a;
+    playingRef.current=key;
+    setPlaying(key);
+    a.src=src;
+    a.play().catch(()=>{audioRef.current=null;playingRef.current=null;setPlaying(null);});
+  };
+
   const deleteRecording=(langKey)=>{
-    if(audioRef.current){try{audioRef.current.pause();}catch(e){}}
-    setPlaying(null);
+    stopEverything();
     local.set('wotd_'+todayIdx+'_'+langKey+'_'+user,null);
     setWotdRecs(p=>({...p,[langKey]:null}));
     sync.deleteRec(todayIdx,langKey,user);
@@ -1309,14 +1341,17 @@ function Home({go}){
             <div style={{display:"flex",gap:8}}>
               {hasRec?<>
                 <button onClick={()=>playAudio(wotdRecs[lk],lk)} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:playing===lk?tw.color+"25":tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
-                  {playing===lk?<><span style={{width:8,height:8,borderRadius:4,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing...</>:"▶ Play yours"}
+                  {playing===lk?<><span style={{width:8,height:8,borderRadius:4,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing · tap to stop</>:"▶ Play yours"}
                 </button>
                 <button onClick={()=>deleteRecording(lk)} style={{padding:"12px 14px",borderRadius:12,border:"none",background:"rgba(217,79,79,0.08)",color:"#D94F4F",cursor:"pointer",display:"flex",alignItems:"center",minHeight:44}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>
               </>
-              :<button onClick={()=>recordWord(lk)} style={{flex:1,padding:"12px",borderRadius:12,border:isRec?"none":"1px dashed rgba(255,255,255,0.12)",background:isRec?S.rose+"15":"rgba(255,255,255,0.02)",color:isRec?S.rose:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
-                {isRec?<><span style={{width:8,height:8,borderRadius:4,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Recording...</>:"🎙 Record your pronunciation"}
+              :isRec?<button onClick={()=>stopRecording()} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:S.rose+"20",color:S.rose,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                <span style={{width:10,height:10,borderRadius:2,background:S.rose,animation:"dcFadeIn 0.6s infinite alternate"}}/>Tap to stop recording
+              </button>
+              :<button onClick={()=>startRecording(lk)} style={{flex:1,padding:"12px",borderRadius:12,border:"1px dashed rgba(255,255,255,0.12)",background:"rgba(255,255,255,0.02)",color:S.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                🎙 Record your pronunciation
               </button>}
             </div>
             {/* Partner recording */}
