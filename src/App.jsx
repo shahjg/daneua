@@ -64,10 +64,6 @@ const sync={
   async addGoal(t,order){if(!supabase)return;try{await supabase.from('dc_goals').insert({t,sort_order:order});}catch{}},
   async toggleGoal(id,done){if(!supabase)return;try{await supabase.from('dc_goals').update({done}).eq('id',id);}catch{}},
   async deleteGoal(id){if(!supabase)return;try{await supabase.from('dc_goals').delete().eq('id',id);}catch{}},
-  // Chat
-  async loadChat(){if(!supabase)return null;try{const{data}=await supabase.from('dc_chat').select('*').order('created_at',{ascending:true}).limit(200);return data;}catch{return null;}},
-  async sendChat(from,to,message){if(!supabase)return;try{await supabase.from('dc_chat').insert({from_user:from,to_user:to,message});}catch{}},
-  async markChatRead(user){if(!supabase)return;try{await supabase.from('dc_chat').update({read:true}).eq('to_user',user).eq('read',false);}catch{}},
 };
 
 // Dark mode context
@@ -1102,7 +1098,7 @@ function Cv({size=48,v="main",r=4,sh}){
 
 function Shell({children,dark}){return(<div className="dc-shell" style={{width:"100%",maxWidth:480,height:"100vh",margin:"0 auto",overflow:"hidden",position:"relative",background:dark?WD.bg:S.black,transition:"background 0.3s"}}><style>{CSS}</style>{children}</div>);}
 
-function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Tea",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"chat",label:"Chat",d:"M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 12px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
+function NavBar({active,go}){const W=useW();const warm=["learn","us"].includes(active);const items=[{id:"home",label:"Home",d:"M13 3L3 9v12h7v-7h4v7h7V9z"},{id:"browse",label:"Tea",d:"M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zM10 13H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm10 0h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"},{id:"learn",label:"Learn",d:"M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"},{id:"us",label:"Us",d:"M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}];return(<div style={{position:"absolute",bottom:0,left:0,right:0,paddingBottom:"max(16px, env(safe-area-inset-bottom))",paddingTop:12,background:warm?`linear-gradient(transparent,${W.bg}ee 20%)`:"linear-gradient(transparent,rgba(0,0,0,0.95) 20%)",display:"flex",alignItems:"center",justifyContent:"space-around",zIndex:40,transition:"background 0.3s"}}>{items.map(({id,label,d})=>{const a=active===id;const col=a?(warm?W.forest:S.white):(warm?W.textMuted:S.muted);return(<button key={id} onClick={()=>go(id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:col,padding:"6px 16px",minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d={d}/></svg><span style={{fontSize:10,fontWeight:a?700:400}}>{label}</span></button>);})}</div>);}
 
 function Home({go}){
   const {user}=useUser()||{user:'shah'};const name=user==='shah'?'Shah':'Dane';const partner=user==='shah'?'Dane':'Shah';
@@ -1795,7 +1791,7 @@ function Browse({go}){
   </div>))}</div></div></div>);
 }
 
-function Learn(){
+function Learn({onLesson}){
   const W=useW();const dark=useDark();
   const {user}=useUser()||{user:'shah'};
   const [lang,setLang]=useState(null);const [view,setView]=useState("home");const [lesson,setLesson]=useState(null);const [step,setStep]=useState(0);const [qIdx,setQIdx]=useState(0);const [sel,setSel]=useState(null);const [ok,setOk]=useState(null);const [xp,setXp]=useState(()=>local.get(user+'_xp',0));const [hearts,setHearts]=useState(()=>local.get(user+'_hearts',5));const [score,setScore]=useState(0);const [done,setDone]=useState(false);const [completed,setCompleted]=useState(()=>local.get(user+'_completed',[]));const [streak]=useState(()=>local.get(user+'_streak',0));const [wCat,setWCat]=useState(null);
@@ -1838,14 +1834,14 @@ function Learn(){
       }
     }
   }},900);};
-  const reset=()=>{setLesson(null);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);setView(lang?"browse":"home");};
+  const reset=()=>{setLesson(null);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);setView(lang?"browse":"home");if(onLesson)onLesson(false);};
   const Ic=({d,c,sz=22})=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><path d={d}/></svg>);
   const lockD="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3-9H9V6a3 3 0 016 0v2z";
   const heartD="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
   const checkD="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
 
   // Lesson complete — with Sy celebration
-  if(done&&lesson){const lc=LANGS[lang].color;return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(180deg,${W.bg} 0%,${lc}08 100%)`,padding:"32px 32px max(100px, calc(env(safe-area-inset-bottom) + 92px))"}}>
+  if(done&&lesson){const lc=LANGS[lang].color;return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(180deg,${W.bg} 0%,${lc}08 100%)`,padding:"32px 32px max(24px, calc(env(safe-area-inset-bottom) + 16px))"}}>
     <div className="dc-bounce" style={{marginBottom:8}}><Sy mood="celebrate" size={100} msg={score===lesson.quiz.length?"Purr-fect score! 🎉":"Great job, keep going!"}/></div>
     <div style={{height:12}}/>
     <h2 style={{color:W.forest,fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:-0.5}}>Lesson Complete!</h2>
@@ -1902,11 +1898,11 @@ function Learn(){
         </div>}
       </div>
       {/* Continue button — always visible, pushed above nav */}
-      <div style={{padding:"12px 20px",paddingBottom:"max(100px, calc(env(safe-area-inset-bottom) + 92px))",flexShrink:0}}>
+      <div style={{padding:"12px 20px",paddingBottom:"max(24px, calc(env(safe-area-inset-bottom) + 16px))",flexShrink:0}}>
         <button onClick={()=>setStep(step+1)} className="dc-slide-up" style={{width:"100%",padding:"16px",borderRadius:50,border:"none",background:`linear-gradient(135deg,${W.forest},${lc})`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${lc}30`}}>{isLast?"Start Quiz \u2192":"Continue"}</button>
       </div>
     </div>);}
-    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px",paddingBottom:"max(100px, calc(env(safe-area-inset-bottom) + 92px))"}}>
+    const q=lesson.quiz[qIdx];return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:W.bg,padding:"12px 20px",paddingBottom:"max(24px, calc(env(safe-area-inset-bottom) + 16px))"}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",minWidth:44,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={W.textMuted} strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         <div style={{flex:1,height:8,background:W.border,borderRadius:4,overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:lc,borderRadius:4,transition:"width 0.3s"}}/></div>
@@ -1999,7 +1995,7 @@ function Learn(){
             const globalIdx=unit.range[0]+i;
             const unlocked=isUnlocked(ls);
             const comp=completed.includes(ls.id);
-            return(<button key={ls.id} onClick={unlocked&&!comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);}:comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);}:undefined} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:W.card,borderRadius:16,marginBottom:10,border:comp?"1.5px solid "+W.success+"40":"1px solid "+W.border,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.3,textAlign:"left",boxShadow:unlocked?"0 2px 8px rgba(0,0,0,0.04)":"none",transition:"all 0.15s"}}>
+            return(<button key={ls.id} onClick={unlocked&&!comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);if(onLesson)onLesson(true);}:comp?()=>{setLesson(ls);setStep(0);setQIdx(0);setSel(null);setOk(null);setScore(0);setDone(false);setHearts(5);if(onLesson)onLesson(true);}:undefined} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",background:W.card,borderRadius:16,marginBottom:10,border:comp?"1.5px solid "+W.success+"40":"1px solid "+W.border,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.3,textAlign:"left",boxShadow:unlocked?"0 2px 8px rgba(0,0,0,0.04)":"none",transition:"all 0.15s"}}>
               <div style={{width:48,height:48,borderRadius:14,background:comp?W.success+"15":!unlocked?W.cardAlt:l.color+"12",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                 {comp?<Ic d={checkD} c={W.success} sz={22}/>:!unlocked?<Ic d={lockD} c={W.textMuted} sz={18}/>:<span style={{color:l.color,fontSize:17,fontWeight:800}}>{globalIdx+1}</span>}
               </div>
@@ -2954,92 +2950,18 @@ class ErrorBoundary extends React.Component{
   }
 }
 
-// ── Chat Component ──
-function Chat(){
-  const {user}=useUser()||{user:'shah'};const other=user==='shah'?'dane':'shah';
-  const [msgs,setMsgs]=useState([]);const [text,setText]=useState("");const [loading,setLoading]=useState(true);
-  const scrollRef=React.useRef(null);const inputRef=React.useRef(null);
-  // Load messages
-  useEffect(()=>{
-    initSupabase.then(async()=>{
-      const data=await sync.loadChat();
-      if(data)setMsgs(data);
-      setLoading(false);
-      // Mark as read
-      sync.markChatRead(user);
-      // Realtime subscription
-      if(supabase){
-        const ch=supabase.channel('chat-rt-'+Date.now()).on('postgres_changes',{event:'INSERT',schema:'public',table:'dc_chat'},payload=>{
-          setMsgs(prev=>[...prev,payload.new]);
-          if(payload.new.to_user===user){
-            notif.notify(payload.new.from_user==='shah'?'Shah':'Dane',payload.new.message);
-            sync.markChatRead(user);
-          }
-        }).subscribe();
-        return()=>supabase.removeChannel(ch);
-      }
-    });
-  },[]);
-  // Auto-scroll to bottom
-  useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs]);
-  const send=()=>{
-    if(!text.trim())return;
-    sync.sendChat(user,other,text.trim());
-    setText("");
-    inputRef.current?.focus();
-  };
-  const formatTime=(ts)=>{const d=new Date(ts);return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
-  const formatDate=(ts)=>{const d=new Date(ts);const today=new Date();if(d.toDateString()===today.toDateString())return"Today";const y=new Date(today-86400000);if(d.toDateString()===y.toDateString())return"Yesterday";return d.toLocaleDateString([],{month:'short',day:'numeric'});};
-  // Group messages by date
-  const grouped=[];let lastDate="";
-  msgs.forEach(m=>{const d=formatDate(m.created_at);if(d!==lastDate){grouped.push({type:'date',label:d});lastDate=d;}grouped.push({type:'msg',...m});});
-
-  return(<div className="dc-fade-in" style={{height:"100%",display:"flex",flexDirection:"column",background:S.black}}>
-    {/* Header */}
-    <div style={{padding:"max(14px, env(safe-area-inset-top)) 20px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-      <h1 style={{color:S.white,fontSize:22,fontWeight:800,margin:0,letterSpacing:-0.5}}>Chat</h1>
-      <p style={{color:S.muted,fontSize:12,margin:"2px 0 0"}}>{user==='shah'?'Shah & Dane':'Dane & Shah'}</p>
-    </div>
-    {/* Messages */}
-    <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"12px 16px",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",gap:4}}>
-      {loading&&<div style={{textAlign:"center",padding:40}}><p style={{color:S.muted,fontSize:13}}>Loading...</p></div>}
-      {!loading&&msgs.length===0&&<div style={{textAlign:"center",padding:40,flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-        <div style={{width:56,height:56,borderRadius:28,background:"linear-gradient(135deg,#0B6B48,#0A3D2C)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.6)"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-        </div>
-        <p style={{color:S.muted,fontSize:13}}>Send {other==='dane'?'Dane':'Shah'} a message ☕</p>
-      </div>}
-      {grouped.map((item,i)=>{
-        if(item.type==='date')return <div key={'d'+i} style={{textAlign:"center",padding:"8px 0"}}><span style={{color:S.muted,fontSize:11,fontWeight:600,background:"rgba(255,255,255,0.04)",padding:"4px 12px",borderRadius:12}}>{item.label}</span></div>;
-        const mine=item.from_user===user;
-        return <div key={item.id||i} style={{display:"flex",justifyContent:mine?"flex-end":"flex-start",marginBottom:2}}>
-          <div style={{maxWidth:"78%",padding:"10px 14px",borderRadius:mine?"18px 18px 4px 18px":"18px 18px 18px 4px",background:mine?"#0B6B48":"rgba(255,255,255,0.08)",color:mine?"#fff":S.white}}>
-            <p style={{fontSize:14,margin:0,lineHeight:1.45,wordBreak:"break-word"}}>{item.message}</p>
-            <p style={{fontSize:10,margin:"4px 0 0",color:mine?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.3)",textAlign:"right"}}>{formatTime(item.created_at)}</p>
-          </div>
-        </div>;
-      })}
-    </div>
-    {/* Input */}
-    <div style={{padding:"8px 12px max(12px, env(safe-area-inset-bottom))",borderTop:"1px solid rgba(255,255,255,0.06)",display:"flex",gap:8,alignItems:"flex-end",background:S.black}}>
-      <input ref={inputRef} value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} placeholder={"Message "+(other==='dane'?'Dane':'Shah')+"..."} style={{flex:1,padding:"12px 16px",borderRadius:24,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",color:S.white,fontSize:14,outline:"none",fontFamily:"inherit",resize:"none"}}/>
-      <button onClick={send} disabled={!text.trim()} style={{width:42,height:42,borderRadius:21,border:"none",background:text.trim()?"#0B6B48":"rgba(255,255,255,0.06)",cursor:text.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s"}}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill={text.trim()?"#fff":"rgba(255,255,255,0.2)"}><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-      </button>
-    </div>
-  </div>);
-}
 
 export default function App(){
   const[user,setUser]=useState(()=>local.get('user',null));
-  const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","chat","series","np","hw"].includes(saved)?saved:'home';});
-  const[tab,setTab]=useState(()=>{const saved=local.get('lastTab','home');return["home","browse","learn","us","chat"].includes(saved)?saved:'home';});
+  const[s,setS]=useState(()=>{const saved=local.get('lastScreen','home');return["home","browse","learn","us","series","np","hw"].includes(saved)?saved:'home';});
+  const[tab,setTab]=useState(()=>{const saved=local.get('lastTab','home');return["home","browse","learn","us"].includes(saved)?saved:'home';});
   const[dark,setDark]=useState(()=>local.get('dark',false));
   const[notifStatus,setNotifStatus]=useState(()=>notif.supported?Notification.permission:'unsupported');
-  const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us","chat"].includes(t)){setTab(t);local.set('lastTab',t);}};
+  const[inLesson,setInLesson]=useState(false);
+  const go=t=>{setS(t);local.set('lastScreen',t);if(["home","browse","learn","us"].includes(t)){setTab(t);local.set('lastTab',t);}};
   const setDarkMode=(v)=>{setDark(v);local.set('dark',v);};
   const logout=()=>{setUser(null);local.set('user',null);setS('home');setTab('home');};
-  const nav=["home","browse","learn","us","chat","series"].includes(s);
+  const nav=["home","browse","learn","us","series"].includes(s)&&!inLesson;
 
   // Don't auto-prompt for notifications — let user enable in settings
 
@@ -3102,8 +3024,7 @@ export default function App(){
     <ErrorBoundary><DarkCtx.Provider value={dark}><Shell dark={dark}>
       {s==="home"&&<Home go={go}/>}
       {s==="browse"&&<Browse go={go}/>}
-      {s==="chat"&&<Chat/>}
-      {s==="learn"&&<Learn/>}
+      {s==="learn"&&<Learn onLesson={setInLesson}/>}
       {s==="us"&&<Us onDark={setDarkMode} isDark={dark}/>}
       {s==="np"&&<NP go={go}/>}
       {s==="hw"&&<HW go={go}/>}
