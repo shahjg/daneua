@@ -1485,8 +1485,8 @@ function Home({go}){
             {/* Recording buttons — full width, clear */}
             <div style={{display:"flex",gap:8}}>
               {hasRec?<>
-                <button onClick={()=>{const tw2=todayWords[wotdSlide];openWotdPlayer(wotdRecs[lk],tw2.w,tw2.m+" · "+name+"'s recording",tw2.color);}} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
-                  ▶ Play yours
+                <button onClick={()=>playAudio(wotdRecs[lk],'own_'+lk)} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:playing==='own_'+lk?tw.color+"25":tw.color+"10",color:tw.color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44}}>
+                  {playing==='own_'+lk?<><span style={{width:8,height:8,borderRadius:4,background:tw.color,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing...</>:"▶ Play yours"}
                 </button>
                 <button onClick={()=>deleteRecording(lk)} style={{padding:"12px 14px",borderRadius:12,border:"none",background:"rgba(217,79,79,0.08)",color:"#D94F4F",cursor:"pointer",display:"flex",alignItems:"center",minHeight:44}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="#D94F4F"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -1500,8 +1500,8 @@ function Home({go}){
               </button>}
             </div>
             {/* Partner recording */}
-            {hasPart&&<button onClick={()=>{const tw2=todayWords[wotdSlide];openWotdPlayer(partnerRecs[lk],tw2.w,tw2.m+" · "+partner+"'s recording",S.rose);}} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:S.rose+"08",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44,marginTop:8}}>
-              ▶ Listen to {partner}'s
+            {hasPart&&<button onClick={()=>playAudio(partnerRecs[lk],'p_'+lk)} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:playing==='p_'+lk?S.rose+"20":S.rose+"08",color:S.rose,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:44,marginTop:8}}>
+              {playing==='p_'+lk?<><span style={{width:8,height:8,borderRadius:4,background:S.rose,animation:"dcFadeIn 0.5s infinite alternate"}}/>Playing {partner}'s...</>:<>▶ Listen to {partner}'s</>}
             </button>}
           </div>
         );})()}
@@ -1612,8 +1612,11 @@ function Browse({go}){
       if(!file)return;
       setUploading(true);
       const folder=mediaType==='video'?'browse_vids':'browse_stories';
-      const url=await sync.uploadMedia(file,folder);
-      const finalUrl=url||URL.createObjectURL(file);
+      let finalUrl=await sync.uploadMedia(file,folder);
+      // If storage upload failed, convert to base64 for cross-device sync
+      if(!finalUrl){
+        finalUrl=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(URL.createObjectURL(file));r.readAsDataURL(file);});
+      }
       const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type};
       // Auto-detect duration
       if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
@@ -2638,20 +2641,22 @@ function NP({go}){
   const onLoaded=()=>{if(audioRef.current)setDur(audioRef.current.duration);};
   const onEnded=()=>{setP(false);updateMediaSession(false);setTimeout(()=>go("hw"),600);};
 
-  // Cleanup media session on unmount
+  // Cleanup media session on unmount — but DON'T stop audio (allow background playback)
   useEffect(()=>{
     return()=>{
-      if(audioRef.current){try{audioRef.current.pause();}catch(e){}}
-      if('mediaSession' in navigator){try{navigator.mediaSession.playbackState='none';}catch(e){}}
+      // Don't pause audio on unmount — let it play in background
+      // Only cleanup if not playing
+      if(audioRef.current&&!p){try{audioRef.current.pause();}catch(e){}}
+      // Don't clear media session — keep lock screen controls alive
     };
-  },[]);
+  },[p]);
 
   const hasMedia=!!curEp.mediaUrl;
   const isVideo=curEp.mediaType==='video';
 
   return(<div className="dc-slide-up" style={{height:"100%",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#1E3264 0%,#15244A 25%,#0D0D0D 55%)"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(8px, env(safe-area-inset-top)) 20px 8px"}}>
-      <button onClick={()=>{if(audioRef.current)try{audioRef.current.pause();}catch(e){}if('mediaSession' in navigator)try{navigator.mediaSession.playbackState='none';}catch(e){}go("series");}} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button onClick={()=>{go("series");}} style={{background:"none",border:"none",cursor:"pointer",padding:8,minWidth:44,minHeight:44}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.white} strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
       <div style={{textAlign:"center"}}><p style={{color:S.sub,fontSize:11,fontWeight:600,letterSpacing:1.5,margin:0}}>PLAYING FROM</p><p style={{color:S.white,fontSize:13,fontWeight:600,margin:"2px 0 0"}}>Tea Sessions</p></div>
       <div style={{width:38}}/>
     </div>
