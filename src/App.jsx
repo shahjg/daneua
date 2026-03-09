@@ -47,7 +47,7 @@ const sync={
   async saveLearn(user,xp,completed,streak,hearts){if(!supabase)return;try{await supabase.from('dc_learn_progress').upsert({user_name:user,xp,completed:JSON.stringify(completed),streak,hearts,updated_at:new Date().toISOString()},{onConflict:'user_name'});}catch{}},
   // Browse — Videos
   async loadBrowseVids(){if(!supabase)return null;try{const{data}=await supabase.from('dc_browse_vids').select('*').order('created_at',{ascending:true});return data;}catch{return null;}},
-  async addBrowseVid(item){if(!supabase)return;try{await supabase.from('dc_browse_vids').insert(item);}catch{}},
+  async addBrowseVid(item){if(!supabase){console.warn('No supabase for addBrowseVid');return;}try{const{error}=await supabase.from('dc_browse_vids').insert(item);if(error)console.error('addBrowseVid error:',error);}catch(e){console.error('addBrowseVid catch:',e);}},
   async deleteBrowseVid(id){if(!supabase)return;try{await supabase.from('dc_browse_vids').delete().eq('id',id);}catch{}},
   async updateBrowseVid(id,updates){if(!supabase)return;try{await supabase.from('dc_browse_vids').update(updates).eq('id',id);}catch{}},
   // Browse — Stories
@@ -57,8 +57,8 @@ const sync={
   async updateBrowseStory(id,updates){if(!supabase)return;try{await supabase.from('dc_browse_stories').update(updates).eq('id',id);}catch{}},
   // Browse — Q&A
   async loadBrowseQA(){if(!supabase)return null;try{const{data}=await supabase.from('dc_browse_qa').select('*').order('created_at',{ascending:false});return data;}catch{return null;}},
-  async addBrowseQA(q,from){if(!supabase)return;try{await supabase.from('dc_browse_qa').insert({question:q,from_user:from});}catch{}},
-  async answerBrowseQA(id,answer){if(!supabase)return;try{await supabase.from('dc_browse_qa').update({answer}).eq('id',id);}catch{}},
+  async addBrowseQA(q,from){if(!supabase){console.warn('No supabase for addBrowseQA');return;}try{const{error}=await supabase.from('dc_browse_qa').insert({question:q,from_user:from});if(error)console.error('addBrowseQA error:',error);}catch(e){console.error('addBrowseQA catch:',e);}},
+  async answerBrowseQA(id,answer){if(!supabase)return;try{const{error}=await supabase.from('dc_browse_qa').update({answer}).eq('id',id);if(error)console.error('answerBrowseQA error:',error);}catch(e){console.error('answerBrowseQA catch:',e);}},
   // Goals
   async loadGoals(){if(!supabase)return null;try{const{data}=await supabase.from('dc_goals').select('*').order('sort_order',{ascending:true});return data;}catch{return null;}},
   async addGoal(t,order){if(!supabase)return;try{await supabase.from('dc_goals').insert({t,sort_order:order});}catch{}},
@@ -1581,25 +1581,36 @@ function Browse({go}){
   const [ms,setMs]=useState([]);
   const [addingM,setAddingM]=useState(false);const [newM,setNewM]=useState("");const [newD,setNewD]=useState("");const [playVid,setPlayVid]=useState(null);
   // Supabase-synced Browse content
-  const [bVids,setBVids]=useState([]);
-  const [bStories,setBStories]=useState([]);
+  const [bVids,setBVids]=useState(()=>local.get('browse_vids',[]));
+  const [bStories,setBStories]=useState(()=>local.get('browse_stories',[]));
   const [bRecipes,setBRecipes]=useState([]);
-  const [bQA,setBQA]=useState([]);
+  const [bQA,setBQA]=useState(()=>local.get('browse_qa',[]));
   const [bWords,setBWords]=useState([]);
   const [loadingBrowse,setLoadingBrowse]=useState(true);
-  // Load from Supabase on mount
+  // Persist browse data to localStorage whenever it changes
+  useEffect(()=>{if(bVids.length)local.set('browse_vids',bVids);},[bVids]);
+  useEffect(()=>{if(bStories.length)local.set('browse_stories',bStories);},[bStories]);
+  useEffect(()=>{if(bQA.length)local.set('browse_qa',bQA);},[bQA]);
+  // Load from Supabase on mount — merge with localStorage
   useEffect(()=>{
     initSupabase.then(async()=>{
-      const [vids,stories,qa]=await Promise.all([
-        sync.loadBrowseVids(),sync.loadBrowseStories(),sync.loadBrowseQA()
-      ]);
-      if(vids)setBVids(vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id})));
-      if(stories)setBStories(stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id})));
-      if(qa)setBQA(qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id})));
-      // Migrate from localStorage if Supabase empty
-      if(!vids||!vids.length){const lv=local.get('browse_vids',[]);if(lv.length){setBVids(lv);lv.forEach(v=>sync.addBrowseVid({t:v.t,s:v.s||'',file_name:v.file,media_url:v.url,media_type:v.type,dur:v.dur}));}}
-      if(!stories||!stories.length){const ls=local.get('browse_stories',[]);if(ls.length){setBStories(ls);ls.forEach(s=>sync.addBrowseStory({t:s.t,s:s.s||'',file_name:s.file,media_url:s.url,media_type:s.media_type,dur:s.dur}));}}
-      if(!qa||!qa.length){const lq=local.get('browse_asked',[]);if(lq.length){setBQA(lq);lq.forEach(q=>sync.addBrowseQA(q.q,q.from||'dane'));}}
+      try{
+        const [vids,stories,qa]=await Promise.all([
+          sync.loadBrowseVids(),sync.loadBrowseStories(),sync.loadBrowseQA()
+        ]);
+        if(vids&&vids.length){
+          const mapped=vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id}));
+          setBVids(mapped);local.set('browse_vids',mapped);
+        }
+        if(stories&&stories.length){
+          const mapped=stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id}));
+          setBStories(mapped);local.set('browse_stories',mapped);
+        }
+        if(qa&&qa.length){
+          const mapped=qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id}));
+          setBQA(mapped);local.set('browse_qa',mapped);
+        }
+      }catch(e){console.error('Browse load error:',e);}
       setLoadingBrowse(false);
     });
   },[]);
@@ -1613,11 +1624,12 @@ function Browse({go}){
       setUploading(true);
       const folder=mediaType==='video'?'browse_vids':'browse_stories';
       let finalUrl=await sync.uploadMedia(file,folder);
-      // If storage upload failed, convert to base64 for cross-device sync
+      // If storage upload failed, convert to base64 so it persists
       if(!finalUrl){
-        finalUrl=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(URL.createObjectURL(file));r.readAsDataURL(file);});
+        finalUrl=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(null);r.readAsDataURL(file);});
       }
-      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type};
+      if(!finalUrl){setUploading(false);return;}
+      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type,id:Date.now()};
       // Auto-detect duration
       if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
         const el=document.createElement(file.type.startsWith('video/')?'video':'audio');
