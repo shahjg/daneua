@@ -1598,57 +1598,22 @@ function Browse({go}){
   const [ms,setMs]=useState([]);
   const [addingM,setAddingM]=useState(false);const [newM,setNewM]=useState("");const [newD,setNewD]=useState("");const [playVid,setPlayVid]=useState(null);
   // Supabase-synced Browse content
-  const [bVids,setBVids]=useState(()=>local.get('browse_vids',[]));
-  const [bStories,setBStories]=useState(()=>local.get('browse_stories',[]));
+  const [bVids,setBVids]=useState([]);
+  const [bStories,setBStories]=useState([]);
   const [bRecipes,setBRecipes]=useState([]);
-  const [bQA,setBQA]=useState(()=>local.get('browse_qa',[]));
+  const [bQA,setBQA]=useState([]);
   const [bWords,setBWords]=useState([]);
   const [loadingBrowse,setLoadingBrowse]=useState(true);
-  // Persist browse metadata to localStorage (without large media data)
-  useEffect(()=>{if(bVids.length)local.set('browse_vids',bVids.map(v=>({...v,url:v.mediaKey?'idb:'+v.mediaKey:v.url})));},[bVids]);
-  useEffect(()=>{if(bStories.length)local.set('browse_stories',bStories.map(s=>({...s,url:s.mediaKey?'idb:'+s.mediaKey:s.url})));},[bStories]);
-  useEffect(()=>{if(bQA.length)local.set('browse_qa',bQA);},[bQA]);
-  // Load from Supabase on mount — merge with localStorage
+  // Load ONLY from Supabase — single source of truth across all devices
   useEffect(()=>{
-    // Hydrate IndexedDB media for localStorage items
-    const hydrateMedia=async(items)=>{
-      const hydrated=[];
-      for(const item of items){
-        if(item.url&&item.url.startsWith('idb:')){
-          const key=item.url.slice(4);
-          const data=await mediaDB.load(key);
-          hydrated.push({...item,url:data||'',mediaKey:key});
-        }else{hydrated.push(item);}
-      }
-      return hydrated;
-    };
-    // Hydrate local items first (instant)
-    (async()=>{
-      const localVids=local.get('browse_vids',[]);
-      const localStories=local.get('browse_stories',[]);
-      if(localVids.length){const h=await hydrateMedia(localVids);setBVids(h);}
-      if(localStories.length){const h=await hydrateMedia(localStories);setBStories(h);}
-    })();
-    // Then try Supabase
     initSupabase.then(async()=>{
       try{
         const [vids,stories,qa]=await Promise.all([
           sync.loadBrowseVids(),sync.loadBrowseStories(),sync.loadBrowseQA()
         ]);
-        if(vids&&vids.length){
-          const mapped=vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id}));
-          const h=await hydrateMedia(mapped);
-          setBVids(h);
-        }
-        if(stories&&stories.length){
-          const mapped=stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id}));
-          const h=await hydrateMedia(mapped);
-          setBStories(h);
-        }
-        if(qa&&qa.length){
-          const mapped=qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id}));
-          setBQA(mapped);local.set('browse_qa',mapped);
-        }
+        if(vids&&vids.length)setBVids(vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id})));
+        if(stories&&stories.length)setBStories(stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id})));
+        if(qa&&qa.length)setBQA(qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id})));
       }catch(e){console.error('Browse load error:',e);}
       setLoadingBrowse(false);
     });
@@ -1662,30 +1627,28 @@ function Browse({go}){
       if(!file)return;
       setUploading(true);
       const folder=mediaType==='video'?'browse_vids':'browse_stories';
-      let finalUrl=await sync.uploadMedia(file,folder);
-      let mediaKey=null;
-      // If storage upload failed, save to IndexedDB (handles large files)
+      const finalUrl=await sync.uploadMedia(file,folder);
       if(!finalUrl){
-        const base64=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(null);r.readAsDataURL(file);});
-        if(!base64){setUploading(false);return;}
-        mediaKey='media_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-        await mediaDB.save(mediaKey,base64);
-        finalUrl=base64; // Use for immediate playback
+        alert('Upload failed — check your connection. Max file size: 50MB.');
+        setUploading(false);return;
       }
-      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type,id:Date.now(),mediaKey:mediaKey};
-      // Auto-detect duration
+      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type,id:Date.now()};
       if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
         const el=document.createElement(file.type.startsWith('video/')?'video':'audio');
         el.crossOrigin='anonymous';el.src=finalUrl;el.onloadedmetadata=()=>{
           const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);
           item.dur=m+":"+String(s).padStart(2,'0');
           setItems(prev=>[...prev,item]);
-          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type,dur:item.dur});
+          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type,dur:item.dur});
           setFormData({});setAddForm(null);setUploading(false);
-        };el.onerror=()=>{setItems(prev=>[...prev,item]);if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type});setFormData({});setAddForm(null);setUploading(false);};
+        };el.onerror=()=>{
+          setItems(prev=>[...prev,item]);
+          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});
+          setFormData({});setAddForm(null);setUploading(false);
+        };
       }else{
         setItems(prev=>[...prev,item]);
-        if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type});
+        if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});
         setFormData({});setAddForm(null);setUploading(false);
       }
     };
