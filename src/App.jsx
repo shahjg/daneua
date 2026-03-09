@@ -75,7 +75,24 @@ const UserCtx = createContext(null);
 const useUser = () => useContext(UserCtx);
 
 // localStorage helpers
-const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JSON.parse(v):f;}catch{return f;}},set(k,v){try{localStorage.setItem('dc_'+k,JSON.stringify(v));}catch{}}};
+const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JSON.parse(v):f;}catch{return f;}},set(k,v){try{localStorage.setItem('dc_'+k,JSON.stringify(v));}catch(e){console.warn('localStorage full:',k,e);}}};
+
+// IndexedDB for large media files (videos/audio) — no size limit
+const mediaDB={
+  _db:null,
+  async open(){
+    if(this._db)return this._db;
+    return new Promise((res,rej)=>{
+      const r=indexedDB.open('dc_media',1);
+      r.onupgradeneeded=()=>{r.result.createObjectStore('files');};
+      r.onsuccess=()=>{this._db=r.result;res(r.result);};
+      r.onerror=()=>rej(r.error);
+    });
+  },
+  async save(key,data){try{const db=await this.open();return new Promise((res)=>{const tx=db.transaction('files','readwrite');tx.objectStore('files').put(data,key);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);});}catch{return false;}},
+  async load(key){try{const db=await this.open();return new Promise((res)=>{const tx=db.transaction('files','readonly');const r=tx.objectStore('files').get(key);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null);});}catch{return null;}},
+  async remove(key){try{const db=await this.open();return new Promise((res)=>{const tx=db.transaction('files','readwrite');tx.objectStore('files').delete(key);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);});}catch{return false;}},
+};
 
 // Push notifications
 const notif={
@@ -1587,12 +1604,32 @@ function Browse({go}){
   const [bQA,setBQA]=useState(()=>local.get('browse_qa',[]));
   const [bWords,setBWords]=useState([]);
   const [loadingBrowse,setLoadingBrowse]=useState(true);
-  // Persist browse data to localStorage whenever it changes
-  useEffect(()=>{if(bVids.length)local.set('browse_vids',bVids);},[bVids]);
-  useEffect(()=>{if(bStories.length)local.set('browse_stories',bStories);},[bStories]);
+  // Persist browse metadata to localStorage (without large media data)
+  useEffect(()=>{if(bVids.length)local.set('browse_vids',bVids.map(v=>({...v,url:v.mediaKey?'idb:'+v.mediaKey:v.url})));},[bVids]);
+  useEffect(()=>{if(bStories.length)local.set('browse_stories',bStories.map(s=>({...s,url:s.mediaKey?'idb:'+s.mediaKey:s.url})));},[bStories]);
   useEffect(()=>{if(bQA.length)local.set('browse_qa',bQA);},[bQA]);
   // Load from Supabase on mount — merge with localStorage
   useEffect(()=>{
+    // Hydrate IndexedDB media for localStorage items
+    const hydrateMedia=async(items)=>{
+      const hydrated=[];
+      for(const item of items){
+        if(item.url&&item.url.startsWith('idb:')){
+          const key=item.url.slice(4);
+          const data=await mediaDB.load(key);
+          hydrated.push({...item,url:data||'',mediaKey:key});
+        }else{hydrated.push(item);}
+      }
+      return hydrated;
+    };
+    // Hydrate local items first (instant)
+    (async()=>{
+      const localVids=local.get('browse_vids',[]);
+      const localStories=local.get('browse_stories',[]);
+      if(localVids.length){const h=await hydrateMedia(localVids);setBVids(h);}
+      if(localStories.length){const h=await hydrateMedia(localStories);setBStories(h);}
+    })();
+    // Then try Supabase
     initSupabase.then(async()=>{
       try{
         const [vids,stories,qa]=await Promise.all([
@@ -1600,11 +1637,13 @@ function Browse({go}){
         ]);
         if(vids&&vids.length){
           const mapped=vids.map(v=>({t:v.t,s:v.s||'',file:v.file_name,url:v.media_url,type:v.media_type,dur:v.dur,id:v.id}));
-          setBVids(mapped);local.set('browse_vids',mapped);
+          const h=await hydrateMedia(mapped);
+          setBVids(h);
         }
         if(stories&&stories.length){
           const mapped=stories.map(s=>({t:s.t,s:s.s||'',file:s.file_name,url:s.media_url,type:s.media_type,dur:s.dur,id:s.id}));
-          setBStories(mapped);local.set('browse_stories',mapped);
+          const h=await hydrateMedia(mapped);
+          setBStories(h);
         }
         if(qa&&qa.length){
           const mapped=qa.map(q=>({q:q.question,a:q.answer||'',from:q.from_user,id:q.id}));
@@ -1624,12 +1663,16 @@ function Browse({go}){
       setUploading(true);
       const folder=mediaType==='video'?'browse_vids':'browse_stories';
       let finalUrl=await sync.uploadMedia(file,folder);
-      // If storage upload failed, convert to base64 so it persists
+      let mediaKey=null;
+      // If storage upload failed, save to IndexedDB (handles large files)
       if(!finalUrl){
-        finalUrl=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(null);r.readAsDataURL(file);});
+        const base64=await new Promise((res)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(null);r.readAsDataURL(file);});
+        if(!base64){setUploading(false);return;}
+        mediaKey='media_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        await mediaDB.save(mediaKey,base64);
+        finalUrl=base64; // Use for immediate playback
       }
-      if(!finalUrl){setUploading(false);return;}
-      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type,id:Date.now()};
+      const item={t:formData.t||file.name.replace(/\.[^.]+$/,''),s:formData.s||'',file:file.name,url:finalUrl,type:file.type,id:Date.now(),mediaKey:mediaKey};
       // Auto-detect duration
       if(file.type.startsWith('video/')||file.type.startsWith('audio/')){
         const el=document.createElement(file.type.startsWith('video/')?'video':'audio');
@@ -1637,12 +1680,12 @@ function Browse({go}){
           const m=Math.floor(el.duration/60);const s=Math.floor(el.duration%60);
           item.dur=m+":"+String(s).padStart(2,'0');
           setItems(prev=>[...prev,item]);
-          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type,dur:item.dur});
+          if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type,dur:item.dur});
           setFormData({});setAddForm(null);setUploading(false);
-        };el.onerror=()=>{setItems(prev=>[...prev,item]);if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});setFormData({});setAddForm(null);setUploading(false);};
+        };el.onerror=()=>{setItems(prev=>[...prev,item]);if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type});setFormData({});setAddForm(null);setUploading(false);};
       }else{
         setItems(prev=>[...prev,item]);
-        if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:item.url,media_type:item.type});
+        if(syncAdd)syncAdd({t:item.t,s:item.s,file_name:item.file,media_url:mediaKey||item.url,media_type:item.type});
         setFormData({});setAddForm(null);setUploading(false);
       }
     };
