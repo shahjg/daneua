@@ -77,6 +77,14 @@ const useUser = () => useContext(UserCtx);
 // localStorage helpers
 const local={get(k,f=null){try{const v=localStorage.getItem('dc_'+k);return v?JSON.parse(v):f;}catch{return f;}},set(k,v){try{localStorage.setItem('dc_'+k,JSON.stringify(v));}catch(e){console.warn('localStorage full:',k,e);}}};
 
+// Audio recording MIME type helper — iOS Safari doesn't support webm, needs mp4
+const getRecMimeType=()=>{
+  if(typeof MediaRecorder==='undefined')return '';
+  const types=['audio/mp4','audio/webm;codecs=opus','audio/webm'];
+  for(const t of types){if(MediaRecorder.isTypeSupported(t))return t;}
+  return '';
+};
+
 // IndexedDB for large media files (videos/audio) — no size limit
 const mediaDB={
   _db:null,
@@ -1333,7 +1341,8 @@ function Home({go}){
       setRecording(langKey);
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
       recStreamRef.current=stream;
-      const mr=new MediaRecorder(stream);
+      const recMime=getRecMimeType();
+      const mr=new MediaRecorder(stream,recMime?{mimeType:recMime}:undefined);
       mediaRecRef.current=mr;
       const chunks=[];
       mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
@@ -1341,7 +1350,7 @@ function Home({go}){
         recStreamRef.current=null;mediaRecRef.current=null;
         stream.getTracks().forEach(t=>t.stop());
         if(chunks.length===0){setRecording(null);return;}
-        const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'});
+        const blob=new Blob(chunks,{type:mr.mimeType||'audio/mp4'});
         const reader=new FileReader();
         reader.onload=()=>{
           const ad=reader.result;
@@ -2053,16 +2062,17 @@ function Learn({onLesson}){
               const existing=local.get(key,null);
               if(existing){
                 // Play existing recording
-                try{const a=new Audio(existing);a.play();}catch(e){}
+                try{const a=new Audio(existing);a.play().catch(()=>{});}catch(e){}
                 return;
               }
               try{
                 const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-                const mr=new MediaRecorder(stream);const chunks=[];
+                const recMime=getRecMimeType();
+                const mr=new MediaRecorder(stream,recMime?{mimeType:recMime}:undefined);const chunks=[];
                 mr.ondataavailable=e=>chunks.push(e.data);
                 mr.onstop=()=>{
                   stream.getTracks().forEach(t=>t.stop());
-                  const blob=new Blob(chunks,{type:'audio/webm'});
+                  const blob=new Blob(chunks,{type:mr.mimeType||'audio/mp4'});
                   const reader=new FileReader();
                   reader.onload=()=>{local.set(key,reader.result);};
                   reader.readAsDataURL(blob);
